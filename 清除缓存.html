@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>清除缓存</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+      text-align: center;
+    }
+    button {
+      background: #07C160;
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #06ad56;
+    }
+    .success {
+      color: #07C160;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>清除缓存并重置API</h1>
+    <p>点击按钮清除所有缓存数据，重置为最新的内置API配置</p>
+    <button onclick="clearCache()">清除缓存</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    function clearCache() {
+      // 清除所有localStorage
+      localStorage.clear()
+      
+      // 显示成功消息
+      document.getElementById('result').innerHTML = '<div class="success">✓ 缓存已清除！<br>请关闭此页面并刷新主页面</div>'
+      
+      // 3秒后自动关闭
+      setTimeout(() => {
+        window.close()
+      }, 3000)
+    }
+  </script>
+</body>
+</html>
+
+
+

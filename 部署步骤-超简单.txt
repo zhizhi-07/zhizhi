@@ -1,0 +1,23 @@
+【10秒部署到网上】
+
+1. 打开浏览器，访问这个网址：
+   https://app.netlify.com/drop
+
+2. 找到项目文件夹里的 dist 文件夹：
+   C:\Users\cl\Desktop\雾\dist
+
+3. 把 dist 文件夹拖到网页上
+
+4. 等待10-30秒
+
+5. 完成！你会得到一个网址，例如：
+   https://xxxxx.netlify.app
+
+就这么简单！不需要命令行！
+
+---
+
+dist文件夹已经生成好了，直接拖上去就行！
+
+
+

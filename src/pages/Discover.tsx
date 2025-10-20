@@ -1,0 +1,104 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { MomentsIcon, VideoChannelIcon, LiveIcon, LookIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon } from '../components/Icons'
+import EmojiManagement from '../components/EmojiManagement'
+
+// 表情包图标组件
+const EmojiIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+    <line x1="9" y1="9" x2="9.01" y2="9"/>
+    <line x1="15" y1="9" x2="15.01" y2="9"/>
+  </svg>
+)
+
+const Discover = () => {
+  const navigate = useNavigate()
+  const [showEmojiManagement, setShowEmojiManagement] = useState(false)
+  
+  const menuGroups = [
+    {
+      id: 1,
+      items: [
+        { id: 11, name: '朋友圈', Icon: MomentsIcon, path: '/moments' },
+        { id: 12, name: '视频号', Icon: VideoChannelIcon, path: '' },
+      ],
+    },
+    {
+      id: 2,
+      items: [
+        { id: 21, name: '直播', Icon: LiveIcon, path: '' },
+        { id: 22, name: '表情包', Icon: EmojiIcon, path: '', action: 'emoji' },
+      ],
+    },
+    {
+      id: 3,
+      items: [
+        { id: 31, name: '看一看', Icon: LookIcon, path: '' },
+        { id: 32, name: '搜一搜', Icon: SearchDiscoverIcon, path: '' },
+      ],
+    },
+    {
+      id: 4,
+      items: [
+        { id: 41, name: '小程序', Icon: MiniProgramIcon, path: '' },
+      ],
+    },
+  ]
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* 顶部标题栏 - 玻璃效果 */}
+      <div className="glass-effect px-5 py-4 border-b border-gray-200/50">
+        <h1 className="text-xl font-semibold text-gray-900">发现</h1>
+      </div>
+
+      {/* 发现列表 */}
+      <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3">
+        {menuGroups.map((group) => (
+          <div key={group.id} className="mb-3">
+            <div className="glass-card rounded-2xl overflow-hidden">
+              {group.items.map((item, index) => {
+                const Icon = item.Icon
+                return (
+                  <div key={item.id}>
+                    <div 
+                      onClick={() => {
+                        if (item.action === 'emoji') {
+                          setShowEmojiManagement(true)
+                        } else if (item.path) {
+                          navigate(item.path)
+                        }
+                      }}
+                      className="flex items-center px-4 py-4 ios-button cursor-pointer"
+                    >
+                      <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center flex-shrink-0 shadow-lg border border-gray-200/50">
+                        <Icon size={22} className="text-gray-600" />
+                      </div>
+                      <span className="ml-4 flex-1 text-gray-900 font-medium">
+                        {item.name}
+                      </span>
+                      <span className="text-gray-400 text-xl">›</span>
+                    </div>
+                    {index < group.items.length - 1 && (
+                      <div className="ml-16 border-b border-gray-100" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 表情包管理 */}
+      <EmojiManagement
+        show={showEmojiManagement}
+        onClose={() => setShowEmojiManagement(false)}
+      />
+    </div>
+  )
+}
+
+export default Discover

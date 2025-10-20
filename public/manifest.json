@@ -1,0 +1,59 @@
+{
+  "name": "微信 UI 克隆 - AI 聊天",
+  "short_name": "微信克隆",
+  "description": "一个功能完整的微信界面克隆，支持 AI 聊天、朋友圈、红包转账等功能",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#07C160",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "聊天界面"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "聊天",
+      "short_name": "聊天",
+      "description": "打开聊天列表",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icon-chat.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "朋友圈",
+      "short_name": "朋友圈",
+      "description": "查看朋友圈",
+      "url": "/moments",
+      "icons": [
+        {
+          "src": "/icon-moments.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
