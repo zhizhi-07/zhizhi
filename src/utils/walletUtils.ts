@@ -229,10 +229,15 @@ export const createCharacterIntimatePayRelation = (
   return true
 }
 
-// 获取单个亲密付关系
+// 获取单个亲密付关系（优先返回AI给用户的亲密付）
 export const getIntimatePayRelation = (characterId: string): IntimatePayRelation | null => {
   const relations = getIntimatePayRelations()
-  return relations.find(r => r.characterId === characterId) || null
+  // 优先查找AI给用户的亲密付（用于红包、转账等场景）
+  const characterToUser = relations.find(r => r.characterId === characterId && r.type === 'character_to_user')
+  if (characterToUser) return characterToUser
+  
+  // 如果没有，返回用户给AI的亲密付
+  return relations.find(r => r.characterId === characterId && r.type === 'user_to_character') || null
 }
 
 // 使用亲密付消费

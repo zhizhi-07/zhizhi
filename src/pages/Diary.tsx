@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { BackIcon } from '../components/Icons'
 import { getDiaries, generateDiary, saveDiary, deleteDiary, exportDiaries, Diary } from '../utils/diarySystem'
 import { useCharacter } from '../context/CharacterContext'
+import FlipPhotoCard from '../components/FlipPhotoCard'
 import diaryIcon from '../assets/diary-icon.png'
 import pencilIcon from '../assets/pencil-icon.png'
 import calendarIcon from '../assets/calendar-icon.png'
@@ -210,11 +211,27 @@ const DiaryPage = () => {
                 
                 {/* 日记内容 */}
                 <div
-                  className={`text-gray-800 leading-relaxed whitespace-pre-wrap ${
-                    expandedId === diary.id ? 'max-h-[600px] overflow-y-auto' : 'line-clamp-3'
+                  className={`text-gray-800 leading-relaxed ${
+                    expandedId === diary.id ? 'max-h-[600px] overflow-y-auto' : ''
                   }`}
                 >
-                  {diary.content}
+                  {diary.content.split(/(\[照片:.+?\])/).map((part, index) => {
+                    // 检查是否是照片标记
+                    const photoMatch = part.match(/\[照片:(.+?)\]/)
+                    if (photoMatch) {
+                      const description = photoMatch[1]
+                      return (
+                        <div key={index} className="my-3 flex justify-center">
+                          <FlipPhotoCard 
+                            description={description}
+                            messageId={Date.now() + index}
+                          />
+                        </div>
+                      )
+                    }
+                    // 普通文本，保留换行
+                    return <span key={index} className="whitespace-pre-wrap">{part}</span>
+                  })}
                 </div>
                 
                 {/* 展开/收起按钮 */}

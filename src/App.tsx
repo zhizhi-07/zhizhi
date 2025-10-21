@@ -8,6 +8,7 @@ import { ApiProvider } from './context/ApiContext'
 import { RedEnvelopeProvider } from './context/RedEnvelopeContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { BackgroundProvider } from './context/BackgroundContext'
+import { AccountingProvider } from './context/AccountingContext'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
 import MomentsSocialManager from './components/MomentsSocialManager'
@@ -48,6 +49,9 @@ import WalletHelp from './pages/WalletHelp'
 import Diary from './pages/Diary'
 import StreakDetail from './pages/StreakDetail'
 import About from './pages/About'
+import Accounting from './pages/Accounting'
+import AccountingChat from './pages/AccountingChat'
+import AddTransaction from './pages/AddTransaction'
 
 function App() {
   // 初始化性能监控
@@ -68,6 +72,7 @@ function App() {
               <MomentsProvider>
                 <MomentsSocialManager>
                   <RedEnvelopeProvider>
+                    <AccountingProvider>
                     <SettingsProvider>
                       <OfflineIndicator />
                       <Router>
@@ -108,9 +113,13 @@ function App() {
               <Route path="/diary/:id" element={<Diary />} />
               <Route path="/streak/:id" element={<StreakDetail />} />
               <Route path="/about" element={<About />} />
+              <Route path="/accounting" element={<Accounting />} />
+              <Route path="/accounting/chat" element={<AccountingChat />} />
+              <Route path="/accounting/add" element={<AddTransaction />} />
                   </Routes>
                 </Router>
                     </SettingsProvider>
+                    </AccountingProvider>
                   </RedEnvelopeProvider>
                 </MomentsSocialManager>
               </MomentsProvider>

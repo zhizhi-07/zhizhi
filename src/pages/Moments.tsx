@@ -17,12 +17,26 @@ const Moments = () => {
   })
 
   // 获取头像显示
-  const getAvatarDisplay = (avatar: string) => {
+  const getAvatarDisplay = (avatar: string, size: 'small' | 'medium' | 'large' = 'medium') => {
+    const sizeClasses = {
+      small: 'text-sm',
+      medium: 'text-base',
+      large: 'text-2xl'
+    }
+    
     if (avatar.startsWith('data:image')) {
       return <img src={avatar} alt="头像" className="w-full h-full object-cover" />
     }
-    // 使用文字代替emoji
-    return <div className="text-gray-700 text-base font-semibold">头像</div>
+    
+    // 如果是emoji，直接显示
+    if (avatar && avatar.length <= 4) {
+      return <div className={`${sizeClasses[size]}`}>{avatar}</div>
+    }
+    
+    // 否则显示首字母
+    return <div className="text-white text-base font-semibold bg-gradient-to-br from-blue-400 to-blue-600 w-full h-full flex items-center justify-center">
+      {avatar?.[0] || '用'}
+    </div>
   }
 
   // 格式化时间
@@ -109,7 +123,7 @@ const Moments = () => {
   return (
     <div className="h-screen overflow-y-auto hide-scrollbar bg-gray-50">
       {/* 顶部封面区域 */}
-      <div className="relative h-80 bg-gray-200 overflow-hidden">
+      <div className="relative h-80 bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden">
         {/* 封面背景 */}
         <div 
           className="absolute inset-0 bg-gray-300 cursor-pointer group"
@@ -122,8 +136,8 @@ const Moments = () => {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center">
-              <div className="text-gray-500 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+              <div className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg">
                 点击上传封面图片
               </div>
             </div>
@@ -156,23 +170,23 @@ const Moments = () => {
         {/* 用户信息 */}
          <div className="absolute bottom-6 right-4 flex items-center gap-3 z-10">
            <div className="text-right max-w-[200px]">
-             <h2 className="text-gray-800 font-semibold text-lg drop-shadow-sm mb-1">
+             <h2 className="text-white font-semibold text-lg drop-shadow-lg mb-1">
                {currentUser?.name || '微信用户'}
              </h2>
              {currentUser?.signature && (
-               <p className="text-gray-600 text-xs drop-shadow-sm line-clamp-2">
+               <p className="text-white/90 text-xs drop-shadow-lg line-clamp-2">
                  {currentUser.signature}
                </p>
              )}
            </div>
-          <div className="w-20 h-20 rounded-2xl glass-card flex items-center justify-center shadow-2xl overflow-hidden border-4 border-white/30">
-            {currentUser && getAvatarDisplay(currentUser.avatar)}
+          <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-2xl overflow-hidden border-4 border-white/50">
+            {currentUser && getAvatarDisplay(currentUser.avatar, 'large')}
           </div>
         </div>
       </div>
 
       {/* 朋友圈动态列表 */}
-      <div className="bg-gray-50/50">
+      <div className="bg-white pb-20">
         {moments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
             <p className="text-sm">暂无动态</p>
@@ -181,12 +195,12 @@ const Moments = () => {
         ) : (
           <div>
             {moments.map((moment) => (
-              <div key={moment.id} className="bg-white/90 backdrop-blur-sm border-b border-gray-100/50 p-4">
+              <div key={moment.id} className="bg-white border-b border-gray-100 p-4 hover:bg-gray-50/50 transition-colors">
                 {/* 动态头部 */}
                 <div className="flex items-start gap-3 mb-3">
                   {/* 用户头像 */}
-                  <div className="w-12 h-12 rounded-xl bg-blue-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
-                    {getAvatarDisplay(moment.userAvatar)}
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                    {getAvatarDisplay(moment.userAvatar, 'medium')}
                   </div>
                   
                   <div className="flex-1">
@@ -240,7 +254,7 @@ const Moments = () => {
 
                 {/* 点赞和评论区域 */}
                 {(moment.likes.length > 0 || moment.comments.length > 0) && (
-                  <div className="ml-15 bg-gray-50/80 backdrop-blur-sm rounded-lg p-3 space-y-2">
+                  <div className="ml-[60px] bg-gray-50 rounded-lg p-3 space-y-2">
                     {/* 点赞列表 */}
                     {moment.likes.length > 0 && (
                       <div className="flex items-start gap-2">
@@ -282,7 +296,7 @@ const Moments = () => {
                 )}
 
                 {/* 操作栏 */}
-                <div className="flex items-center justify-end gap-4 mt-3 ml-15">
+                <div className="flex items-center justify-end gap-4 mt-3 ml-[60px]">
                   <button 
                     onClick={() => handleLike(moment.id)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ios-button transition-colors ${
@@ -310,7 +324,7 @@ const Moments = () => {
 
                 {/* 评论输入框 */}
                 {showCommentInput === moment.id && (
-                  <div className="mt-3 ml-15">
+                  <div className="mt-3 ml-[60px]">
                     <div className="glass-card rounded-xl p-3">
                       {/* 显示正在回复谁 */}
                       {replyToUser && (

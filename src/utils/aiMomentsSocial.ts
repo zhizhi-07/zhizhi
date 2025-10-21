@@ -364,12 +364,12 @@ export const triggerAIReactToComment = async (
   likeMoment: (momentId: string, userId: string, userName: string, userAvatar: string) => void,
   addComment: (momentId: string, userId: string, userName: string, userAvatar: string, content: string) => void
 ) => {
-  // 获取所有启用了AI朋友圈功能的角色（排除刚评论的角色和发布者）
+  // 获取所有启用了AI朋友圈功能的角色（排除刚评论的角色）
+  // 如果是用户评论了AI的朋友圈，AI本身可以回复
   const enabledCharacters = allCharacters.filter(char => {
     const enabled = localStorage.getItem(`ai_moments_enabled_${char.id}`)
-    return enabled === 'true' && 
-           char.name !== newCommentUserName && 
-           char.id !== moment.userId
+    // 只排除刚评论的角色，不排除发布者（这样AI可以回复自己朋友圈下的评论）
+    return enabled === 'true' && char.name !== newCommentUserName
   })
   
   // 获取已有的评论内容，用于去重

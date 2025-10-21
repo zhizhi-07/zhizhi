@@ -625,7 +625,6 @@ AI: "我今天加班到很晚"
   // 从角色描述中提取初始记忆
   async extractInitialMemories(characterDescription: string): Promise<void> {
     if (this.initialMemoriesExtracted) {
-      console.log('💭 初始记忆已提取过，跳过')
       return
     }
 

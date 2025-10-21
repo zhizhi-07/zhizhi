@@ -14,6 +14,8 @@ const PublishMoment = () => {
   const [content, setContent] = useState('')
   const [location, setLocation] = useState('')
   const [showLocationInput, setShowLocationInput] = useState(false)
+  const [images, setImages] = useState<Array<{id: string, url: string}>>([])
+  const [isPublishing, setIsPublishing] = useState(false)
 
   // 触发AI角色查看朋友圈（批量处理，只调用一次API）
   const triggerAIInteractions = async (momentId: string, momentData: any) => {
@@ -103,15 +105,56 @@ const PublishMoment = () => {
     }
   }
 
-  const handlePublish = () => {
+  // 处理图片上传
+  const handleImageUpload = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.multiple = true
+    input.onchange = (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || [])
+      if (files.length === 0) return
+      
+      // 最多9张图片
+      const remainingSlots = 9 - images.length
+      const filesToProcess = files.slice(0, remainingSlots)
+      
+      filesToProcess.forEach(file => {
+        if (file.size > 5 * 1024 * 1024) {
+          alert('图片大小不能超过5MB')
+          return
+        }
+        
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          const imageData = event.target?.result as string
+          setImages(prev => [...prev, {
+            id: `img_${Date.now()}_${Math.random()}`,
+            url: imageData
+          }])
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+    input.click()
+  }
+  
+  // 删除图片
+  const handleRemoveImage = (imageId: string) => {
+    setImages(prev => prev.filter(img => img.id !== imageId))
+  }
+
+  const handlePublish = async () => {
     if (!currentUser || !content.trim()) return
+    
+    setIsPublishing(true)
 
     const momentData = {
       userId: currentUser.id,
       userName: currentUser.name,
       userAvatar: currentUser.avatar,
       content: content.trim(),
-      images: [],
+      images: images,
       location: location.trim() || undefined
     }
 
@@ -130,9 +173,9 @@ const PublishMoment = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-white">
       {/* 顶部导航栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 sticky top-0 z-10">
         <button 
           onClick={() => navigate('/moments', { replace: true })}
           className="flex items-center gap-2 text-gray-700 ios-button"
@@ -143,17 +186,17 @@ const PublishMoment = () => {
         <h1 className="text-lg font-semibold text-gray-900">发表文字</h1>
         <button 
           onClick={handlePublish}
-          disabled={!content.trim()}
-          className="px-4 py-1.5 rounded-full glass-effect text-blue-600 text-sm font-medium ios-button disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!content.trim() || isPublishing}
+          className="px-4 py-1.5 rounded-full bg-green-500 text-white text-sm font-medium ios-button disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          发表
+          {isPublishing ? '发布中...' : '发表'}
         </button>
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
+      <div className="flex-1 overflow-y-auto hide-scrollbar p-4 bg-gray-50">
         {/* 文字输入 */}
-        <div className="glass-card rounded-2xl p-4 mb-4">
+        <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -165,17 +208,51 @@ const PublishMoment = () => {
         </div>
 
         {/* 图片上传区域 */}
-        <div className="glass-card rounded-2xl p-4 mb-4">
-          <button className="w-full aspect-square max-w-[120px] rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 ios-button hover:border-blue-400 hover:text-blue-400 transition-colors">
-            <div className="text-center">
-              <ImageIcon size={32} className="mx-auto mb-2" />
-              <span className="text-xs">添加图片</span>
+        {images.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <div className="grid grid-cols-3 gap-2">
+              {images.map((image) => (
+                <div key={image.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100">
+                  <img src={image.url} alt="" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => handleRemoveImage(image.id)}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/50 text-white flex items-center justify-center text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {images.length < 9 && (
+                <button 
+                  onClick={handleImageUpload}
+                  className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 ios-button hover:border-blue-400 hover:text-blue-400 transition-colors"
+                >
+                  <div className="text-center">
+                    <ImageIcon size={24} className="mx-auto mb-1" />
+                    <span className="text-xs">添加</span>
+                  </div>
+                </button>
+              )}
             </div>
-          </button>
-        </div>
+          </div>
+        )}
+        
+        {images.length === 0 && (
+          <div className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <button 
+              onClick={handleImageUpload}
+              className="w-full aspect-square max-w-[120px] rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 ios-button hover:border-blue-400 hover:text-blue-400 transition-colors"
+            >
+              <div className="text-center">
+                <ImageIcon size={32} className="mx-auto mb-2" />
+                <span className="text-xs">添加图片</span>
+              </div>
+            </button>
+          </div>
+        )}
 
         {/* 功能选项 */}
-        <div className="glass-card rounded-2xl overflow-hidden">
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
           <button 
             onClick={() => setShowLocationInput(!showLocationInput)}
             className="w-full flex items-center justify-between px-4 py-4 ios-button"

@@ -46,25 +46,10 @@ interface MomentsContextType {
 
 const MomentsContext = createContext<MomentsContextType | undefined>(undefined)
 
-// 默认示例数据
-const defaultMoments: Moment[] = [
-  {
-    id: '1',
-    userId: '1',
-    userName: '微信用户',
-    userAvatar: 'default',
-    content: '今天天气不错，出来走走',
-    images: [],
-    likes: [],
-    comments: [],
-    createdAt: new Date(Date.now() - 3600000).toISOString()
-  }
-]
-
 export const MomentsProvider = ({ children }: { children: ReactNode }) => {
   const [moments, setMoments] = useState<Moment[]>(() => {
     const saved = localStorage.getItem('moments')
-    return saved ? JSON.parse(saved) : defaultMoments
+    return saved ? JSON.parse(saved) : []
   })
 
   useEffect(() => {

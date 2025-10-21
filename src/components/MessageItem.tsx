@@ -405,7 +405,7 @@ const MessageItem = ({
 
   // 语音消息
   if (message.messageType === 'voice' && message.voiceText) {
-    const duration = Math.min(Math.max(Math.ceil(message.voiceText.length / 3), 1), 60)
+    const duration = Math.min(Math.max(Math.ceil(message.voiceText.length / 5), 1), 60)
     const isPlaying = playingVoiceId === message.id
     const showText = showVoiceTextMap[message.id]
 

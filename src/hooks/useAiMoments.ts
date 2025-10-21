@@ -19,20 +19,14 @@ export const useAiMoments = (characterId: string) => {
     return saved === 'true'
   }
 
-  // AI主动发布朋友圈
+  // AI主动发布朋友圈（由AI自己决定是否发布）
   const triggerAiPost = async () => {
     if (!character || !isAiMomentsEnabled() || isProcessingRef.current) return
-
-    const now = Date.now()
-    const timeSinceLastPost = now - lastPostTimeRef.current
-
-    // 至少间隔10分钟才能发布新朋友圈（缩短间隔）
-    if (timeSinceLastPost < 10 * 60 * 1000) return
 
     isProcessingRef.current = true
 
     try {
-      console.log(`🤖 ${character.name} 正在准备发布朋友圈...`)
+      console.log(`🤖 ${character.name} 正在考虑是否发布朋友圈...`)
       
       const content = await aiPostMoment(
         character.id,
@@ -50,12 +44,14 @@ export const useAiMoments = (characterId: string) => {
           images: []
         })
         
-        lastPostTimeRef.current = now
+        lastPostTimeRef.current = Date.now()
         console.log(`✅ ${character.name} 发布了朋友圈: ${content}`)
         console.log(`🔔 触发其他AI查看 ${character.name} 的朋友圈`)
         
         // AI发布朋友圈后，其他AI也会看到并可能互动
         // 这个会由useMomentsSocial Hook自动处理
+      } else {
+        console.log(`😶 ${character.name} 暂时不想发朋友圈`)
       }
     } catch (error) {
       console.error('AI发布朋友圈失败:', error)
@@ -130,7 +126,7 @@ export const useAiMoments = (characterId: string) => {
     }
   }
 
-  // 定时检查并执行AI朋友圈操作
+  // 监听聊天消息，在聊天后触发AI朋友圈活动
   useEffect(() => {
     if (!isAiMomentsEnabled()) {
       console.log(`🚫 AI朋友圈功能未启用 (角色ID: ${characterId})`)
@@ -139,39 +135,23 @@ export const useAiMoments = (characterId: string) => {
 
     console.log(`✅ AI朋友圈功能已启用 (角色: ${character?.name})`)
     
-    // 随机延迟30秒-2分钟后首次执行（缩短测试时间）
-    const initialDelay = (0.5 + Math.random() * 1.5) * 60 * 1000
-    console.log(`⏰ 首次检查将在 ${Math.ceil(initialDelay / 1000)} 秒后执行`)
-    
-    const initialTimer = setTimeout(() => {
-      console.log(`🎬 开始首次AI朋友圈活动`)
-      // 优先互动用户朋友圈
-      triggerAiInteract()
+    // 监听聊天消息变化，在聊天后触发朋友圈活动
+    const chatMessages = localStorage.getItem(`chat_messages_${characterId}`)
+    if (chatMessages) {
+      const messages = JSON.parse(chatMessages)
+      const lastMessage = messages[messages.length - 1]
       
-      // 30秒后可能发布自己的朋友圈
-      setTimeout(() => {
-        if (Math.random() < 0.3) {
+      // 如果最近有聊天（5分钟内），考虑发布朋友圈
+      if (lastMessage && Date.now() - (lastMessage.timestamp || 0) < 5 * 60 * 1000) {
+        // 延迟1-3分钟后考虑发布朋友圈（让AI有时间"思考"）
+        const delay = (1 + Math.random() * 2) * 60 * 1000
+        const timer = setTimeout(() => {
+          console.log(`💭 ${character?.name} 在聊天后考虑发布朋友圈...`)
           triggerAiPost()
-        }
-      }, 30000)
-    }, initialDelay)
-
-    // 每5分钟检查一次（缩短测试时间）
-    const interval = setInterval(() => {
-      // 70%概率互动朋友圈（提高互动概率）
-      if (Math.random() < 0.7) {
-        triggerAiInteract()
+        }, delay)
+        
+        return () => clearTimeout(timer)
       }
-      
-      // 20%概率发布朋友圈
-      if (Math.random() < 0.2) {
-        triggerAiPost()
-      }
-    }, 5 * 60 * 1000)
-
-    return () => {
-      clearTimeout(initialTimer)
-      clearInterval(interval)
     }
   }, [characterId, character?.name, moments])
 

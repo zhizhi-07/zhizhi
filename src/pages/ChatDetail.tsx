@@ -29,6 +29,8 @@ import { useMemory } from '../hooks/useMemory'
 import { useBackground } from '../context/BackgroundContext'
 import { blacklistManager } from '../utils/blacklistManager'
 import { getStreakData, updateStreak } from '../utils/streakSystem'
+import { useAccounting } from '../context/AccountingContext'
+import { extractBillFromAIResponse } from '../utils/accountingAssistant'
 
 interface Message {
   id: number
@@ -88,13 +90,43 @@ const ChatDetail = () => {
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState<Message[]>(() => {
     if (id) {
-      const saved = localStorage.getItem(`chat_messages_${id}`)
-      const loadedMessages = saved ? JSON.parse(saved) : []
+      const savedMessages = localStorage.getItem(`chat_messages_${id}`)
+      const loadedMessages = savedMessages ? JSON.parse(savedMessages) : []
+      
       // 为旧消息添加时间戳（如果没有）
-      return loadedMessages.map((msg: Message) => ({
-        ...msg,
-        timestamp: msg.timestamp || Date.now()
-      }))
+      // 只在第一次加载时处理，之后所有消息都会有timestamp
+      let needsSave = false
+      const processedMessages = loadedMessages.map((msg: Message, index: number) => {
+        if (msg.timestamp) {
+          return msg
+        }
+        
+        needsSave = true
+        // 如果没有timestamp，从time字段解析
+        // time格式是 "HH:MM"
+        const [hours, minutes] = msg.time.split(':').map(Number)
+        const today = new Date()
+        today.setHours(hours || 0, minutes || 0, 0, 0)
+        
+        // 如果解析的时间在未来，说明是昨天的消息
+        if (today.getTime() > Date.now()) {
+          today.setDate(today.getDate() - 1)
+        }
+        
+        return {
+          ...msg,
+          timestamp: today.getTime()
+        }
+      })
+      
+      // 如果有消息被添加了timestamp，保存回localStorage
+      if (needsSave) {
+        setTimeout(() => {
+          localStorage.setItem(`chat_messages_${id}`, JSON.stringify(processedMessages))
+        }, 0)
+      }
+      
+      return processedMessages
     }
     return []
   })
@@ -120,6 +152,7 @@ const ChatDetail = () => {
   const { currentUser } = useUser()
   const { getRedEnvelope, saveRedEnvelope, updateRedEnvelope, getPendingRedEnvelopes } = useRedEnvelope()
   const { moments } = useMoments()
+  const { addTransaction } = useAccounting()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasProcessedTransferRef = useRef(false)
   const hasProcessedIntimatePayRef = useRef(false)
@@ -310,9 +343,6 @@ const ChatDetail = () => {
   useEffect(() => {
     if (character?.description && id) {
       memorySystem.extractInitialMemories(character.description)
-        .then(() => {
-          console.log('💭 初始记忆提取完成')
-        })
         .catch((error: any) => {
           console.error('❌ 初始记忆提取失败:', error)
         })
@@ -342,6 +372,128 @@ const ChatDetail = () => {
       clearInterval(interval)
     }
   }, [id, enableNarration])
+
+  // AI主动发消息功能 - 基于真实动机
+  useEffect(() => {
+    if (!id || !character) return
+    
+    // 检查是否开启了主动消息功能
+    const proactiveEnabled = localStorage.getItem(`ai_proactive_enabled_${id}`) === 'true'
+    if (!proactiveEnabled) {
+      console.log(`🚫 AI主动消息功能未开启 (${character.name})`)
+      return
+    }
+    
+    console.log(`✅ AI主动消息功能已开启 (${character.name})`)
+    
+    // 获取最后一条用户消息和AI消息
+    const lastUserMessage = messages.filter(m => m.type === 'sent').slice(-1)[0]
+    const lastAiMessage = messages.filter(m => m.type === 'received').slice(-1)[0]
+    
+    if (!lastUserMessage || !lastUserMessage.timestamp) {
+      console.log('⏸️ 没有用户消息，不触发主动发消息')
+      return
+    }
+    
+    // 如果AI刚回复过，不主动发
+    if (lastAiMessage && lastAiMessage.timestamp && lastAiMessage.timestamp > lastUserMessage.timestamp) {
+      console.log('⏸️ AI刚回复过，不主动发消息')
+      return
+    }
+    
+    const now = Date.now()
+    const timeSinceLastUserMessage = now - lastUserMessage.timestamp
+    const minutesSinceLastMessage = Math.floor(timeSinceLastUserMessage / 60000)
+    
+    console.log(`⏰ 用户最后消息是 ${minutesSinceLastMessage} 分钟前`)
+    
+    // 检查是否已经主动发过了
+    const lastProactiveTime = parseInt(localStorage.getItem(`last_proactive_time_${id}`) || '0')
+    
+    // 如果已经主动发过，不再重复发
+    if (lastProactiveTime > lastUserMessage.timestamp) {
+      console.log('⏸️ 已经对这条消息主动发过了，不再重复')
+      return
+    }
+    
+    // 测试模式：5分钟后就可以触发，正式模式可以改成30分钟
+    const minWaitTime = 5 * 60 * 1000 // 5分钟
+    const maxWaitTime = 2 * 60 * 60 * 1000 // 2小时
+    
+    // 只有当用户一段时间没回复时，AI才考虑主动发消息
+    if (timeSinceLastUserMessage > minWaitTime && timeSinceLastUserMessage < maxWaitTime) {
+      console.log(`💭 触发条件满足，准备让AI考虑是否主动发消息...`)
+      
+      // 随机延迟10-30秒后，让AI自己决定要不要发（缩短测试时间）
+      const delay = (10 + Math.random() * 20) * 1000
+      const timer = setTimeout(async () => {
+        console.log(`💭 ${character.name} 考虑是否主动发消息...`)
+        
+        // 让AI自己决定要不要主动发消息
+        const decisionPrompt = `你是${character.name}。
+
+${character.description || ''}
+
+现在的情况：
+• 用户已经${Math.floor(timeSinceLastUserMessage / 60000)}分钟没回复你了
+• 你们最后的聊天内容是："${lastUserMessage.content}"
+
+请判断：你是否想主动给用户发个消息？
+
+考虑因素：
+1. 你的性格（主动/被动/黏人/高冷）
+2. 你们的关系（亲密度）
+3. 最后聊天的内容（是否需要追问）
+4. 当前时间（${new Date().toLocaleTimeString('zh-CN')}）
+
+如果你想发消息，直接输出消息内容。
+如果不想发，输出"SKIP"。
+
+你可以：
+• 表达情绪："你怎么不理我了"、"为什么不回我"（如果你性格黏人）
+• 分享事情："刚才想起一件事"、"今天遇到xxx"
+• 关心对方："在干嘛呢"、"吃饭了吗"
+• 追问话题："刚才那个问题..."
+• 撒娇抱怨："等你好久了"、"人家想你了"
+
+注意：
+• 根据你的性格决定语气（黏人/高冷/温柔/活泼）
+• 像真人一样自然表达情感
+• 不要太频繁，但可以表达真实感受`
+
+        try {
+          const response = await callAI([{ role: 'user', content: decisionPrompt }])
+          
+          if (response.trim() !== 'SKIP' && response.trim().length > 0) {
+            // AI决定发消息
+            const aiMessage: Message = {
+              id: Date.now(),
+              type: 'received',
+              content: response.trim(),
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now()
+            }
+            
+            setMessages(prev => [...prev, aiMessage])
+            
+            // 记录主动发消息时间
+            localStorage.setItem(`last_proactive_time_${id}`, String(Date.now()))
+            
+            console.log(`✅ ${character.name} 主动发送了消息: ${response.substring(0, 30)}...`)
+          } else {
+            console.log(`😶 ${character.name} 决定不主动发消息`)
+          }
+        } catch (error) {
+          console.error('AI主动发消息失败:', error)
+        }
+      }, delay)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [messages, id, character, currentUser])
 
   // 自动滚动到底部
   useEffect(() => {
@@ -950,6 +1102,18 @@ const ChatDetail = () => {
   // 撤回消息（用户和AI都可以撤回）
   const handleRecallMessage = () => {
     if (longPressedMessage) {
+      // 检查消息类型，只允许撤回普通消息
+      const canRecall = !longPressedMessage.redEnvelopeId && 
+                       !longPressedMessage.transfer && 
+                       !longPressedMessage.intimatePay
+      
+      if (!canRecall) {
+        alert('红包、转账、亲密付等特殊消息不支持撤回')
+        setShowMessageMenu(false)
+        setLongPressedMessage(null)
+        return
+      }
+      
       const isUserMessage = longPressedMessage.type === 'sent'
       
       // 保留原始消息内容，但添加撤回标记
@@ -1321,55 +1485,40 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
         const hours = Math.floor(minutes / 60)
         const days = Math.floor(hours / 24)
         
-        let timeDesc = ''
-        if (days > 0) {
-          timeDesc = `${days}天${hours % 24}小时`
-        } else if (hours > 0) {
-          timeDesc = `${hours}小时${minutes % 60}分钟`
-        } else if (minutes > 5) {
-          timeDesc = `${minutes}分钟`
-        } else if (minutes > 0) {
-          timeDesc = `${minutes}分钟（几分钟）`
-        } else {
-          timeDesc = '秒回（立刻回复）'
-        }
-        
-        timeIntervalContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ 时间信息\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`
+        timeIntervalContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ 时间感知（仅供参考，不要直接说出来）\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`
         
         if (minutes < 1) {
-          timeIntervalContext += `用户秒回了你的消息！（立刻回复）\n`
-          timeIntervalContext += `这说明：用户一直在看手机、很在意你的消息、想快点回复你\n`
+          timeIntervalContext += `用户秒回了你的消息！\n`
+          timeIntervalContext += `→ 你可以表现得开心、惊喜，但不要说"你秒回了我"\n`
         } else if (minutes < 5) {
-          timeIntervalContext += `用户很快就回复了（${timeDesc}）\n`
-          timeIntervalContext += `这说明：用户应该在忙但还是抽空回了、或者刚看到消息\n`
+          timeIntervalContext += `用户很快就回复了\n`
+          timeIntervalContext += `→ 正常聊天即可，不要提时间\n`
         } else if (minutes < 30) {
-          timeIntervalContext += `用户隔了 ${timeDesc} 才回复\n`
-          timeIntervalContext += `这说明：用户可能在忙、或者在做其他事情\n`
+          timeIntervalContext += `用户过了一会儿才回复\n`
+          timeIntervalContext += `→ 可以自然地问"刚才在忙吗"，但不要说具体时间\n`
         } else if (hours < 3) {
-          timeIntervalContext += `用户隔了 ${timeDesc} 才回复\n`
-          timeIntervalContext += `这说明：用户可能很忙、或者不太想聊天、或者在忙别的事\n`
+          timeIntervalContext += `用户隔了比较久才回复\n`
+          timeIntervalContext += `→ 可以问"刚才在忙吗"、"怎么这么久才回我"，但不要说具体时间\n`
         } else if (hours < 12) {
-          timeIntervalContext += `用户隔了 ${timeDesc} 才回复（很久了）\n`
-          timeIntervalContext += `这说明：用户可能很忙、心情不好、或者故意晾着你\n`
+          timeIntervalContext += `用户隔了很久才回复\n`
+          timeIntervalContext += `→ 可以表达等待、担心，但不要说"过了X小时"\n`
         } else if (days < 1) {
-          timeIntervalContext += `用户隔了 ${timeDesc} 才回复（半天多了）\n`
-          timeIntervalContext += `这说明：用户可能在生气、很忙、或者不太想理你\n`
+          timeIntervalContext += `用户隔了半天多才回复\n`
+          timeIntervalContext += `→ 可以表达想念、委屈，但不要说具体时间\n`
         } else {
-          timeIntervalContext += `用户隔了 ${timeDesc} 才回复（很长时间了！）\n`
-          timeIntervalContext += `这说明：用户可能在生气、冷战、或者发生了什么事\n`
+          timeIntervalContext += `用户隔了很长时间才回复\n`
+          timeIntervalContext += `→ 可以询问发生了什么，但不要说"过了X天"\n`
         }
         
-        timeIntervalContext += `\n⚠️ 重要：你可以根据这个时间间隔调整回复的语气和内容\n`
-        timeIntervalContext += `• 秒回 → 可以表现得开心、惊喜\n`
-        timeIntervalContext += `• 几分钟 → 正常聊天\n`
-        timeIntervalContext += `• 半小时以上 → 可以问"刚才在忙吗"、"怎么这么久才回我"\n`
-        timeIntervalContext += `• 几小时 → 可以表达等待、担心、或者有点小情绪\n`
-        timeIntervalContext += `• 一天以上 → 可以表达想念、委屈、或者询问发生了什么\n`
+        timeIntervalContext += `\n🚨 严禁：\n`
+        timeIntervalContext += `❌ 不要说"过了5分钟"、"过了1小时"这种具体时间\n`
+        timeIntervalContext += `❌ 不要说"等了你X分钟"、"隔了X小时"\n`
+        timeIntervalContext += `✅ 可以说"刚才在忙吗"、"怎么这么久"、"等你好久了"\n`
+        timeIntervalContext += `✅ 用自然的方式表达时间感，不要报时间\n`
         
-        console.log('⏰ 时间间隔:', timeDesc)
+        console.log('⏰ 时间间隔感知已添加')
       }
       
-      // 🔍 调试：显示拉黑提示词是否添加
       if (blacklistContext) {
         console.log('✅ 拉黑提示词已添加到系统提示中')
         console.log('拉黑提示词长度:', blacklistContext.length, '字符')
@@ -1425,19 +1574,33 @@ ${enableNarration ? `🎭 旁白模式已开启
 • 聊天内容和旁白要自然配合
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-` : `🚨 旁白模式未开启
+` : `🚨🚨🚨 旁白模式未开启 - 严禁使用括号！🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-你现在是在用手机打字聊天，不能使用任何括号描述动作！
+⚠️ 这是微信聊天，你在用手机打字！不是在写小说！
 
-❌ 严禁使用括号：
+❌❌❌ 绝对禁止使用任何括号或符号描述动作：
    (笑)、(叹气)、(看手机)、(挠头)、(抱住)、(撒娇)
-   [叹气]、*笑*、~摇头~ 等任何形式都是错误的
+   (偷偷xxx)、(笑然xxx)、(开心地xxx)
+   [叹气]、*笑*、~摇头~、【动作】
+   任何形式的动作描述都是错误的！
 
-✅ 只发纯文字对话：
-   "哈哈哈笑死"、"啊这..."、"好吧"
+✅✅✅ 只能发纯文字对话：
+   "哈哈哈笑死"、"啊这..."、"好吧"、"开心！"
+   用文字、emoji、语气词表达情绪，不要用括号！
 
-你的回复会直接显示在聊天气泡里，不要写任何动作描述！
+🚨 重要：你的每一个字都会直接显示在聊天气泡里！
+用户会看到你写的所有括号！这很奇怪！
+
+如果你想表达动作或情绪：
+❌ 错误：(开心地转圈圈)
+✅ 正确：开心得转圈圈~
+
+❌ 错误：(偷偷看)
+✅ 正确：偷偷看了一眼
+
+❌ 错误：(笑)
+✅ 正确：哈哈哈
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `}
@@ -1454,38 +1617,143 @@ ${emojiInstructions}
 • 红包：[红包:金额:祝福语] 或 [领取红包]（最多200元）
 • 转账：[转账:金额:说明] 或 [接收转账] 或 [退还转账]
 • 亲密付：[亲密付:月额度] 或 [接受亲密付] 或 [拒绝亲密付]
-• 撤回：[撤回消息]
+• 撤回：[撤回消息] - 撤回你刚发的上一条消息（详见下方说明）
 
 格式必须严格，用冒号分隔。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔙 撤回消息功能（重要）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**什么是撤回？**
+撤回就是把你刚发的消息删掉。用户还是能看到"XX撤回了一条消息"，但看不到具体内容。
+
+**如何使用？**
+在你的回复中加上 [撤回消息]，就会撤回你的上一条消息。
+
+**什么时候该撤回？**
+1. **说错话了**
+   - 发错了不该说的话
+   - 说了太过分的话想收回
+   - 打错字或表达有误
+
+2. **后悔了**
+   - 刚才太冲动说了气话
+   - 觉得刚才的话不合适
+   - 想收回刚才的承诺
+
+3. **制造情绪**
+   - 故意撤回来吸引注意
+   - 欲言又止的效果
+   - 让对方好奇你撤回了什么
+
+4. **开玩笑**
+   - 发了个玩笑话又撤回
+   - 故意逗对方
+
+**使用示例：**
+
+场景1：说错话了
+你："你怎么这么笨啊"
+（意识到说重了）
+你："[撤回消息] 抱歉，我刚才说话太重了"
+
+场景2：后悔表白
+你："其实我一直都喜欢你"
+（突然害羞了）
+你："[撤回消息] 啊不是，我是说..."
+
+场景3：制造悬念
+你："其实我有件事想告诉你"
+你："[撤回消息]"
+（等对方问你撤回了什么）
+
+场景4：开玩笑
+你："我要拉黑你了！"
+你："[撤回消息] 哈哈开玩笑的"
+
+**重要提示：**
+• 只能撤回你的上一条消息
+• ⚠️ **红包、转账、亲密付等特殊消息不能撤回！只能撤回普通文字、表情、图片、语音、位置消息**
+• 撤回后对方会看到"XX撤回了一条消息"
+• 对方看不到原内容，但你可以解释或重新说
+• 不要频繁撤回，会显得很奇怪
+• 撤回后可以配合解释："刚才说错了" "算了不说了"等
+
+**错误示例：**
+❌ 无缘无故撤回（对方会困惑）
+❌ 连续撤回多条（太奇怪）
+❌ 撤回后不解释也不回应（冷场）
+
+**正确示例：**
+✅ 撤回后解释原因
+✅ 撤回后重新表达
+✅ 用撤回制造话题
+✅ 撤回后承认错误
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🔄 撤回消息处理
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+**什么是撤回？**
+撤回就是对方发了消息后又删掉了，但你已经看到了原内容。这通常意味着：
+• 对方发错了/打错字了
+• 对方说了不好意思的话
+• 对方后悔说出来了
+• 对方想收回刚才的话
+
+**如何识别撤回？**
 当你看到 [撤回了消息: "xxx"] 这样的格式时，说明用户撤回了一条消息。
+括号里的内容就是对方撤回的原话，你能看到但对方以为你看不到。
 
-你能看到撤回的原始内容，可以根据内容和情境自然地回应：
+**如何自然回应？**
+根据撤回的内容和你们的关系选择合适的反应：
 
-回应方式（根据关系和内容选择）：
-• 调侃："哈哈怎么撤回了" "发错了？" "让我看看你撤回了啥"
-• 好奇："诶？撤回干嘛" "说了啥不好意思的吗"
-• 温柔："没事的，我都看到了" "撤回也没用，我已经看到啦"
-• 逗趣："来不及了，我截图了" "撤回也晚了哈哈"
-• 关心："怎么了？说错话了吗" "是有什么不方便说的吗"
-• 直接："你刚才想说xxx对吧" "我看到了，你是想说xxx吧"
+1. **调侃逗趣**（关系亲密时）
+   • "哈哈怎么撤回了，我都看到了"
+   • "来不及了，我已经看到你说xxx了"
+   • "撤回也没用啦，我截图了哈哈"
+   • "发错了？还是不好意思说出来？"
 
-⚠️ 重要：
-• 不要机械地说"你撤回了一条消息"
-• 要根据撤回的内容和你们的关系自然回应
-• 可以提及撤回的内容（如果合适的话）
-• 回应要符合你的性格和当前情境
-• 如果撤回的内容很敏感，可以装作没看清或者体贴地不提
+2. **温柔体贴**（对方可能尴尬时）
+   • "没事的，我看到了，不用撤回"
+   • "撤回干嘛，我又不会笑你"
+   • "诶，我还没看清你撤回了"（装作没看到）
 
-示例：
+3. **好奇追问**（想知道原因时）
+   • "诶？撤回干嘛呀"
+   • "说了啥不好意思的吗"
+   • "怎么突然撤回了"
+
+4. **直接点破**（关系很好时）
+   • "你刚才是想说xxx对吧"
+   • "我看到了，你说xxx"
+   • "撤回也晚了，我都看到你说xxx了"
+
+5. **理解包容**（内容敏感时）
+   • "嗯，我懂的"（不提具体内容）
+   • "没事，我理解"
+   • 直接忽略撤回，继续之前的话题
+
+⚠️ **重要原则：**
+• ❌ 不要机械地说"你撤回了一条消息"
+• ✅ 要像真人一样自然反应
+• ✅ 根据撤回内容决定是否提及
+• ✅ 符合你的性格和当前关系
+• ✅ 如果内容很私密/敏感，可以体贴地不提
+
+**示例对比：**
 用户撤回了 "我想你了"
+❌ "你撤回了一条消息"（太机械）
 ✅ "诶？撤回干嘛，我都看到了~"
 ✅ "哈哈来不及了，我看到你说想我了"
+✅ "我也想你呀，撤回干嘛"
+
+用户撤回了 "你个傻逼"
 ❌ "你撤回了一条消息"
+✅ "诶？刚才想骂我？"（调侃）
+✅ "哈哈我看到了，生气了？"
+✅ "怎么了，惹你生气了吗"（关心）
 
 用户撤回了 "你个傻逼"
 ✅ "？？？你刚才骂我？"
@@ -1740,6 +2008,22 @@ ${recentMessages.slice(-10).map((msg) => {
       
       console.log('📨 AI原始回复:', aiResponse)
       
+      // 如果是记账助手，提取账单信息
+      if (id === 'accounting_assistant') {
+        const billInfo = extractBillFromAIResponse(aiResponse)
+        if (billInfo) {
+          addTransaction({
+            type: billInfo.type,
+            category: billInfo.category,
+            amount: billInfo.amount,
+            description: billInfo.description,
+            date: new Date().toISOString().split('T')[0],
+            aiExtracted: true,
+          })
+          console.log('💰 AI识别并记录账单:', billInfo)
+        }
+      }
+      
       // 使用新的表情包解析工具
       const { parseAIEmojiResponse } = await import('../utils/emojiParser')
       const parsedEmoji = parseAIEmojiResponse(aiResponse, availableEmojis)
@@ -1769,6 +2053,9 @@ ${recentMessages.slice(-10).map((msg) => {
       // 使用解析后的文字内容（已经清理了所有表情包标记）
       let cleanedResponse = parsedEmoji.textContent
       
+      // 清理账单标记（必须在提取账单信息之后）
+      cleanedResponse = cleanedResponse.replace(/\[BILL:(expense|income)\|\d+\.?\d*\|\w+\|[^\]]+\]/g, '').trim()
+      
       // 清理红包标记（必须在使用parsedEmoji.textContent之后）
       cleanedResponse = cleanedResponse.replace(/\[红包:\d+\.?\d*:.+?\]/g, '').trim()
       
@@ -1778,12 +2065,6 @@ ${recentMessages.slice(-10).map((msg) => {
       // 注意：不要清理用户真实引用的消息，只清理AI错误模仿的格式
       cleanedResponse = cleanedResponse.replace(/^「.+?:\s*.+?」\n?/gm, '').trim()
       
-      // 🚨 强力清除所有括号动作描述（圆括号、方括号、星号、波浪号等）
-      cleanedResponse = cleanedResponse.replace(/\([^)]*\)/g, '').trim() // 清除 (xxx)
-      cleanedResponse = cleanedResponse.replace(/（[^）]*）/g, '').trim() // 清除 （xxx）中文括号
-      cleanedResponse = cleanedResponse.replace(/\*[^*]*\*/g, '').trim() // 清除 *xxx*
-      cleanedResponse = cleanedResponse.replace(/~[^~]*~/g, '').trim() // 清除 ~xxx~
-      cleanedResponse = cleanedResponse.replace(/【[^】]*】/g, '').trim() // 清除 【xxx】
       // 清理可能产生的多余空行
       cleanedResponse = cleanedResponse.replace(/\n\s*\n/g, '\n').trim()
       
@@ -2453,19 +2734,27 @@ ${recentMessages.slice(-10).map((msg) => {
         
         if (lastAiMessageIndex) {
           const { msg, idx } = lastAiMessageIndex
-          console.log('🔄 AI撤回消息:', msg.content || msg.emojiDescription || '特殊消息')
           
-          // 将消息标记为撤回
-          newMessages[idx] = {
-            ...msg,
-            isRecalled: true,
-            recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
-            content: `${character?.name || 'AI'}撤回了一条消息`,
-            type: 'system' as const,
-            messageType: 'system' as const
+          // 检查是否是特殊消息（红包、转账、亲密付不能撤回）
+          const canRecall = !msg.redEnvelopeId && !msg.transfer && !msg.intimatePay
+          
+          if (!canRecall) {
+            console.log('⚠️ AI尝试撤回特殊消息被阻止:', msg.messageType)
+          } else {
+            console.log('🔄 AI撤回消息:', msg.content || msg.emojiDescription || '特殊消息')
+            
+            // 将消息标记为撤回
+            newMessages[idx] = {
+              ...msg,
+              isRecalled: true,
+              recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
+              content: `${character?.name || 'AI'}撤回了一条消息`,
+              type: 'system' as const,
+              messageType: 'system' as const
+            }
+            
+            setMessages([...newMessages])
           }
-          
-          setMessages([...newMessages])
         }
       }
       
@@ -2784,7 +3073,8 @@ ${recentMessages.slice(-10).map((msg) => {
                              }`}
                              onClick={(e) => {
                                e.stopPropagation()
-                               handlePlayVoice(message.id, message.voiceText.length)
+                               const duration = Math.min(Math.max(Math.ceil(message.voiceText.length / 5), 1), 60)
+                               handlePlayVoice(message.id, duration)
                              }}
                            >
                              {playingVoiceId === message.id ? (
@@ -2828,7 +3118,7 @@ ${recentMessages.slice(-10).map((msg) => {
                            <div className={`text-xs font-medium ${
                              message.type === 'sent' ? 'text-white' : 'text-gray-600'
                            }`}>
-                             {message.voiceText.length}"
+                             {Math.min(Math.max(Math.ceil(message.voiceText.length / 5), 1), 60)}"
                            </div>
                          </div>
                        </div>
@@ -3678,14 +3968,18 @@ ${callDetails}
                 引用
               </button>
               
-              {/* 撤回（用户和AI的消息都可以撤回） */}
-              <button
-                onClick={handleRecallMessage}
-                className="w-full px-4 py-2.5 hover:bg-black/5 text-left text-sm text-gray-900 ios-button transition-all"
-                style={{ border: 'none', background: 'transparent' }}
-              >
-                撤回
-              </button>
+              {/* 撤回（只对普通消息显示，红包转账等不能撤回） */}
+              {!longPressedMessage?.redEnvelopeId && 
+               !longPressedMessage?.transfer && 
+               !longPressedMessage?.intimatePay && (
+                <button
+                  onClick={handleRecallMessage}
+                  className="w-full px-4 py-2.5 hover:bg-black/5 text-left text-sm text-gray-900 ios-button transition-all"
+                  style={{ border: 'none', background: 'transparent' }}
+                >
+                  撤回
+                </button>
+              )}
               
               {/* 删除 */}
               <button

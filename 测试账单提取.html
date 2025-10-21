@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>测试账单提取</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-case {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>账单提取测试工具</h1>
+    
+    <div>
+        <h2>测试AI回复</h2>
+        <textarea id="testInput" style="width: 100%; height: 100px; padding: 10px; font-size: 14px;" placeholder="粘贴AI的完整回复..."></textarea>
+        <button onclick="testExtraction()">测试提取</button>
+        <button onclick="checkLocalStorage()">查看本地账单</button>
+        <button onclick="clearTransactions()">清空账单</button>
+    </div>
+    
+    <div id="result"></div>
+    
+    <h2>标准测试用例</h2>
+    <div id="testCases"></div>
+
+    <script>
+        // 提取函数（复制自代码）
+        function extractBillFromAIResponse(response) {
+            const billPattern = /\[BILL:(expense|income)\|(\d+\.?\d*)\|(\w+)\|([^\]]+)\]/;
+            const match = response.match(billPattern);
+            
+            if (!match) return null;
+            
+            const [, type, amount, category, description] = match;
+            
+            return {
+                type: type,
+                amount: parseFloat(amount),
+                category,
+                description: description.trim(),
+                cleanResponse: response.replace(billPattern, '').trim()
+            };
+        }
+
+        function testExtraction() {
+            const input = document.getElementById('testInput').value;
+            const result = extractBillFromAIResponse(input);
+            
+            const resultDiv = document.getElementById('result');
+            if (result) {
+                resultDiv.innerHTML = `
+                    <div class="test-case success">
+                        <h3>✅ 提取成功！</h3>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                        <p><strong>显示给用户的内容：</strong></p>
+                        <pre>${result.cleanResponse}</pre>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="test-case fail">
+                        <h3>❌ 提取失败</h3>
+                        <p>AI回复中没有找到 [BILL:...] 标记</p>
+                        <p><strong>原始回复：</strong></p>
+                        <pre>${input}</pre>
+                    </div>
+                `;
+            }
+        }
+
+        function checkLocalStorage() {
+            const transactions = localStorage.getItem('accounting_transactions');
+            const resultDiv = document.getElementById('result');
+            
+            if (transactions) {
+                const parsed = JSON.parse(transactions);
+                resultDiv.innerHTML = `
+                    <div class="test-case">
+                        <h3>📊 本地账单数据（共 ${parsed.length} 条）</h3>
+                        <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="test-case fail">
+                        <h3>❌ 没有找到账单数据</h3>
+                        <p>localStorage 中没有 accounting_transactions</p>
+                    </div>
+                `;
+            }
+        }
+
+        function clearTransactions() {
+            if (confirm('确定要清空所有账单吗？')) {
+                localStorage.removeItem('accounting_transactions');
+                alert('已清空账单数据');
+                checkLocalStorage();
+            }
+        }
+
+        // 运行标准测试用例
+        function runStandardTests() {
+            const testCases = [
+                {
+                    name: '奶茶消费',
+                    input: '好的，已经帮你记录了！餐饮消费20元，备注：买了一杯奶茶。今天喝奶茶啦～[BILL:expense|20|food|买了一杯奶茶]',
+                    expected: { type: 'expense', amount: 20, category: 'food' }
+                },
+                {
+                    name: '螺蛳粉消费',
+                    input: '哇！三块钱真的好划算啊～已经帮你记录好了：餐饮消费3元，备注：一碗螺蛳粉。这么便宜的螺蛳粉是在哪里买的呀？[BILL:expense|3|food|一碗螺蛳粉]',
+                    expected: { type: 'expense', amount: 3, category: 'food' }
+                },
+                {
+                    name: '打车消费',
+                    input: '好的！交通15元已记录。记得注意安全哦～[BILL:expense|15|transport|打车回家]',
+                    expected: { type: 'expense', amount: 15, category: 'transport' }
+                },
+                {
+                    name: '工资收入',
+                    input: '恭喜恭喜！工资5000元已记录～这个月要好好规划哦[BILL:income|5000|salary|工资]',
+                    expected: { type: 'income', amount: 5000, category: 'salary' }
+                },
+                {
+                    name: '没有标记（正常聊天）',
+                    input: '怎么啦？发生什么事了吗？跟我说说吧～',
+                    expected: null
+                }
+            ];
+
+            const testCasesDiv = document.getElementById('testCases');
+            testCasesDiv.innerHTML = testCases.map(tc => {
+                const result = extractBillFromAIResponse(tc.input);
+                const success = tc.expected === null 
+                    ? result === null 
+                    : result && result.type === tc.expected.type && result.amount === tc.expected.amount;
+                
+                return `
+                    <div class="test-case ${success ? 'success' : 'fail'}">
+                        <h3>${success ? '✅' : '❌'} ${tc.name}</h3>
+                        <p><strong>输入：</strong></p>
+                        <pre>${tc.input}</pre>
+                        <p><strong>提取结果：</strong></p>
+                        <pre>${result ? JSON.stringify(result, null, 2) : 'null'}</pre>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 页面加载时运行测试
+        runStandardTests();
+    </script>
+</body>
+</html>

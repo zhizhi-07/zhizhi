@@ -213,9 +213,9 @@ const ChatSettings = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+      <div className="sticky top-0 z-10 bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200 shadow-sm">
         <button
           onClick={() => navigate(-1)}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
@@ -229,7 +229,7 @@ const ChatSettings = () => {
       </div>
 
       {/* 设置内容 */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3">
+      <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3 pb-20">
         {/* 角色信息 */}
         <div className="mb-3">
           <div className="px-4 py-2">
@@ -593,6 +593,56 @@ const ChatSettings = () => {
                   }`}
                 />
               </div>
+            </button>
+          </div>
+        </div>
+
+        {/* 危险操作 */}
+        <div className="mb-3">
+          <div className="px-4 py-2">
+            <span className="text-sm text-red-600 font-medium">危险操作</span>
+            <p className="text-xs text-gray-400 mt-1">以下操作不可恢复，请谨慎操作</p>
+          </div>
+          <div className="glass-card rounded-2xl overflow-hidden">
+            <button
+              onClick={() => {
+                if (confirm(`确定要清除与 ${character.name} 的所有聊天记录吗？\n\n将会清除：\n• 所有聊天消息\n• TA的日记\n• AI记忆\n• 记忆总结\n• 续火花记录\n\n此操作不可恢复！`)) {
+                  if (confirm('再次确认：真的要清除所有数据吗？')) {
+                    // 清除聊天消息
+                    localStorage.removeItem(`chat_messages_${id}`)
+                    // 清除日记
+                    localStorage.removeItem(`diaries_${id}`)
+                    // 清除记忆
+                    localStorage.removeItem(`memories_${id}`)
+                    localStorage.removeItem(`memory_summary_${id}`)
+                    localStorage.removeItem(`initial_memories_extracted_${id}`)
+                    // 清除续火花
+                    localStorage.removeItem(`streak_data_${id}`)
+                    // 清除对话轮数
+                    localStorage.removeItem(`conversation_rounds_${id}`)
+                    
+                    alert('✅ 所有聊天记录已清除！')
+                    // 返回聊天页面
+                    navigate(`/chat/${id}`)
+                  }
+                }
+              }}
+              className="w-full px-4 py-4 flex items-center justify-between ios-button hover:bg-red-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-red-600">清除聊天记录</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    删除所有消息、日记、记忆等数据
+                  </div>
+                </div>
+              </div>
+              <span className="text-red-400 text-xl">›</span>
             </button>
           </div>
         </div>
