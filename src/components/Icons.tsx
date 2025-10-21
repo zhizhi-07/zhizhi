@@ -313,3 +313,11 @@ export const AccountBookIcon = ({ size = 24, className = '' }: IconProps) => (
   </svg>
 )
 
+export const ShakeIcon = ({ size = 24, className = '' }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <rect x="7" y="4" width="10" height="16" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M11 5h2M11 19h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M4 8l-2 2 2 2M20 8l2 2-2 2M4 14l-2 2 2 2M20 14l2 2-2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MomentsIcon, VideoChannelIcon, LiveIcon, LookIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon } from '../components/Icons'
+import { MomentsIcon, VideoChannelIcon, LiveIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon, ShakeIcon } from '../components/Icons'
 import EmojiManagement from '../components/EmojiManagement'
 
 // 表情包图标组件
@@ -29,13 +29,13 @@ const Discover = () => {
       id: 2,
       items: [
         { id: 21, name: '直播', Icon: LiveIcon, path: '' },
-        { id: 22, name: '表情包', Icon: EmojiIcon, path: '', action: 'emoji' },
+        { id: 22, name: '摇一摇', Icon: ShakeIcon, path: '/shake' },
       ],
     },
     {
       id: 3,
       items: [
-        { id: 31, name: '看一看', Icon: LookIcon, path: '' },
+        { id: 31, name: '表情包', Icon: EmojiIcon, path: '', action: 'emoji' },
         { id: 32, name: '搜一搜', Icon: SearchDiscoverIcon, path: '' },
       ],
     },

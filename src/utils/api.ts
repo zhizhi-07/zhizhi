@@ -60,7 +60,7 @@ async function callOpenAIFormatAPI(messages: Message[], settings: ApiSettings): 
       temperature: settings.temperature ?? 0.7,
       max_tokens: settings.maxTokens || 2000
     })
-  }, 15000)
+  }, 300000)
 
   if (!response.ok) {
     const errorText = await response.text()
@@ -122,7 +122,7 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
         maxOutputTokens: settings.maxTokens || 2000
       }
     })
-  }, 15000)
+  }, 300000)
 
   if (!response.ok) {
     const errorText = await response.text()

@@ -9,6 +9,8 @@ import { RedEnvelopeProvider } from './context/RedEnvelopeContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { BackgroundProvider } from './context/BackgroundContext'
 import { AccountingProvider } from './context/AccountingContext'
+import { GroupProvider } from './context/GroupContext'
+import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
 import MomentsSocialManager from './components/MomentsSocialManager'
@@ -52,6 +54,11 @@ import About from './pages/About'
 import Accounting from './pages/Accounting'
 import AccountingChat from './pages/AccountingChat'
 import AddTransaction from './pages/AddTransaction'
+import GroupList from './pages/GroupList'
+import CreateGroup from './pages/CreateGroup'
+import GroupChatDetail from './pages/GroupChatDetail'
+import GroupSettings from './pages/GroupSettings'
+import ShakeShake from './pages/ShakeShake'
 
 function App() {
   // 初始化性能监控
@@ -69,6 +76,8 @@ function App() {
           <ApiProvider>
           <UserProvider>
             <CharacterProvider>
+              <GroupProvider>
+              <GroupRedEnvelopeProvider>
               <MomentsProvider>
                 <MomentsSocialManager>
                   <RedEnvelopeProvider>
@@ -116,6 +125,11 @@ function App() {
               <Route path="/accounting" element={<Accounting />} />
               <Route path="/accounting/chat" element={<AccountingChat />} />
               <Route path="/accounting/add" element={<AddTransaction />} />
+              <Route path="/group-list" element={<GroupList />} />
+              <Route path="/create-group" element={<CreateGroup />} />
+              <Route path="/group/:id" element={<GroupChatDetail />} />
+              <Route path="/group-settings/:id" element={<GroupSettings />} />
+              <Route path="/shake" element={<ShakeShake />} />
                   </Routes>
                 </Router>
                     </SettingsProvider>
@@ -123,6 +137,8 @@ function App() {
                   </RedEnvelopeProvider>
                 </MomentsSocialManager>
               </MomentsProvider>
+              </GroupRedEnvelopeProvider>
+              </GroupProvider>
             </CharacterProvider>
           </UserProvider>
           </ApiProvider>

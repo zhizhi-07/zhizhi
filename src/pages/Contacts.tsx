@@ -8,7 +8,7 @@ const Contacts = () => {
 
   const specialContacts = [
     { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/create-character' },
-    { id: 2, name: '群聊', Icon: GroupIcon, path: '' },
+    { id: 2, name: '群聊', Icon: GroupIcon, path: '/group-list' },
     { id: 3, name: '标签', Icon: TagIcon, path: '' },
   ]
 

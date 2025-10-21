@@ -395,19 +395,6 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* 更新日志 */}
-        <div className="mb-3">
-          <div className="glass-card rounded-2xl overflow-hidden">
-            <div 
-              onClick={() => navigate('/changelog')}
-              className="flex items-center justify-between px-4 py-4 ios-button cursor-pointer"
-            >
-              <span className="text-gray-900 font-medium">更新日志</span>
-              <span className="text-gray-400 text-xl">›</span>
-            </div>
-          </div>
-        </div>
-
         {/* 退出登录 */}
         <div className="mb-6">
           <button className="w-full glass-card rounded-2xl px-4 py-4 text-red-500 font-medium ios-button">
