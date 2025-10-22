@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>检查主动发消息开关</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .result {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 8px;
+      background: #f5f5f5;
+    }
+    .enabled {
+      background: #d4edda;
+      color: #155724;
+    }
+    .disabled {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 检查 AI 主动发消息开关</h1>
+  
+  <div id="results"></div>
+  
+  <h2>操作</h2>
+  <button onclick="checkAll()">刷新检查</button>
+  <button onclick="enableAll()">全部开启</button>
+  <button onclick="disableAll()">全部关闭</button>
+  
+  <script>
+    function checkAll() {
+      const results = document.getElementById('results');
+      results.innerHTML = '<h2>检查结果：</h2>';
+      
+      // 获取所有相关的 localStorage 键
+      const keys = Object.keys(localStorage);
+      const proactiveKeys = keys.filter(k => k.includes('ai_proactive_enabled_'));
+      
+      if (proactiveKeys.length === 0) {
+        results.innerHTML += '<div class="result disabled">❌ 没有找到任何角色的主动发消息设置</div>';
+        return;
+      }
+      
+      proactiveKeys.forEach(key => {
+        const characterId = key.replace('ai_proactive_enabled_', '');
+        const enabled = localStorage.getItem(key) === 'true';
+        const className = enabled ? 'enabled' : 'disabled';
+        const icon = enabled ? '✅' : '❌';
+        
+        results.innerHTML += `
+          <div class="result ${className}">
+            ${icon} 角色 ID: ${characterId}<br>
+            状态: ${enabled ? '已开启' : '未开启'}<br>
+            <button onclick="toggle('${key}')">切换</button>
+          </div>
+        `;
+      });
+    }
+    
+    function toggle(key) {
+      const current = localStorage.getItem(key) === 'true';
+      localStorage.setItem(key, String(!current));
+      checkAll();
+    }
+    
+    function enableAll() {
+      const keys = Object.keys(localStorage);
+      const proactiveKeys = keys.filter(k => k.includes('ai_proactive_enabled_'));
+      proactiveKeys.forEach(key => {
+        localStorage.setItem(key, 'true');
+      });
+      alert('✅ 已全部开启！');
+      checkAll();
+    }
+    
+    function disableAll() {
+      const keys = Object.keys(localStorage);
+      const proactiveKeys = keys.filter(k => k.includes('ai_proactive_enabled_'));
+      proactiveKeys.forEach(key => {
+        localStorage.setItem(key, 'false');
+      });
+      alert('❌ 已全部关闭！');
+      checkAll();
+    }
+    
+    // 页面加载时自动检查
+    checkAll();
+  </script>
+</body>
+</html>

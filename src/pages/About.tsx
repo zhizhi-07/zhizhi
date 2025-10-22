@@ -12,6 +12,25 @@ const About = () => {
   // 更新日志数据（按时间倒序）
   const updateLogs = [
     {
+      version: 'v1.0.2',
+      date: '2025-10-22',
+      summary: 'AI热梗系统上线',
+      changes: [
+        '新增AI热梗系统：智能识别和使用网络流行语',
+        '大幅优化AI提示词，提升对话质量和自然度',
+        '优化群聊和单聊回复逻辑',
+        '修复AI无法发送亲密付',
+        '修复功能标记显示到聊天中',
+        '修复记忆系统重复提取',
+        '修复发送消息自动触发AI回复',
+        '新增直播交互骨架（功能待完善）',
+        '增加谁是卧底游戏',
+        '增加五子棋游戏',
+        '增加热梗小程序',
+        '增加续火花小程序'
+      ]
+    },
+    {
       version: 'v1.0.1',
       date: '2025-10-21',
       summary: '群聊与摇一摇',
@@ -103,7 +122,7 @@ const About = () => {
           <div className="text-center mb-4">
             <img src={appIcon} alt="汁汁" className="w-24 h-24 mx-auto mb-4 object-contain" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">汁汁</h2>
-            <div className="text-gray-500">v1.0.1</div>
+            <div className="text-gray-500">v1.0.2</div>
           </div>
         </div>
         

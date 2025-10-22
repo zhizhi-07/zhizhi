@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BackIcon, CameraIcon, LikeIcon, CommentIcon, MoreVerticalIcon, HeartFilledIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
 import { useMoments } from '../context/MomentsContext'
+import { ImageViewer } from '../components/ImageViewer'
 
 const Moments = () => {
   const navigate = useNavigate()
@@ -15,6 +16,9 @@ const Moments = () => {
     // 从localStorage读取封面图片
     return localStorage.getItem('moments_cover_image') || ''
   })
+  const [viewerImages, setViewerImages] = useState<string[]>([])
+  const [viewerIndex, setViewerIndex] = useState(0)
+  const [showViewer, setShowViewer] = useState(false)
 
   // 获取头像显示
   const getAvatarDisplay = (avatar: string, size: 'small' | 'medium' | 'large' = 'medium') => {
@@ -120,6 +124,13 @@ const Moments = () => {
     input.click()
   }
 
+  // 打开图片查看器
+  const handleImageClick = (images: string[], index: number) => {
+    setViewerImages(images)
+    setViewerIndex(index)
+    setShowViewer(true)
+  }
+
   return (
     <div className="h-screen overflow-y-auto hide-scrollbar bg-gray-50">
       {/* 顶部封面区域 */}
@@ -222,8 +233,12 @@ const Moments = () => {
                         moment.images.length === 3 ? 'grid-cols-3' :
                         'grid-cols-3'
                       }`}>
-                        {moment.images.map((image) => (
-                          <div key={image.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100">
+                        {moment.images.map((image, index) => (
+                          <div 
+                            key={image.id} 
+                            className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => handleImageClick(moment.images.map(img => img.url), index)}
+                          >
                             <img 
                               src={image.url} 
                               alt="" 
@@ -371,6 +386,15 @@ const Moments = () => {
           </div>
         )}
       </div>
+
+      {/* 图片查看器 */}
+      {showViewer && (
+        <ImageViewer
+          images={viewerImages}
+          initialIndex={viewerIndex}
+          onClose={() => setShowViewer(false)}
+        />
+      )}
     </div>
   )
 }

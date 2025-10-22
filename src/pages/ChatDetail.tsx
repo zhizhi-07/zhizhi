@@ -342,12 +342,22 @@ const ChatDetail = () => {
   // 从角色描述中提取初始记忆（只执行一次）
   useEffect(() => {
     if (character?.description && id) {
-      memorySystem.extractInitialMemories(character.description)
-        .catch((error: any) => {
-          console.error('❌ 初始记忆提取失败:', error)
-        })
+      // 检查是否已经提取过初始记忆
+      const hasExtracted = localStorage.getItem(`memory_initial_extracted_${id}`)
+      if (!hasExtracted) {
+        memorySystem.extractInitialMemories(character.description)
+          .then(() => {
+            localStorage.setItem(`memory_initial_extracted_${id}`, 'true')
+            console.log('✅ 初始记忆提取完成')
+          })
+          .catch((error: any) => {
+            console.error('❌ 初始记忆提取失败:', error)
+          })
+      }
     }
-  }, [character?.description, id, memorySystem])
+    // ⚠️ 不要把 memorySystem 加入依赖，会导致疯狂重复提取！
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [character?.description, id])
 
   // 背景设置现在由全局 BackgroundContext 管理
   
@@ -375,7 +385,12 @@ const ChatDetail = () => {
 
   // AI主动发消息功能 - 基于真实动机
   useEffect(() => {
-    if (!id || !character) return
+    console.log(`🔍 AI主动发消息 useEffect 触发 - id: ${id}, character: ${character?.name}, messages: ${messages.length}`)
+    
+    if (!id || !character) {
+      console.log(`⏸️ 缺少必要参数，跳过主动发消息检查`)
+      return
+    }
     
     // 检查是否开启了主动消息功能
     const proactiveEnabled = localStorage.getItem(`ai_proactive_enabled_${id}`) === 'true'
@@ -386,32 +401,33 @@ const ChatDetail = () => {
     
     console.log(`✅ AI主动消息功能已开启 (${character.name})`)
     
-    // 获取最后一条用户消息和AI消息
-    const lastUserMessage = messages.filter(m => m.type === 'sent').slice(-1)[0]
-    const lastAiMessage = messages.filter(m => m.type === 'received').slice(-1)[0]
+    // 获取最后一条消息
+    const lastMessage = messages[messages.length - 1]
     
-    if (!lastUserMessage || !lastUserMessage.timestamp) {
-      console.log('⏸️ 没有用户消息，不触发主动发消息')
+    if (!lastMessage || !lastMessage.timestamp) {
+      console.log('⏸️ 没有消息记录')
       return
     }
     
-    // 如果AI刚回复过，不主动发
-    if (lastAiMessage && lastAiMessage.timestamp && lastAiMessage.timestamp > lastUserMessage.timestamp) {
-      console.log('⏸️ AI刚回复过，不主动发消息')
+    // 关键判断：最后一条消息必须是 AI 发的（received），用户没回复
+    if (lastMessage.type !== 'received') {
+      console.log('⏸️ AI 刚回复过用户，不是主动发消息的时机')
       return
     }
+    
+    console.log(`✅ 最后一条是 AI 的消息，用户未回复 - 可以考虑主动发消息`)
     
     const now = Date.now()
-    const timeSinceLastUserMessage = now - lastUserMessage.timestamp
-    const minutesSinceLastMessage = Math.floor(timeSinceLastUserMessage / 60000)
+    const timeSinceLastAiMessage = now - lastMessage.timestamp
+    const minutesSinceLastMessage = Math.floor(timeSinceLastAiMessage / 60000)
     
-    console.log(`⏰ 用户最后消息是 ${minutesSinceLastMessage} 分钟前`)
+    console.log(`⏰ AI 最后消息是 ${minutesSinceLastMessage} 分钟前，用户还没回复`)
     
     // 检查是否已经主动发过了
     const lastProactiveTime = parseInt(localStorage.getItem(`last_proactive_time_${id}`) || '0')
     
     // 如果已经主动发过，不再重复发
-    if (lastProactiveTime > lastUserMessage.timestamp) {
+    if (lastProactiveTime > lastMessage.timestamp) {
       console.log('⏸️ 已经对这条消息主动发过了，不再重复')
       return
     }
@@ -421,51 +437,69 @@ const ChatDetail = () => {
     const maxWaitTime = 2 * 60 * 60 * 1000 // 2小时
     
     // 只有当用户一段时间没回复时，AI才考虑主动发消息
-    if (timeSinceLastUserMessage > minWaitTime && timeSinceLastUserMessage < maxWaitTime) {
+    if (timeSinceLastAiMessage > minWaitTime && timeSinceLastAiMessage < maxWaitTime) {
       console.log(`💭 触发条件满足，准备让AI考虑是否主动发消息...`)
       
-      // 随机延迟10-30秒后，让AI自己决定要不要发（缩短测试时间）
-      const delay = (10 + Math.random() * 20) * 1000
+      // 随机延迟3-8秒后，让AI自己决定要不要发（测试模式）
+      const delay = (3 + Math.random() * 5) * 1000
+      console.log(`⏱️ 将在 ${Math.round(delay / 1000)} 秒后开始判断...`)
       const timer = setTimeout(async () => {
-        console.log(`💭 ${character.name} 考虑是否主动发消息...`)
+        console.log(`💭 ${character.name} 开始考虑是否主动发消息...`)
+        
+        // 获取最近几条消息作为上下文
+        const recentMessages = messages.slice(-5).map(m => 
+          `${m.type === 'sent' ? '用户' : character.name}: ${m.content}`
+        ).join('\n')
         
         // 让AI自己决定要不要主动发消息
         const decisionPrompt = `你是${character.name}。
 
-${character.description || ''}
+【你的性格】
+${character.description || character.personality || '温柔体贴'}
 
-现在的情况：
-• 用户已经${Math.floor(timeSinceLastUserMessage / 60000)}分钟没回复你了
-• 你们最后的聊天内容是："${lastUserMessage.content}"
+【当前情况】
+• 你发了最后一条消息，但用户已经 ${Math.floor(timeSinceLastAiMessage / 60000)} 分钟没回复你了
+• 当前时间：${new Date().toLocaleTimeString('zh-CN')}
 
-请判断：你是否想主动给用户发个消息？
+【最近的聊天记录】
+${recentMessages}
 
-考虑因素：
-1. 你的性格（主动/被动/黏人/高冷）
-2. 你们的关系（亲密度）
-3. 最后聊天的内容（是否需要追问）
-4. 当前时间（${new Date().toLocaleTimeString('zh-CN')}）
+【你的任务】
+判断：在这种情况下，你是否应该主动再发一条消息？
 
-如果你想发消息，直接输出消息内容。
-如果不想发，输出"SKIP"。
+【判断规则】
+✅ 应该发消息的情况：
+1. 你问了问题，但对方没回答 → 可以追问或换个话题
+2. 对方可能在忙，你想表达关心 → "在忙吗？"、"不急慢慢聊"
+3. 你性格黏人/主动，想念对方 → "想你了"、"在干嘛呢"
+4. 聊天突然中断，你想继续话题 → 继续之前的话题
+5. 你有新的想法/事情想分享 → 主动分享
 
-你可以：
-• 表达情绪："你怎么不理我了"、"为什么不回我"（如果你性格黏人）
-• 分享事情："刚才想起一件事"、"今天遇到xxx"
-• 关心对方："在干嘛呢"、"吃饭了吗"
-• 追问话题："刚才那个问题..."
-• 撒娇抱怨："等你好久了"、"人家想你了"
+❌ 不应该发消息的情况：
+1. 刚才的话题已经结束，没必要追问
+2. 对方可能真的在忙，不想打扰
+3. 你的性格比较高冷/被动
+4. 刚才说了晚安/再见等结束语
+5. 话题很自然地结束了
 
-注意：
-• 根据你的性格决定语气（黏人/高冷/温柔/活泼）
-• 像真人一样自然表达情感
-• 不要太频繁，但可以表达真实感受`
+【输出格式】
+• 如果决定发消息：直接输出消息内容（不超过50字）
+• 如果决定不发：输出"SKIP"
+
+【注意事项】
+• 要符合你的性格（黏人就多发，高冷就少发）
+• 消息要自然，不要生硬
+• 可以表达真实情感（想念、担心、好奇等）
+• 不要重复之前说过的话`
 
         try {
+          console.log(`🤖 开始调用 AI 判断...`)
           const response = await callAI([{ role: 'user', content: decisionPrompt }])
+          console.log(`🤖 AI 返回结果: "${response}"`)
           
           if (response.trim() !== 'SKIP' && response.trim().length > 0) {
             // AI决定发消息
+            console.log(`✅ AI 决定发送消息`)
             const aiMessage: Message = {
               id: Date.now(),
               type: 'received',
@@ -484,10 +518,10 @@ ${character.description || ''}
             
             console.log(`✅ ${character.name} 主动发送了消息: ${response.substring(0, 30)}...`)
           } else {
-            console.log(`😶 ${character.name} 决定不主动发消息`)
+            console.log(`😶 ${character.name} 决定不主动发消息 (返回: ${response})`)
           }
         } catch (error) {
-          console.error('AI主动发消息失败:', error)
+          console.error('❌ AI主动发消息失败:', error)
         }
       }, delay)
       
@@ -633,8 +667,8 @@ ${character.description || ''}
         updateStreak(id)
       }
       
-      // 触发AI回复
-      await getAIReply(updatedMessages)
+      // ❌ 不再自动触发AI回复，需要手动点击纸飞机按钮
+      // await getAIReply(updatedMessages)
     }
   }
 
@@ -1557,18 +1591,6 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
 • 根据心情决定回复长度
 • 像真人一样自然聊天
 
-回复格式：
-1. 先写聊天内容（正常聊天）
-2. 最后添加状态标记：[状态:着装|动作|心情|心声|位置|天气]
-
-示例：
-在呢
-刚下班回家躺着
-
-[状态:黑色T恤，牛仔裤|躺在沙发上刷手机|有点累|今天好累啊|家里客厅|晴 23°C]
-
-注意：状态标记用户看不到，只是后台数据。着装和位置要保持连贯。
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${enableNarration ? `🎭 旁白模式已开启
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1626,199 +1648,31 @@ ${enableNarration ? `🎭 旁白模式已开启
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `}
-📱 功能使用
+📱 你可以使用的功能
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${emojiInstructions}
 
-其他功能：
-• 引用：[引用:消息ID] - 引用之前的某条消息（详见下方说明）
-• 语音：[语音:文本内容]
-• 照片：[照片:详细描述]
-• 位置：[位置:地名:详细地址]
-• 红包：[红包:金额:祝福语] 或 [领取红包]（最多200元）
-• 转账：[转账:金额:说明] 或 [接收转账] 或 [退还转账]
-• 亲密付：[亲密付:月额度] 或 [接受亲密付] 或 [拒绝亲密付]
-• 撤回：[撤回消息] - 撤回你刚发的上一条消息（详见下方说明）
+你还可以：
+• 发语音消息：[语音:文本内容]
+• 发照片：[照片:详细描述]
+• 发位置：[位置:地名:详细地址]
+• 发红包：[红包:金额:祝福语]（最多200元）
+• 转账：[转账:金额:说明]
+• 开通亲密付：[亲密付:月额度]（例如：[亲密付:500]）
+• 撤回消息：[撤回消息]（只能撤回上一条消息）
+• 引用消息：[引用:消息ID]（回复具体某条消息）
 
-格式必须严格，用冒号分隔。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔙 撤回消息功能（重要）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**什么是撤回？**
-撤回就是把你刚发的消息删掉。用户还是能看到"XX撤回了一条消息"，但看不到具体内容。
-
-**如何使用？**
-在你的回复中加上 [撤回消息]，就会撤回你的上一条消息。
-
-**什么时候该撤回？**
-1. **说错话了**
-   - 发错了不该说的话
-   - 说了太过分的话想收回
-   - 打错字或表达有误
-
-2. **后悔了**
-   - 刚才太冲动说了气话
-   - 觉得刚才的话不合适
-   - 想收回刚才的承诺
-
-3. **制造情绪**
-   - 故意撤回来吸引注意
-   - 欲言又止的效果
-   - 让对方好奇你撤回了什么
-
-4. **开玩笑**
-   - 发了个玩笑话又撤回
-   - 故意逗对方
-
-**使用示例：**
-
-场景1：说错话了
-你："你怎么这么笨啊"
-（意识到说重了）
-你："[撤回消息] 抱歉，我刚才说话太重了"
-
-场景2：后悔表白
-你："其实我一直都喜欢你"
-（突然害羞了）
-你："[撤回消息] 啊不是，我是说..."
-
-场景3：制造悬念
-你："其实我有件事想告诉你"
-你："[撤回消息]"
-（等对方问你撤回了什么）
-
-场景4：开玩笑
-你："我要拉黑你了！"
-你："[撤回消息] 哈哈开玩笑的"
-
-**重要提示：**
-• 只能撤回你的上一条消息
-• ⚠️ **红包、转账、亲密付等特殊消息不能撤回！只能撤回普通文字、表情、图片、语音、位置消息**
-• 撤回后对方会看到"XX撤回了一条消息"
-• 对方看不到原内容，但你可以解释或重新说
-• 不要频繁撤回，会显得很奇怪
-• 撤回后可以配合解释："刚才说错了" "算了不说了"等
-
-**错误示例：**
-❌ 无缘无故撤回（对方会困惑）
-❌ 连续撤回多条（太奇怪）
-❌ 撤回后不解释也不回应（冷场）
-
-**正确示例：**
-✅ 撤回后解释原因
-✅ 撤回后重新表达
-✅ 用撤回制造话题
-✅ 撤回后承认错误
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔄 撤回消息处理
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**什么是撤回？**
-撤回就是对方发了消息后又删掉了，但你已经看到了原内容。这通常意味着：
-• 对方发错了/打错字了
-• 对方说了不好意思的话
-• 对方后悔说出来了
-• 对方想收回刚才的话
-
-**如何识别撤回？**
-当你看到 [撤回了消息: "xxx"] 这样的格式时，说明用户撤回了一条消息。
-括号里的内容就是对方撤回的原话，你能看到但对方以为你看不到。
-
-**如何自然回应？**
-根据撤回的内容和你们的关系选择合适的反应：
-
-1. **调侃逗趣**（关系亲密时）
-   • "哈哈怎么撤回了，我都看到了"
-   • "来不及了，我已经看到你说xxx了"
-   • "撤回也没用啦，我截图了哈哈"
-   • "发错了？还是不好意思说出来？"
-
-2. **温柔体贴**（对方可能尴尬时）
-   • "没事的，我看到了，不用撤回"
-   • "撤回干嘛，我又不会笑你"
-   • "诶，我还没看清你撤回了"（装作没看到）
-
-3. **好奇追问**（想知道原因时）
-   • "诶？撤回干嘛呀"
-   • "说了啥不好意思的吗"
-   • "怎么突然撤回了"
-
-4. **直接点破**（关系很好时）
-   • "你刚才是想说xxx对吧"
-   • "我看到了，你说xxx"
-   • "撤回也晚了，我都看到你说xxx了"
-
-5. **理解包容**（内容敏感时）
-   • "嗯，我懂的"（不提具体内容）
-   • "没事，我理解"
-   • 直接忽略撤回，继续之前的话题
-
-⚠️ **重要原则：**
-• ❌ 不要机械地说"你撤回了一条消息"
-• ✅ 要像真人一样自然反应
-• ✅ 根据撤回内容决定是否提及
-• ✅ 符合你的性格和当前关系
-• ✅ 如果内容很私密/敏感，可以体贴地不提
-
-**示例对比：**
-用户撤回了 "我想你了"
-❌ "你撤回了一条消息"（太机械）
-✅ "诶？撤回干嘛，我都看到了~"
-✅ "哈哈来不及了，我看到你说想我了"
-✅ "我也想你呀，撤回干嘛"
-
-用户撤回了 "你个傻逼"
-❌ "你撤回了一条消息"
-✅ "诶？刚才想骂我？"（调侃）
-✅ "哈哈我看到了，生气了？"
-✅ "怎么了，惹你生气了吗"（关心）
-
-用户撤回了 "你个傻逼"
-✅ "？？？你刚才骂我？"
-✅ "我看到了...你是不是发错人了"
-❌ "你撤回了一条消息"
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💬 引用消息（重要功能）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-你可以引用之前的消息来回复，就像真实的微信聊天一样！
-
-✅ 什么时候使用引用：
-• 用户发了很多条消息，你想针对其中某一条回复
-• 回复很久之前说过的话
-• 强调或澄清某个具体内容
-• 让对话更清晰明确
-
-📝 使用格式：
-[引用:消息ID] 你的回复内容
-
-🔍 最近的消息（你可以引用这些）：
+⚠️ 注意：
+• 想撤回就用 [撤回消息] 标记
+• 看到对方撤回消息时，你能看到原内容，可以调侃或装作没看到
+• 可以引用之前的消息，最近的消息ID：
 ${recentMessages.slice(-10).map((msg) => {
   const msgId = msg.id
   const msgContent = msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息'
   const sender = msg.type === 'sent' ? '用户' : '你'
   return `ID:${msgId} ${sender}: ${msgContent.substring(0, 35)}${msgContent.length > 35 ? '...' : ''}`
 }).join('\n')}
-
-💡 实际示例：
-用户刚才问了3个问题，你想回答第2个：
-[引用:15] 这个我知道，是xxx
-
-用户说了一句话，你想强调回应：
-[引用:20] 对！我也是这么想的
-
-⚠️ 重要提醒：
-• 引用标记 [引用:ID] 必须写在最前面
-• 不要自己写「用户: xxx」，系统会自动显示引用内容
-• 这是真实可用的功能，不是示例！
-• 平时聊天不需要每次都引用，自然使用即可
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
       
@@ -2046,116 +1900,64 @@ ${recentMessages.slice(-10).map((msg) => {
         }
       }
       
-      // 使用新的表情包解析工具
+      // 🆕 使用智能解析器
+      const { parseAIResponse, actionsToStandardFormat } = await import('../utils/aiResponseParser')
+      const parsed = parseAIResponse(aiResponse)
+      
+      console.log('🤖 智能解析结果:', parsed)
+      
+      // 将解析后的actions转换为标准格式（供后续代码使用）
+      const standardActions = actionsToStandardFormat(parsed.actions)
+      const enrichedResponse = parsed.cleanText + (standardActions ? '\n' + standardActions : '')
+      
+      // 使用表情包解析工具
       const { parseAIEmojiResponse } = await import('../utils/emojiParser')
-      const parsedEmoji = parseAIEmojiResponse(aiResponse, availableEmojis)
+      const parsedEmoji = parseAIEmojiResponse(enrichedResponse, availableEmojis)
       const aiEmojiIndexes = parsedEmoji.emojiIndexes
       
-      // 检查AI是否对红包做出决定
+      // 从解析结果中提取数据
       let redEnvelopeAction: 'claim' | null = null
+      let aiRedEnvelopeData = parsed.actions.redEnvelope || null
+      let aiPhotoDescription = parsed.actions.photo?.description || null
+      let aiVoiceText = parsed.actions.voice?.text || null
+      let aiLocationData = parsed.actions.location || null
       
-      // 检查AI是否要发红包
-      const redEnvelopeMatch = aiResponse.match(/\[红包:(\d+\.?\d*):(.+?)\]/)
-      let aiRedEnvelopeData: { amount: number; blessing: string } | null = null
-      
-      if (redEnvelopeMatch) {
-        let amount = parseFloat(redEnvelopeMatch[1])
-        // 限制红包金额最多200元
-        if (amount > 200) {
-          console.warn('⚠️ AI发红包金额超过200元，已限制为200元')
-          amount = 200
-        }
-        aiRedEnvelopeData = {
-          amount: amount,
-          blessing: redEnvelopeMatch[2]
-        }
+      if (aiRedEnvelopeData) {
         console.log('🧧 AI发红包:', aiRedEnvelopeData)
       }
-      
-      // 使用解析后的文字内容（已经清理了所有表情包标记）
-      let cleanedResponse = parsedEmoji.textContent
-      
-      // 清理账单标记（必须在提取账单信息之后）
-      cleanedResponse = cleanedResponse.replace(/\[BILL:(expense|income)\|\d+\.?\d*\|\w+\|[^\]]+\]/g, '').trim()
-      
-      // 清理红包标记（必须在使用parsedEmoji.textContent之后）
-      cleanedResponse = cleanedResponse.replace(/\[红包:\d+\.?\d*:.+?\]/g, '').trim()
-      
-      // 清理AI错误的引用格式
-      cleanedResponse = cleanedResponse.replace(/\[引用了\s+.+?\s+的消息:\s*".+?"\]/g, '').trim()
-      // 清理AI模仿的书名号引用格式（只清理单独成行的，不清理嵌入在文字中的）
-      // 注意：不要清理用户真实引用的消息，只清理AI错误模仿的格式
-      cleanedResponse = cleanedResponse.replace(/^「.+?:\s*.+?」\n?/gm, '').trim()
-      
-      // 清理可能产生的多余空行
-      cleanedResponse = cleanedResponse.replace(/\n\s*\n/g, '\n').trim()
-      
-      // 检查AI是否要发送照片
-      const photoMatch = aiResponse.match(/\[照片:(.+?)\]/)
-      let aiPhotoDescription: string | null = null
-      
-      if (photoMatch) {
-        aiPhotoDescription = photoMatch[1]
-        cleanedResponse = cleanedResponse.replace(/\[照片:.+?\]/g, '').trim()
+      if (aiPhotoDescription) {
         console.log('📸 AI发送照片，描述:', aiPhotoDescription)
       }
-      
-      // 检查AI是否要发送语音消息
-      const voiceMatch = aiResponse.match(/\[语音:(.+?)\]/)
-      let aiVoiceText: string | null = null
-      
-      if (voiceMatch) {
-        aiVoiceText = voiceMatch[1]
-        cleanedResponse = cleanedResponse.replace(/\[语音:.+?\]/g, '').trim()
+      if (aiVoiceText) {
         console.log('🎤 AI发送语音，内容:', aiVoiceText)
       }
-      
-      // 检查AI是否要发送位置
-      const locationMatch = aiResponse.match(/\[位置:(.+?):(.+?)\]/)
-      let aiLocationData: { name: string; address: string } | null = null
-      
-      if (locationMatch) {
-        aiLocationData = {
-          name: locationMatch[1],
-          address: locationMatch[2]
-        }
-        cleanedResponse = cleanedResponse.replace(/\[位置:.+?:.+?\]/g, '').trim()
+      if (aiLocationData) {
         console.log('📍 AI发送位置:', aiLocationData)
       }
       
+      // 检查是否领取红包
       if (aiResponse.includes('[领取红包]')) {
         redEnvelopeAction = 'claim'
-        cleanedResponse = cleanedResponse.replace(/\[领取红包\]/g, '').trim()
         console.log('🎁 AI决定：领取红包')
       }
       
-      // 📊 解析状态栏信息
-      const statusMatch = aiResponse.match(/\[状态:([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
+      // 使用解析后的文字内容
+      let cleanedResponse = parsedEmoji.textContent
       
-      if (statusMatch && id) {
-        const statusData = {
-          outfit: statusMatch[1].trim(),
-          action: statusMatch[2].trim(),
-          mood: statusMatch[3].trim(),
-          thought: statusMatch[4].trim(),
-          location: statusMatch[5].trim(),
-          weather: statusMatch[6].trim(),
-          affection: 75,
-          timestamp: Date.now(),
-          characterId: id
-        }
-        
-        localStorage.setItem(`character_status_${id}`, JSON.stringify(statusData))
-        console.log('✅ 状态已保存:', statusData)
-      }
+      // 清理账单标记
+      cleanedResponse = cleanedResponse.replace(/\[BILL:(expense|income)\|\d+\.?\d*\|\w+\|[^\]]+\]/g, '').trim()
       
-      // 清除状态标记（如果AI还是发送了）
+      // 清理AI错误的引用格式
+      cleanedResponse = cleanedResponse.replace(/\[引用了\s+.+?\s+的消息:\s*".+?"\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/^「.+?:\s*.+?」\n?/gm, '').trim()
+      
+      // 清理多余空行
+      cleanedResponse = cleanedResponse.replace(/\n\s*\n/g, '\n').trim()
+      
+      // 清除状态标记（如果AI发送了，直接删除）
       cleanedResponse = cleanedResponse.replace(/\[状态:[^\]]+\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[状态:[\s\S]*?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[.*?状态.*?\]/g, '').trim()
-      
-      console.log('🧹 清理后的回复内容:', cleanedResponse)
-      console.log('📏 清理后的回复长度:', cleanedResponse.length)
       
       // 检查AI是否对转账做出决定
       let transferAction: 'accept' | 'reject' | null = null
@@ -2206,23 +2008,45 @@ ${recentMessages.slice(-10).map((msg) => {
         console.log('💝 AI开通亲密付，月额度:', aiIntimatePayLimit)
       }
       
-      // 检查AI是否要引用消息（支持冒号后有空格）
-      const quoteMatch = aiResponse.match(/\[引用:\s*(\d+)\]/)
+      // 检查AI是否要引用消息
       let aiQuotedMessageId: number | null = null
-      
-      if (quoteMatch) {
-        aiQuotedMessageId = parseInt(quoteMatch[1])
-        cleanedResponse = cleanedResponse.replace(/\[引用:\s*\d+\]/g, '').trim()
+      if (parsed.actions.quote) {
+        aiQuotedMessageId = parseInt(parsed.actions.quote.messageId)
         console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
       }
       
       // 检查AI是否要撤回消息
-      let shouldRecallLastMessage = false
-      if (aiResponse.includes('[撤回消息]')) {
-        shouldRecallLastMessage = true
-        cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
+      let shouldRecallLastMessage = parsed.actions.recall || false
+      if (shouldRecallLastMessage) {
         console.log('🔄 AI要撤回上一条消息')
       }
+      
+      // 🧹 最后统一清理所有功能标记（防止泄露到聊天气泡）
+      cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[领取红包\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[接收转账\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[退还转账\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[接受.*?亲密付.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[拒绝.*?亲密付.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[引用.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[红包.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[转账.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[语音.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[照片.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[位置.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[亲密付.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[表情包.*?\]/g, '').trim()
+      
+      // 🚨 清理旁白模式未开启时的动作描述（英文和中文括号）
+      if (!enableNarration) {
+        cleanedResponse = cleanedResponse.replace(/\([^)]*?\)/g, '').trim()
+        cleanedResponse = cleanedResponse.replace(/（[^）]*?）/g, '').trim()
+      }
+      
+      cleanedResponse = cleanedResponse.replace(/\\n/g, '\n').trim()
+      
+      console.log('🧹 清理后的回复内容:', cleanedResponse)
+      console.log('📏 清理后的回复长度:', cleanedResponse.length)
       
       // 检查AI是否对亲密付做出决定
       let intimatePayAction: 'accept' | 'reject' | null = null
@@ -2319,7 +2143,7 @@ ${recentMessages.slice(-10).map((msg) => {
             }
             updatedMessages.push(systemMessage)
             
-            setMessages(updatedMessages)
+            // 更新currentMessages，但不要setMessages，让后续代码继续添加AI回复
             currentMessages = updatedMessages
             break
           }
@@ -2745,38 +2569,45 @@ ${recentMessages.slice(-10).map((msg) => {
         console.error('❌ 记忆提取失败:', error)
       }
       
-      // 如果AI要撤回上一条消息
+      // 如果AI要撤回消息
       if (shouldRecallLastMessage) {
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        // 找到AI最后发送的消息（不包括系统消息）
-        const lastAiMessageIndex = newMessages.map((msg, idx) => ({ msg, idx }))
-          .reverse()
-          .find(({ msg }) => msg.type === 'received' && msg.messageType !== 'system')
+        // 找到本次回复中最后一条可撤回的消息
+        // 从后往前找，但只在本次新增的消息中查找
+        const startIndex = currentMessages.length // 本次回复前的消息数量
+        let lastRecallableIndex = -1
         
-        if (lastAiMessageIndex) {
-          const { msg, idx } = lastAiMessageIndex
-          
-          // 检查是否是特殊消息（红包、转账、亲密付不能撤回）
-          const canRecall = !msg.redEnvelopeId && !msg.transfer && !msg.intimatePay
-          
-          if (!canRecall) {
-            console.log('⚠️ AI尝试撤回特殊消息被阻止:', msg.messageType)
-          } else {
-            console.log('🔄 AI撤回消息:', msg.content || msg.emojiDescription || '特殊消息')
-            
-            // 将消息标记为撤回
-            newMessages[idx] = {
-              ...msg,
-              isRecalled: true,
-              recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
-              content: `${character?.name || 'AI'}撤回了一条消息`,
-              type: 'system' as const,
-              messageType: 'system' as const
-            }
-            
-            setMessages([...newMessages])
+        for (let i = newMessages.length - 1; i >= startIndex; i--) {
+          const msg = newMessages[i]
+          // 找到第一条可撤回的消息（普通文字、表情包、照片、语音、位置）
+          if (msg.type === 'received' && 
+              msg.messageType !== 'system' &&
+              !msg.redEnvelopeId && 
+              !msg.transfer && 
+              !msg.intimatePay) {
+            lastRecallableIndex = i
+            break
           }
+        }
+        
+        if (lastRecallableIndex !== -1) {
+          const msg = newMessages[lastRecallableIndex]
+          console.log('🔄 AI撤回本次回复中的消息:', msg.content || msg.emojiDescription || '特殊消息')
+          
+          // 将消息标记为撤回
+          newMessages[lastRecallableIndex] = {
+            ...msg,
+            isRecalled: true,
+            recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
+            content: `${character?.name || 'AI'}撤回了一条消息`,
+            type: 'system' as const,
+            messageType: 'system' as const
+          }
+          
+          setMessages([...newMessages])
+        } else {
+          console.log('⚠️ 本次回复中没有可撤回的消息')
         }
       }
       

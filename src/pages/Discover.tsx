@@ -13,6 +13,16 @@ const EmojiIcon = ({ size = 24, className = '' }: { size?: number; className?: s
   </svg>
 )
 
+// 小游戏图标组件
+const GameIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
+    <polyline points="17 2 12 7 7 2"/>
+    <circle cx="8" cy="14" r="1"/>
+    <circle cx="16" cy="14" r="1"/>
+  </svg>
+)
+
 const Discover = () => {
   const navigate = useNavigate()
   const [showEmojiManagement, setShowEmojiManagement] = useState(false)
@@ -28,7 +38,7 @@ const Discover = () => {
     {
       id: 2,
       items: [
-        { id: 21, name: '直播', Icon: LiveIcon, path: '' },
+        { id: 21, name: '直播', Icon: LiveIcon, path: '/live' },
         { id: 22, name: '摇一摇', Icon: ShakeIcon, path: '/shake' },
       ],
     },
@@ -43,7 +53,13 @@ const Discover = () => {
       id: 4,
       items: [
         { id: 41, name: '记账本', Icon: AccountBookIcon, path: '/accounting' },
-        { id: 42, name: '小程序', Icon: MiniProgramIcon, path: '' },
+        { id: 42, name: '小程序', Icon: MiniProgramIcon, path: '/mini-programs' },
+      ],
+    },
+    {
+      id: 5,
+      items: [
+        { id: 51, name: '小游戏', Icon: GameIcon, path: '/games' },
       ],
     },
   ]

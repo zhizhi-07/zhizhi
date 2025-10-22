@@ -59,6 +59,15 @@ import CreateGroup from './pages/CreateGroup'
 import GroupChatDetail from './pages/GroupChatDetail'
 import GroupSettings from './pages/GroupSettings'
 import ShakeShake from './pages/ShakeShake'
+import Live from './pages/Live'
+import LiveRoom from './pages/LiveRoom'
+import SparkMoments from './pages/SparkMoments'
+import MemesLibrary from './pages/MemesLibrary'
+import MiniPrograms from './pages/MiniPrograms'
+import GomokuGame from './pages/GomokuGame'
+import GameCharacterSelect from './pages/GameCharacterSelect'
+import GameList from './pages/GameList'
+import UndercoverGame from './pages/UndercoverGame'
 
 function App() {
   // 初始化性能监控
@@ -130,6 +139,15 @@ function App() {
               <Route path="/group/:id" element={<GroupChatDetail />} />
               <Route path="/group-settings/:id" element={<GroupSettings />} />
               <Route path="/shake" element={<ShakeShake />} />
+              <Route path="/live" element={<Live />} />
+              <Route path="/live/:id" element={<LiveRoom />} />
+              <Route path="/spark-moments" element={<SparkMoments />} />
+              <Route path="/memes-library" element={<MemesLibrary />} />
+              <Route path="/mini-programs" element={<MiniPrograms />} />
+              <Route path="/gomoku/:id" element={<GomokuGame />} />
+              <Route path="/game-select" element={<GameCharacterSelect />} />
+              <Route path="/games" element={<GameList />} />
+              <Route path="/undercover" element={<UndercoverGame />} />
                   </Routes>
                 </Router>
                     </SettingsProvider>

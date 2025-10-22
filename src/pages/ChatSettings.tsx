@@ -7,6 +7,7 @@ import memoryIcon from '../assets/memory-icon.png'
 import memorySummaryIcon from '../assets/memory-summary-icon.png'
 import diaryIcon from '../assets/diary-icon.png'
 import { blacklistManager } from '../utils/blacklistManager'
+import { ScheduleSettings } from '../components/ScheduleSettings'
 
 // 拉黑图标 - 使用绝对路径
 const blockedIcon = '/拉黑.png'
@@ -61,6 +62,7 @@ const ChatSettings = () => {
     return localStorage.getItem(`ai_bubble_css_${id}`) || ''
   })
   const [showBubbleSettings, setShowBubbleSettings] = useState(false)
+  const [showScheduleSettings, setShowScheduleSettings] = useState(false)
 
   // 拉黑状态
   const [isBlocked, setIsBlocked] = useState(() => {
@@ -505,7 +507,7 @@ const ChatSettings = () => {
           <div className="glass-card rounded-2xl overflow-hidden">
             <button
               onClick={handleToggleAiProactive}
-              className="w-full px-4 py-4 flex items-center justify-between ios-button"
+              className="w-full px-4 py-4 flex items-center justify-between ios-button border-b border-gray-100"
             >
               <div className="flex items-center gap-3">
                 <div className="text-left">
@@ -526,6 +528,23 @@ const ChatSettings = () => {
                   }`}
                 />
               </div>
+            </button>
+
+            {/* 定时消息设置 */}
+            <button
+              onClick={() => setShowScheduleSettings(true)}
+              className="w-full px-4 py-4 flex items-center justify-between ios-button"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⏰</span>
+                <div className="text-left">
+                  <div className="font-medium text-gray-900">定时消息设置</div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    设置早安、晚安等定时问候
+                  </div>
+                </div>
+              </div>
+              <span className="text-gray-400 text-xl">›</span>
             </button>
           </div>
         </div>
@@ -810,6 +829,11 @@ const ChatSettings = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 定时消息设置弹窗 */}
+      {showScheduleSettings && (
+        <ScheduleSettings onClose={() => setShowScheduleSettings(false)} />
       )}
     </div>
   )
