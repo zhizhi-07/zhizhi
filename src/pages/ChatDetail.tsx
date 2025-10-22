@@ -597,7 +597,7 @@ ${character.description || ''}
     }
   }, [location.state?.sendIntimatePay, location.state?.monthlyLimit, id, character])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (inputValue.trim() && !isAiTyping) {
       const now = Date.now()
       const userMessage: Message = {
@@ -623,7 +623,8 @@ ${character.description || ''}
         } : undefined
       }
       
-      setMessages([...messages, userMessage])
+      const updatedMessages = [...messages, userMessage]
+      setMessages(updatedMessages)
       setInputValue('')
       setQuotedMessage(null) // 清除引用
       
@@ -631,6 +632,9 @@ ${character.description || ''}
       if (id) {
         updateStreak(id)
       }
+      
+      // 触发AI回复
+      await getAIReply(updatedMessages)
     }
   }
 
@@ -1362,6 +1366,22 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       const streakData = id ? getStreakData(id) : null
       const streakDays = streakData?.currentStreak || 0
       
+      // 🔥 检索热梗
+      const { retrieveMemes } = await import('../utils/memesRetrieval')
+      const lastUserMessage = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
+      const userMessageContent = lastUserMessage?.content || ''
+      const matchedMemes = await retrieveMemes(userMessageContent, 3)
+      
+      // 转换为 RetrievedMeme 格式
+      const retrievedMemes = matchedMemes.map(m => ({
+        梗: m['梗'],
+        含义: m['含义']
+      }))
+      
+      if (matchedMemes.length > 0) {
+        console.log('🔥 检测到热梗:', matchedMemes.map(m => m['梗']).join(', '))
+      }
+      
       const systemPrompt = buildRoleplayPrompt(
         {
           name: character?.name || 'AI',
@@ -1371,7 +1391,9 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
         {
           name: currentUser?.name || '用户'
         },
-        streakDays
+        enableNarration, // 传入旁白模式开关
+        streakDays,
+        retrievedMemes // 传入热梗
       )
       
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
