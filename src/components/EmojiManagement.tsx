@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getEmojis, deleteEmoji, exportEmojis, importEmojis, clearAllEmojis, Emoji } from '../utils/emojiStorage'
+import StatusBar from './StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 interface EmojiManagementProps {
   show: boolean
@@ -7,6 +9,7 @@ interface EmojiManagementProps {
 }
 
 const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
+  const { showStatusBar } = useSettings()
   const [emojis, setEmojis] = useState<Emoji[]>([])
   const [batchFiles, setBatchFiles] = useState<File[]>([])
   const [showBatchPreview, setShowBatchPreview] = useState(false)
@@ -221,8 +224,10 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
 
   return (
     <div className="fixed inset-0 bg-[#EDEDED] z-50 flex flex-col">
-      {/* 顶部导航栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={onClose}
           className="text-gray-700 text-base"
@@ -231,6 +236,7 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
         </button>
         <h1 className="text-base font-semibold text-gray-900">表情包管理</h1>
         <div className="w-12"></div>
+        </div>
       </div>
 
       {/* 统计信息 */}

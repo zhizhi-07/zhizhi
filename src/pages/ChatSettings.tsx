@@ -7,6 +7,8 @@ import memoryIcon from '../assets/memory-icon.png'
 import memorySummaryIcon from '../assets/memory-summary-icon.png'
 import diaryIcon from '../assets/diary-icon.png'
 import { blacklistManager } from '../utils/blacklistManager'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 // 拉黑图标 - 使用绝对路径
 const blockedIcon = '/拉黑.png'
@@ -16,6 +18,7 @@ const ChatSettings = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { getCharacter } = useCharacter()
+  const { showStatusBar } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const character = id ? getCharacter(id) : undefined
@@ -452,8 +455,10 @@ const ChatSettings = () => {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      {/* 顶部标题栏 */}
-      <div className="sticky top-0 z-10 bg-white px-4 py-3 flex items-center justify-between border-b border-gray-200 shadow-sm">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
@@ -464,6 +469,7 @@ const ChatSettings = () => {
           聊天设置
         </h1>
         <div className="w-6"></div>
+        </div>
       </div>
 
       {/* 设置内容 */}
