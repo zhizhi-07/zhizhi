@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { BackIcon } from '../components/Icons'
+import { BackIcon, ImageIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
 import { useCharacter } from '../context/CharacterContext'
 import { useBackground } from '../context/BackgroundContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const GroupSettings = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const { getGroup, updateGroup, deleteGroup, removeMember } = useGroup()
+  const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const { background, getBackgroundStyle } = useBackground()
   
@@ -62,24 +65,26 @@ const GroupSettings = () => {
   }
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 壁纸背景层 */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={getBackgroundStyle()}
-      />
-      
-      {/* 内容层 */}
-      <div className="relative z-10 h-full flex flex-col">
-        {/* 顶部导航栏 */}
-        <div className={`px-5 py-4 flex items-center justify-between border-b border-white/20 sticky top-0 z-50 shadow-sm ${background ? 'glass-dark' : 'glass-effect'}`}>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="ios-button">
-            <BackIcon size={24} />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-900">群设置</h1>
-        </div>
-      </div>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
+      <div className="h-full flex flex-col relative overflow-hidden">
+        {/* 壁纸背景层 */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={getBackgroundStyle()}
+        />
+        
+        {/* 内容层 */}
+        <div className="relative z-10 h-full flex flex-col">
+          {/* 顶部导航栏 */}
+          <div className={`px-5 py-4 flex items-center justify-between border-b border-white/20 sticky top-0 z-50 shadow-sm ${background ? 'glass-dark' : 'glass-effect'}`}>
+            <div className="flex items-center gap-3">
+              <button onClick={() => navigate(-1)} className="ios-button">
+                <BackIcon size={24} />
+              </button>
+              <h1 className="text-xl font-semibold text-gray-900">群设置</h1>
+            </div>
+          </div>
 
         {/* 设置内容 */}
         <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
@@ -198,6 +203,7 @@ const GroupSettings = () => {
           >
             解散群聊
           </button>
+        </div>
         </div>
         </div>
       </div>

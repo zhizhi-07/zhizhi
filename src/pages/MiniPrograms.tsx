@@ -1,9 +1,13 @@
 import { useNavigate } from 'react-router-dom'
+import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import sparkIcon from '../assets/spark-icon.png'
 import memesIcon from '../assets/memes-icon.png'
 
 const MiniPrograms = () => {
   const navigate = useNavigate()
+  const { showStatusBar } = useSettings()
 
   const programs = [
     {
@@ -25,7 +29,8 @@ const MiniPrograms = () => {
   ]
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 border-b border-gray-200/50 flex items-center">
         <button

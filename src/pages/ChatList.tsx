@@ -5,6 +5,8 @@ import { useCharacter } from '../context/CharacterContext'
 import { useGroup } from '../context/GroupContext'
 import { useBackground } from '../context/BackgroundContext'
 import { getStreakData } from '../utils/streakSystem'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 interface Chat {
   id: string
@@ -25,6 +27,7 @@ const ChatList = () => {
   const { characters } = useCharacter()
   const { groups } = useGroup()
   const { background, getBackgroundStyle } = useBackground()
+  const { showStatusBar } = useSettings()
   const [chats, setChats] = useState<Chat[]>(() => {
     const saved = localStorage.getItem('chatList')
     return saved ? JSON.parse(saved) : []
@@ -166,10 +169,12 @@ const ChatList = () => {
       
       {/* 内容层 - 在背景上方 */}
       <div className="relative z-10 h-full flex flex-col bg-transparent">
-        {/* 顶部标题栏 - 玻璃效果 */}
-        <div className={`px-5 py-4 flex items-center justify-between border-b border-white/20 sticky top-0 z-50 shadow-sm ${background ? 'glass-dark' : 'glass-effect'}`}>
-        <h1 className="text-xl font-semibold text-gray-900">微信</h1>
-        <div className="flex items-center gap-4">
+        {/* 顶部：StatusBar + 导航栏一体化 */}
+        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+          {showStatusBar && <StatusBar />}
+          <div className="px-5 py-4 flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-gray-900">微信</h1>
+            <div className="flex items-center gap-4">
           <button className="ios-button text-gray-700 hover:text-gray-900">
             <SearchIcon size={22} />
           </button>
@@ -221,11 +226,12 @@ const ChatList = () => {
               </>
             )}
           </div>
+            </div>
+          </div>
         </div>
-      </div>
 
       {/* 聊天列表 */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar relative z-0">
+      <div className="flex-1 overflow-y-auto hide-scrollbar relative z-0 pt-3">
         {chats.length === 0 ? (
           <div className="empty-state">
             <EmptyIcon size={100} className="text-gray-400 mb-4" />

@@ -1,9 +1,12 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const Live = () => {
   const navigate = useNavigate()
+  const { showStatusBar } = useSettings()
   const [activeTab, setActiveTab] = useState<'recommend' | 'following'>('recommend')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -26,6 +29,9 @@ const Live = () => {
 
   return (
     <div className="h-screen flex flex-col bg-white">
+      {/* iOS状态栏 */}
+      {showStatusBar && <StatusBar />}
+      
       {/* 顶部导航栏 - 液态玻璃效果 */}
       <div className="glass-effect px-4 py-3 border-b border-gray-200/50">
         <div className="flex items-center justify-between">

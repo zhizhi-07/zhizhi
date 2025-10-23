@@ -2,11 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
 import { BackIcon, ImageIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { toPinyin } from '../utils/pinyin'
 
 const CreateCharacter = () => {
   const navigate = useNavigate()
   const { addCharacter } = useCharacter()
+  const { showStatusBar } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -99,9 +102,11 @@ const CreateCharacter = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="ios-button text-gray-700 hover:text-gray-900"
@@ -117,6 +122,7 @@ const CreateCharacter = () => {
         >
           完成
         </button>
+        </div>
       </div>
 
       {/* 创建表单 */}

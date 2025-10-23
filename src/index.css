@@ -76,7 +76,7 @@ body {
 
 /* 液态玻璃效果系统 - 白色干净版 */
 .glass-effect {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
@@ -93,7 +93,7 @@ body {
 
 /* 卡片玻璃效果 */
 .glass-card {
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.4);

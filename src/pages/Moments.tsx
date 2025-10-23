@@ -4,11 +4,14 @@ import { BackIcon, CameraIcon, LikeIcon, CommentIcon, MoreVerticalIcon, HeartFil
 import { useUser } from '../context/UserContext'
 import { useMoments } from '../context/MomentsContext'
 import { ImageViewer } from '../components/ImageViewer'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const Moments = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
   const { moments, likeMoment, unlikeMoment, addComment } = useMoments()
+  const { showStatusBar } = useSettings()
   const [showCommentInput, setShowCommentInput] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
   const [replyToUser, setReplyToUser] = useState<string>('')
@@ -132,7 +135,32 @@ const Moments = () => {
   }
 
   return (
-    <div className="h-screen overflow-y-auto hide-scrollbar bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate('/discover', { replace: true })
+            }}
+            className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
+          >
+             <BackIcon size={20} className="text-gray-700" />
+           </button>
+           <button 
+             onClick={(e) => {
+               e.stopPropagation()
+               navigate('/publish-moment')
+             }}
+             className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
+           >
+             <CameraIcon size={20} className="text-gray-700" />
+          </button>
+        </div>
+      </div>
+
       {/* 顶部封面区域 */}
       <div className="relative h-80 bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden">
         {/* 封面背景 */}
@@ -154,28 +182,6 @@ const Moments = () => {
             </div>
           )}
           <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors" />
-        </div>
-        
-        {/* 顶部导航栏 */}
-        <div className="relative z-10 flex items-center justify-between px-4 py-3">
-          <button 
-            onClick={(e) => {
-              e.stopPropagation()
-              navigate('/discover', { replace: true })
-            }}
-            className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
-          >
-             <BackIcon size={20} className="text-gray-700" />
-           </button>
-           <button 
-             onClick={(e) => {
-               e.stopPropagation()
-               navigate('/publish-moment')
-             }}
-             className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
-           >
-             <CameraIcon size={20} className="text-gray-700" />
-          </button>
         </div>
 
         {/* 用户信息 */}

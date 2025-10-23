@@ -3134,10 +3134,10 @@ ${recentMessages.slice(-10).map((msg) => {
       
       {/* 内容层 */}
       <div className="relative z-10 h-full flex flex-col">
-        {/* iOS状态栏 - 根据设置显示 */}
-        {showStatusBar && <StatusBar />}
-        {/* 顶部导航栏 - 玻璃毛玻璃效果，能透过看到壁纸 */}
-        <div className={`px-4 py-3 flex items-center justify-between border-b border-white/20 ${background ? 'glass-dark' : 'glass-effect'}`}>
+        {/* 顶部：StatusBar + 导航栏一体化 */}
+        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+          {showStatusBar && <StatusBar />}
+          <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
@@ -3178,7 +3178,8 @@ ${recentMessages.slice(-10).map((msg) => {
             <MoreIcon size={24} />
           </button>
         </div>
-      </div>
+          </div>
+        </div>
 
       {/* 聊天消息区域 */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4">

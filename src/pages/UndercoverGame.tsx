@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { callAI } from '../utils/api'
 
@@ -32,6 +35,7 @@ interface GameState {
 
 const UndercoverGame = () => {
   const navigate = useNavigate()
+  const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
   
   const [gameState, setGameState] = useState<GameState>({
@@ -436,7 +440,8 @@ ${aiInfo}
   const userPlayer = gameState.players.find(p => p.id === 'user')
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 to-pink-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 border-b border-gray-200/50 flex items-center">
         <button

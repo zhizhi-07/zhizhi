@@ -2,11 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { SearchIcon, AddIcon, EmptyIcon, NewFriendIcon, GroupIcon, TagIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
 import { useBackground } from '../context/BackgroundContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const Contacts = () => {
   const navigate = useNavigate()
   const { characters } = useCharacter()
   const { background, getBackgroundStyle } = useBackground()
+  const { showStatusBar } = useSettings()
 
   const specialContacts = [
     { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/create-character' },
@@ -16,20 +19,14 @@ const Contacts = () => {
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 全局背景层 */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={background ? getBackgroundStyle() : {
-          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
-        }}
-      />
-      
-      {/* 内容层 */}
-      <div className="relative z-10 h-full flex flex-col">
-      {/* 顶部标题栏 - 玻璃效果 */}
-      <div className="glass-effect px-5 py-4 flex items-center justify-between border-b border-gray-200/50 sticky top-0 z-50 bg-white/95 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900">通讯录</h1>
-        <div className="flex items-center gap-4">
+        <div className="absolute inset-0 z-0" style={getBackgroundStyle()} />
+        <div className="relative z-10 h-full flex flex-col bg-transparent">
+          {/* 顶部：StatusBar + 导航栏一体化 */}
+          <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+            {showStatusBar && <StatusBar />}
+            <div className="px-5 py-4 flex items-center justify-between">
+              <h1 className="text-xl font-semibold text-gray-900">通讯录</h1>
+              <div className="flex items-center gap-4">
           <button 
             onClick={() => console.log('搜索联系人')}
             className="ios-button text-gray-700 hover:text-gray-900 cursor-pointer"
@@ -42,8 +39,9 @@ const Contacts = () => {
           >
             <AddIcon size={22} />
           </button>
-        </div>
-      </div>
+              </div>
+            </div>
+          </div>
 
       {/* 通讯录列表 */}
       <div className="flex-1 overflow-y-auto hide-scrollbar relative z-0">
@@ -110,7 +108,7 @@ const Contacts = () => {
           </div>
         )}
       </div>
-      </div>
+        </div>
     </div>
   )
 }

@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { callAI } from '../utils/api'
 
@@ -18,6 +21,7 @@ const BOARD_SIZE = 15
 const GomokuGame = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   
   const character = id ? getCharacter(id) : null
@@ -213,7 +217,6 @@ ${boardState}
 
 ${chatHistory ? `最近的聊天：\n${chatHistory}\n` : ''}
 ${inputMessage ? `我说：${inputMessage}\n` : ''}
-
 请你：
 1. 决定下一步的位置（格式：x,y，坐标从0到14）
 2. 说一些话（可以评论棋局、回复我的话、或者闲聊）
@@ -418,7 +421,8 @@ ${inputMessage ? `我说：${inputMessage}\n` : ''}
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-amber-50 to-orange-50">
+      {showStatusBar && <StatusBar />}
       {/* 先手选择对话框 */}
       {showFirstPlayerSelect && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

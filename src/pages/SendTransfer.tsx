@@ -1,10 +1,13 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const SendTransfer = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { characterName, chatId } = location.state || {}
+  const { showStatusBar } = useSettings()
 
   const [amount, setAmount] = useState('')
   const [message, setMessage] = useState('')
@@ -27,7 +30,8 @@ const SendTransfer = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#EDEDED]">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部标题栏 */}
       <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-gray-200">
         <button

@@ -5,6 +5,7 @@ import { useSettings } from '../context/SettingsContext'
 import { useBackground } from '../context/BackgroundContext'
 import { getStorageInfo, manualCleanStorage, compressStorageData } from '../utils/storage'
 import { saveImage, getImage, deleteImage } from '../utils/imageStorage'
+import StatusBar from '../components/StatusBar'
 
 const Settings = () => {
   const navigate = useNavigate()
@@ -52,6 +53,14 @@ const Settings = () => {
   const [focusModeColor, setFocusModeColor] = useState(focusMode?.color || '#9333ea')
   const [focusModeShowBg, setFocusModeShowBg] = useState(focusMode?.showBg !== false)
   const focusModeIconInputRef = useRef<HTMLInputElement>(null)
+  
+  // 时间背景设置
+  const [timeSettings, setTimeSettings] = useState(() => {
+    const saved = localStorage.getItem('time_settings')
+    return saved ? JSON.parse(saved) : { showBg: true, color: '#22c55e' }
+  })
+  const [timeColor, setTimeColor] = useState(timeSettings.color || '#22c55e')
+  const [timeShowBg, setTimeShowBg] = useState(timeSettings.showBg !== false)
 
   // 气泡设置
   const [userBubbleColor, setUserBubbleColor] = useState(() => {
@@ -235,6 +244,13 @@ const Settings = () => {
     }
     reader.readAsDataURL(file)
   }
+  
+  // 更新时间设置
+  const updateTimeSettings = (updates: any) => {
+    const newSettings = { ...timeSettings, ...updates }
+    setTimeSettings(newSettings)
+    localStorage.setItem('time_settings', JSON.stringify(newSettings))
+  }
 
   // 清理缓存
   const handleClearCache = () => {
@@ -307,9 +323,13 @@ const Settings = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 - 玻璃效果 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+    <div className="h-full flex flex-col relative overflow-hidden">
+      <div className="absolute inset-0 z-0" style={globalBackground ? { backgroundImage: `url(${globalBackground})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} />
+      <div className="relative z-10 h-full flex flex-col bg-transparent">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
@@ -320,6 +340,7 @@ const Settings = () => {
           设置
         </h1>
         <div className="w-6"></div>
+        </div>
       </div>
 
       {/* 设置内容 */}
@@ -514,6 +535,62 @@ const Settings = () => {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* 时间背景设置 */}
+            <div className="px-4 py-4 border-b border-gray-100">
+              <div className="text-gray-900 font-medium mb-3">时间显示</div>
+              
+              <div className="space-y-3">
+                {/* 显示背景开关 */}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-gray-600">显示背景色</label>
+                  <button
+                    onClick={() => {
+                      const newValue = !timeShowBg
+                      setTimeShowBg(newValue)
+                      updateTimeSettings({ showBg: newValue })
+                    }}
+                    className={`relative w-12 h-6 rounded-full transition-all ${
+                      timeShowBg ? 'bg-green-500' : 'bg-gray-300'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform ${
+                        timeShowBg ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    ></div>
+                  </button>
+                </div>
+                
+                {/* 背景颜色选择 */}
+                {timeShowBg && (
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">背景颜色</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={timeColor}
+                        onChange={(e) => {
+                          setTimeColor(e.target.value)
+                          updateTimeSettings({ color: e.target.value })
+                        }}
+                        className="w-12 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={timeColor}
+                        onChange={(e) => {
+                          setTimeColor(e.target.value)
+                          updateTimeSettings({ color: e.target.value })
+                        }}
+                        className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                        placeholder="#22c55e"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 全局气泡自定义 */}
@@ -887,6 +964,7 @@ const Settings = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

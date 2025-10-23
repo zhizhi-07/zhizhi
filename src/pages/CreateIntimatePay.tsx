@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { BackIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
@@ -8,6 +8,7 @@ import { useSettings } from '../context/SettingsContext'
 
 const CreateIntimatePay = () => {
   const navigate = useNavigate()
+  const { characterId } = useParams<{ characterId: string }>()
   const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
   const [selectedCharacterId, setSelectedCharacterId] = useState('')

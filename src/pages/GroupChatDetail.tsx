@@ -1,5 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { BackIcon, MoreIcon, SendIcon, AddCircleIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
 import { useCharacter } from '../context/CharacterContext'
@@ -33,6 +35,7 @@ const GroupChatDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const { getGroup, updateGroup } = useGroup()
+  const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const { currentUser } = useUser()
   const { background, getBackgroundStyle } = useBackground()
@@ -821,17 +824,20 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
   }
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 壁纸背景层 */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={getBackgroundStyle()}
-      />
+    <div className="h-screen flex flex-col bg-gray-50">
+      <div className="h-full flex flex-col relative overflow-hidden">
+        {/* 壁纸背景层 */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={getBackgroundStyle()}
+        />
 
-      {/* 内容层 */}
-      <div className="relative z-10 h-full flex flex-col bg-transparent">
-        {/* 顶部导航栏 */}
-        <div className={`px-5 py-4 flex items-center justify-between border-b border-white/20 sticky top-0 z-50 shadow-sm ${background ? 'glass-dark' : 'glass-effect'}`}>
+        {/* 内容层 */}
+        <div className="relative z-10 h-full flex flex-col bg-transparent">
+        {/* 顶部：StatusBar + 导航栏一体化 */}
+        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+          {showStatusBar && <StatusBar />}
+          <div className="px-5 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 flex-1 overflow-hidden">
             <button onClick={() => navigate(-1)} className="ios-button text-gray-700">
               <BackIcon size={24} />
@@ -850,6 +856,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
           >
             <MoreIcon size={24} />
           </button>
+          </div>
         </div>
 
         {/* 消息列表 */}
@@ -1164,6 +1171,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
           onClose={() => setShowEmojiPanel(false)}
           onSelect={handleSelectEmoji}
         />
+        </div>
       </div>
     </div>
   )

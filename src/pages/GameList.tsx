@@ -1,4 +1,7 @@
 import { useNavigate } from 'react-router-dom'
+import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import gomokuIcon from '../assets/gomoku-icon.png'
 import undercoverIcon from '../assets/undercover-icon.png'
 
@@ -24,6 +27,7 @@ const BlackjackIcon = () => (
 
 const GameList = () => {
   const navigate = useNavigate()
+  const { showStatusBar } = useSettings()
 
   const games = [
     {
@@ -65,7 +69,8 @@ const GameList = () => {
   ]
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 border-b border-gray-200/50 flex items-center">
         <button

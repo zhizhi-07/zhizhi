@@ -2,11 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
 import { BackIcon, ImageIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { toPinyin } from '../utils/pinyin'
 
 const CreateUser = () => {
   const navigate = useNavigate()
   const { addUser } = useUser()
+  const { showStatusBar } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
@@ -83,7 +86,8 @@ const CreateUser = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部标题栏 */}
       <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
         <button

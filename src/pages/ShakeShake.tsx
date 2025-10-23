@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCharacter } from '../context/CharacterContext'
 import { callAI } from '../utils/api'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 // 随机头像emoji
 const RANDOM_AVATARS = [
@@ -246,6 +248,7 @@ const PRESET_TAGS = [
 const ShakeShake = () => {
   const navigate = useNavigate()
   const { addCharacter } = useCharacter()
+  const { showStatusBar } = useSettings()
   const [isShaking, setIsShaking] = useState(false)
   const [showResult, setShowResult] = useState(false)
   const [randomAIs, setRandomAIs] = useState<any[]>([])
@@ -365,6 +368,9 @@ const ShakeShake = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {/* iOS状态栏 */}
+      {showStatusBar && <StatusBar />}
+      
       {/* 顶部导航 */}
       <div className="glass-effect px-5 py-4 border-b border-gray-200/50 flex items-center">
         <button onClick={() => navigate(-1)} className="text-gray-600 mr-3">

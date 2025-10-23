@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackIcon, AddIcon } from '../components/Icons'
 import { useAccounting } from '../context/AccountingContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types/accounting'
 
 const Accounting = () => {
   const navigate = useNavigate()
   const { transactions, deleteTransaction, getMonthlyTotal } = useAccounting()
+  const { showStatusBar } = useSettings()
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return { year: now.getFullYear(), month: now.getMonth() }
@@ -56,6 +59,7 @@ const Accounting = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
         <button

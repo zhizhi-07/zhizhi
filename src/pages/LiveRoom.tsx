@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 interface Comment {
   user: string
@@ -11,6 +13,7 @@ interface Comment {
 const LiveRoom = () => {
   const navigate = useNavigate()
   const { id } = useParams()
+  const { showStatusBar } = useSettings()
   const [isFollowing, setIsFollowing] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(88000)
@@ -48,6 +51,7 @@ const LiveRoom = () => {
 
   return (
     <div className="h-screen flex flex-col bg-black">
+      {showStatusBar && <StatusBar />}
       {/* 直播画面区域 */}
       <div className="relative flex-1 bg-gray-900">
         {/* 模拟直播画面 */}

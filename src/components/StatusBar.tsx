@@ -4,10 +4,16 @@ import statusIcons from '../assets/status-icons.png'
 const StatusBar = () => {
   const [currentTime, setCurrentTime] = useState(new Date())
   
-  // 专注模式设置（可以在 localStorage 中自定义）
+  // 专注模式设置
   const [focusMode, setFocusMode] = useState(() => {
     const saved = localStorage.getItem('focus_mode')
     return saved ? JSON.parse(saved) : null
+  })
+  
+  // 时间背景设置
+  const [timeSettings, setTimeSettings] = useState(() => {
+    const saved = localStorage.getItem('time_settings')
+    return saved ? JSON.parse(saved) : { showBg: true, color: '#22c55e' }
   })
 
   useEffect(() => {
@@ -18,11 +24,14 @@ const StatusBar = () => {
     return () => clearInterval(timer)
   }, [])
   
-  // 监听专注模式变化
+  // 监听专注模式和时间设置变化
   useEffect(() => {
     const handleStorageChange = () => {
-      const saved = localStorage.getItem('focus_mode')
-      setFocusMode(saved ? JSON.parse(saved) : null)
+      const savedFocus = localStorage.getItem('focus_mode')
+      setFocusMode(savedFocus ? JSON.parse(savedFocus) : null)
+      
+      const savedTime = localStorage.getItem('time_settings')
+      setTimeSettings(savedTime ? JSON.parse(savedTime) : { showBg: true, color: '#22c55e' })
     }
     
     window.addEventListener('storage', handleStorageChange)
@@ -41,10 +50,16 @@ const StatusBar = () => {
   }
 
   return (
-    <div className="bg-transparent h-11 flex items-center justify-between pl-6 pr-2 text-sm font-semibold text-gray-900">
-      {/* 左侧：时间（带绿色圆角背景） */}
+    <div className="h-11 flex items-center justify-between pl-6 pr-2 text-sm font-semibold text-gray-900">
+      {/* 左侧：时间（可自定义背景） */}
       <div className="flex items-center gap-2">
-        <span className="tracking-tight bg-green-500 text-white px-3 py-1 rounded-full text-base font-bold">
+        <span 
+          className="tracking-tight px-3 py-1 rounded-full text-base font-bold"
+          style={{
+            backgroundColor: timeSettings.showBg !== false ? (timeSettings.color || '#22c55e') : 'transparent',
+            color: timeSettings.showBg !== false ? 'white' : '#111827'
+          }}
+        >
           {formatTime(currentTime)}
         </span>
         

@@ -1,5 +1,7 @@
-import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { BackIcon } from '../components/Icons'
 import { getDiaries, generateDiary, saveDiary, deleteDiary, exportDiaries, Diary } from '../utils/diarySystem'
 import { useCharacter } from '../context/CharacterContext'
@@ -11,6 +13,7 @@ import trashIcon from '../assets/trash-icon.png'
 
 const DiaryPage = () => {
   const navigate = useNavigate()
+  const { showStatusBar } = useSettings()
   const { id } = useParams()
   const { getCharacter } = useCharacter()
   const character = id ? getCharacter(id) : undefined
@@ -106,33 +109,35 @@ const DiaryPage = () => {
   }
   
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex flex-col">
-      {/* 顶部导航 */}
-      <div className="glass-effect shadow-sm bg-white/80 backdrop-blur-lg flex-shrink-0">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white/50 rounded-full transition-colors"
-          >
-            <BackIcon className="w-6 h-6 text-gray-700" />
-          </button>
-          
-          <div className="flex items-center gap-2">
-            <img src={diaryIcon} alt="日记" className="w-6 h-6 object-contain" />
-            <h1 className="text-lg font-semibold text-gray-900">
-              {character?.name || 'TA'}的日记本
-            </h1>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
+      <div className="fixed inset-0 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex flex-col">
+        {/* 顶部导航 */}
+        <div className="glass-effect shadow-sm bg-white/80 backdrop-blur-lg flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+            >
+              <BackIcon className="w-6 h-6 text-gray-700" />
+            </button>
+            
+            <div className="flex items-center gap-2">
+              <img src={diaryIcon} alt="日记" className="w-6 h-6 object-contain" />
+              <h1 className="text-lg font-semibold text-gray-900">
+                {character?.name || 'TA'}的日记本
+              </h1>
+            </div>
+            
+            <button
+              onClick={handleExport}
+              className="text-sm text-blue-600 hover:text-blue-700 px-3 py-1 rounded-lg hover:bg-white/50 transition-colors"
+              disabled={diaries.length === 0}
+            >
+              导出
+            </button>
           </div>
-          
-          <button
-            onClick={handleExport}
-            className="text-sm text-blue-600 hover:text-blue-700 px-3 py-1 rounded-lg hover:bg-white/50 transition-colors"
-            disabled={diaries.length === 0}
-          >
-            导出
-          </button>
         </div>
-      </div>
       
       {/* 内容区域 - 可滚动 */}
       <div className="flex-1 overflow-y-auto">
@@ -255,6 +260,7 @@ const DiaryPage = () => {
           </div>
         )}
         </div>
+      </div>
       </div>
     </div>
   )

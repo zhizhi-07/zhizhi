@@ -2,11 +2,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
 import { getStreakData, getCurrentLevel, getNextMilestone, getChatRate, MILESTONES } from '../utils/streakSystem'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const StreakDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const { getCharacter } = useCharacter()
+  const { showStatusBar } = useSettings()
   const character = id ? getCharacter(id) : undefined
   
   const streakData = id ? getStreakData(id) : null
@@ -19,7 +22,8 @@ const StreakDetail = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-orange-50 via-red-50 to-pink-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航 */}
       <div className="glass-effect sticky top-0 z-10 shadow-sm bg-white/80 backdrop-blur-lg">
         <div className="flex items-center justify-between px-4 py-3">

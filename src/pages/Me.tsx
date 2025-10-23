@@ -2,11 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { ServiceIcon, FavoriteIcon, MomentsIcon, WalletIcon, SettingsIcon, ImageIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
 import { useBackground } from '../context/BackgroundContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const Me = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
   const { background, getBackgroundStyle } = useBackground()
+  const { showStatusBar } = useSettings()
 
   // 检查是否是自定义头像（base64图片）
   const isCustomAvatar = currentUser?.avatar && currentUser.avatar.startsWith('data:image')
@@ -32,20 +35,18 @@ const Me = () => {
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 全局背景层 */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={background ? getBackgroundStyle() : {
-          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
-        }}
-      />
-      
-      {/* 内容层 */}
-      <div className="relative z-10 h-full flex flex-col">
-      {/* 顶部标题栏 - 玻璃效果 */}
-      <div className="glass-effect px-5 py-4 border-b border-gray-200/50">
-        <h1 className="text-xl font-semibold text-gray-900">我</h1>
-      </div>
+        {/* 全局背景层 */}
+        <div className="absolute inset-0 z-0" style={getBackgroundStyle()} />
+        
+        {/* 内容层 */}
+        <div className="relative z-10 h-full flex flex-col bg-transparent">
+          {/* 顶部：StatusBar + 导航栏一体化 */}
+          <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+            {showStatusBar && <StatusBar />}
+            <div className="px-5 py-4">
+              <h1 className="text-xl font-semibold text-gray-900">我</h1>
+            </div>
+          </div>
 
       {/* 个人信息区域 */}
       <div className="px-3 pt-3 mb-3">
@@ -103,7 +104,7 @@ const Me = () => {
           </div>
         ))}
       </div>
-      </div>
+        </div>
     </div>
   )
 }

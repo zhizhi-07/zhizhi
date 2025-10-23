@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { BackIcon, ImageIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
 import { useMoments } from '../context/MomentsContext'
@@ -10,6 +12,7 @@ const PublishMoment = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
   const { addMoment, likeMoment, addComment } = useMoments()
+  const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
   const [content, setContent] = useState('')
   const [location, setLocation] = useState('')
@@ -173,7 +176,8 @@ const PublishMoment = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white">
+    <div className="h-screen flex flex-col bg-gray-50">
+      {showStatusBar && <StatusBar />}
       {/* 顶部导航栏 */}
       <div className="bg-white px-4 py-3 flex items-center justify-between border-b border-gray-100 sticky top-0 z-10">
         <button 

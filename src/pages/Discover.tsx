@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useBackground } from '../context/BackgroundContext'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 import { MomentsIcon, VideoChannelIcon, LiveIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon, ShakeIcon } from '../components/Icons'
 import EmojiManagement from '../components/EmojiManagement'
-import { useBackground } from '../context/BackgroundContext'
 
 // 表情包图标组件
 const EmojiIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
@@ -26,9 +28,10 @@ const GameIcon = ({ size = 24, className = '' }: { size?: number; className?: st
 
 const Discover = () => {
   const navigate = useNavigate()
-  const [showEmojiManagement, setShowEmojiManagement] = useState(false)
   const { background, getBackgroundStyle } = useBackground()
-  
+  const { showStatusBar } = useSettings()
+  const [showEmojiManagement, setShowEmojiManagement] = useState(false)
+
   const menuGroups = [
     {
       id: 1,
@@ -68,55 +71,50 @@ const Discover = () => {
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 全局背景层 */}
-      <div 
-        className="absolute inset-0 z-0"
-        style={background ? getBackgroundStyle() : {
-          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
-        }}
-      />
-      
-      {/* 内容层 */}
-      <div className="relative z-10 h-full flex flex-col">
-      {/* 顶部标题栏 - 玻璃效果 */}
-      <div className="glass-effect px-5 py-4 border-b border-gray-200/50">
-        <h1 className="text-xl font-semibold text-gray-900">发现</h1>
-      </div>
+        <div className="absolute inset-0 z-0" style={getBackgroundStyle()} />
+        <div className="relative z-10 h-full flex flex-col bg-transparent">
+        {/* 顶部：StatusBar + 导航栏一体化 */}
+        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+          {showStatusBar && <StatusBar />}
+          <div className="px-5 py-4">
+            <h1 className="text-xl font-semibold text-gray-900">发现</h1>
+          </div>
+        </div>
 
-      {/* 发现列表 */}
-      <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3">
-        {menuGroups.map((group) => (
-          <div key={group.id} className="mb-3">
-            <div className="glass-card rounded-2xl overflow-hidden">
-              {group.items.map((item, index) => {
-                const Icon = item.Icon
-                return (
-                  <div key={item.id}>
-                    <div 
-                      onClick={() => {
-                        if (item.action === 'emoji') {
-                          setShowEmojiManagement(true)
-                        } else if (item.path) {
-                          navigate(item.path)
-                        }
-                      }}
-                      className="flex items-center px-4 py-4 ios-button cursor-pointer"
-                    >
-                      <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center flex-shrink-0 shadow-lg border border-gray-200/50">
-                        <Icon size={22} className="text-gray-600" />
+        {/* 发现列表 */}
+        <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3">
+          {menuGroups.map((group) => (
+            <div key={group.id} className="mb-3">
+              <div className="glass-card rounded-2xl overflow-hidden">
+                {group.items.map((item, index) => {
+                  const Icon = item.Icon
+                  return (
+                    <div key={item.id}>
+                      <div 
+                        onClick={() => {
+                          if (item.action === 'emoji') {
+                            setShowEmojiManagement(true)
+                          } else if (item.path) {
+                            navigate(item.path)
+                          }
+                        }}
+                        className="flex items-center px-4 py-4 ios-button cursor-pointer"
+                      >
+                        <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center flex-shrink-0 shadow-lg border border-gray-200/50">
+                          <Icon size={22} className="text-gray-600" />
+                        </div>
+                        <span className="ml-4 flex-1 text-gray-900 font-medium">
+                          {item.name}
+                        </span>
+                        <span className="text-gray-400 text-xl">›</span>
                       </div>
-                      <span className="ml-4 flex-1 text-gray-900 font-medium">
-                        {item.name}
-                      </span>
-                      <span className="text-gray-400 text-xl">›</span>
+                      {index < group.items.length - 1 && (
+                        <div className="ml-16 border-b border-gray-100" />
+                      )}
                     </div>
-                    {index < group.items.length - 1 && (
-                      <div className="ml-16 border-b border-gray-100" />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
           </div>
         ))}
       </div>
@@ -126,7 +124,7 @@ const Discover = () => {
         show={showEmojiManagement}
         onClose={() => setShowEmojiManagement(false)}
       />
-      </div>
+        </div>
     </div>
   )
 }
