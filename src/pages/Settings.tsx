@@ -41,6 +41,17 @@ const Settings = () => {
   const [isUploading, setIsUploading] = useState(false)
   const [backgroundPreview, setBackgroundPreview] = useState(globalBackground)
   const [storageInfo, setStorageInfo] = useState(getStorageInfo())
+  
+  // 专注模式设置
+  const [focusMode, setFocusMode] = useState(() => {
+    const saved = localStorage.getItem('focus_mode')
+    return saved ? JSON.parse(saved) : null
+  })
+  const [focusModeIcon, setFocusModeIcon] = useState(focusMode?.icon || '')
+  const [focusModeName, setFocusModeName] = useState(focusMode?.name || '')
+  const [focusModeColor, setFocusModeColor] = useState(focusMode?.color || '#9333ea')
+  const [focusModeShowBg, setFocusModeShowBg] = useState(focusMode?.showBg !== false)
+  const focusModeIconInputRef = useRef<HTMLInputElement>(null)
 
   // 气泡设置
   const [userBubbleColor, setUserBubbleColor] = useState(() => {
@@ -168,6 +179,61 @@ const Settings = () => {
     const newValue = !applyToAllPages
     setApplyToAllPages(newValue)
     localStorage.setItem('apply_background_to_all_pages', String(newValue))
+  }
+  
+  // 切换专注模式
+  const handleToggleFocusMode = () => {
+    if (focusMode) {
+      // 关闭专注模式
+      setFocusMode(null)
+      localStorage.removeItem('focus_mode')
+    } else {
+      // 开启专注模式
+      const newMode = { 
+        icon: focusModeIcon, 
+        name: focusModeName,
+        color: focusModeColor,
+        showBg: focusModeShowBg
+      }
+      setFocusMode(newMode)
+      localStorage.setItem('focus_mode', JSON.stringify(newMode))
+    }
+  }
+  
+  // 更新专注模式配置
+  const updateFocusMode = (updates: any) => {
+    if (focusMode) {
+      const newMode = { ...focusMode, ...updates }
+      setFocusMode(newMode)
+      localStorage.setItem('focus_mode', JSON.stringify(newMode))
+    }
+  }
+  
+  // 上传专注模式图标
+  const handleFocusModeIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 1 * 1024 * 1024) {
+      alert('图片大小不能超过1MB')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setFocusModeIcon(base64String)
+      updateFocusMode({ icon: base64String })
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+    }
+    reader.readAsDataURL(file)
   }
 
   // 清理缓存
@@ -321,6 +387,133 @@ const Settings = () => {
                   }`}
                 ></div>
               </button>
+            </div>
+
+            {/* 专注模式设置 */}
+            <div className="px-4 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1">
+                  <div className="text-gray-900 font-medium mb-0.5">专注模式</div>
+                  <div className="text-xs text-gray-500">在状态栏显示自定义图标和文字</div>
+                </div>
+                <button
+                  onClick={handleToggleFocusMode}
+                  className={`relative w-14 h-8 rounded-full transition-all duration-300 ${
+                    focusMode ? 'bg-purple-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                      focusMode ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  ></div>
+                </button>
+              </div>
+              
+              {/* 专注模式自定义 */}
+              {focusMode && (
+                <div className="space-y-3 pt-3 border-t border-gray-100">
+                  {/* 图标上传 */}
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">图标</label>
+                    <input
+                      ref={focusModeIconInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFocusModeIconUpload}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      {focusModeIcon && (
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 flex items-center justify-center">
+                          <img src={focusModeIcon} alt="图标" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => focusModeIconInputRef.current?.click()}
+                        className="flex-1 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs"
+                      >
+                        {focusModeIcon ? '更换图标' : '上传图标'}
+                      </button>
+                      {focusModeIcon && (
+                        <button
+                          onClick={() => {
+                            setFocusModeIcon('')
+                            updateFocusMode({ icon: '' })
+                          }}
+                          className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs"
+                        >
+                          删除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* 名称 */}
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">名称</label>
+                    <input
+                      type="text"
+                      value={focusModeName}
+                      onChange={(e) => {
+                        setFocusModeName(e.target.value)
+                        updateFocusMode({ name: e.target.value })
+                      }}
+                      placeholder="请输入模式名称"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                    />
+                  </div>
+                  
+                  {/* 显示背景开关 */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-600">显示背景色</label>
+                    <button
+                      onClick={() => {
+                        const newValue = !focusModeShowBg
+                        setFocusModeShowBg(newValue)
+                        updateFocusMode({ showBg: newValue })
+                      }}
+                      className={`relative w-12 h-6 rounded-full transition-all ${
+                        focusModeShowBg ? 'bg-purple-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform ${
+                          focusModeShowBg ? 'translate-x-6' : 'translate-x-0'
+                        }`}
+                      ></div>
+                    </button>
+                  </div>
+                  
+                  {/* 背景颜色选择 */}
+                  {focusModeShowBg && (
+                    <div>
+                      <label className="text-xs text-gray-600 mb-1 block">背景颜色</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={focusModeColor}
+                          onChange={(e) => {
+                            setFocusModeColor(e.target.value)
+                            updateFocusMode({ color: e.target.value })
+                          }}
+                          className="w-12 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={focusModeColor}
+                          onChange={(e) => {
+                            setFocusModeColor(e.target.value)
+                            updateFocusMode({ color: e.target.value })
+                          }}
+                          className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                          placeholder="#9333ea"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* 全局气泡自定义 */}
