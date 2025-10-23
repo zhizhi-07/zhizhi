@@ -129,7 +129,7 @@ const MusicPlayer = () => {
       album: '舍得',
       duration: 241,
       cover: musicCover,
-      audioUrl: '/songs/舍得-王唯旖#evb5d.mp3',
+      audioUrl: '/songs/舍得-王唯旖.mp3',
       lyricsUrl: '/songs/舍得-王唯旖.lrc'
     },
     {
