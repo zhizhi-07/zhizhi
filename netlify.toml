@@ -6,11 +6,6 @@
 [functions]
   node_bundler = "esbuild"
 
-# 定时任务配置（每小时运行一次）
-[[functions]]
-  path = "/scheduled-messages"
-  schedule = "0 * * * *"
-
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

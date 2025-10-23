@@ -647,19 +647,21 @@ const ChatSettings = () => {
             <span className="text-sm text-gray-600 font-medium">红包 & 转账封面</span>
             <p className="text-xs text-gray-400 mt-1">自定义红包和转账的背景图片</p>
           </div>
-          <div className="glass-card rounded-2xl overflow-hidden">
-            {/* 红包封面 */}
-            <div className="px-4 py-4 border-b border-gray-100">
-              <input
-                ref={redEnvelopeCoverInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleRedEnvelopeCoverUpload}
-                className="hidden"
-              />
-              <div className="flex items-center gap-3">
+          <div className="glass-card rounded-2xl p-4">
+            <div className="grid grid-cols-4 gap-2">
+              {/* 红包封面 */}
+              <div>
+                <input
+                  ref={redEnvelopeCoverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleRedEnvelopeCoverUpload}
+                  className="hidden"
+                />
+                <div className="text-sm font-medium text-gray-900 mb-2">红包封面</div>
                 <div 
-                  className="w-20 h-20 rounded-xl overflow-hidden border-2 border-red-200 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-red-500 to-orange-500"
+                  onClick={() => redEnvelopeCoverInputRef.current?.click()}
+                  className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-red-200 flex items-center justify-center bg-gradient-to-br from-red-500 to-orange-500 cursor-pointer hover:opacity-90 transition-opacity group"
                   style={{
                     backgroundImage: redEnvelopeCover ? `url(${redEnvelopeCover})` : 'none',
                     backgroundSize: 'cover',
@@ -667,43 +669,39 @@ const ChatSettings = () => {
                   }}
                 >
                   {!redEnvelopeCover && (
-                    <span className="text-3xl">🧧</span>
+                    <span className="text-5xl">🧧</span>
                   )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 mb-1">红包封面</div>
-                  <div className="flex gap-2">
+                  {redEnvelopeCover && (
                     <button
-                      onClick={() => redEnvelopeCoverInputRef.current?.click()}
-                      className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg ios-button text-xs font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveRedEnvelopeCover()
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                     >
-                      {redEnvelopeCover ? '更换' : '上传'}
+                      ×
                     </button>
-                    {redEnvelopeCover && (
-                      <button
-                        onClick={handleRemoveRedEnvelopeCover}
-                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
-                      >
-                        移除
-                      </button>
-                    )}
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-xs text-center">点击{redEnvelopeCover ? '更换' : '上传'}</p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-1 text-center">自定义红包的背景图片</p>
               </div>
-            </div>
 
-            {/* 红包图标 */}
-            <div className="px-4 py-4 border-b border-gray-100">
-              <input
-                ref={redEnvelopeIconInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleRedEnvelopeIconUpload}
-                className="hidden"
-              />
-              <div className="flex items-center gap-3">
+              {/* 红包图标 */}
+              <div>
+                <input
+                  ref={redEnvelopeIconInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleRedEnvelopeIconUpload}
+                  className="hidden"
+                />
+                <div className="text-sm font-medium text-gray-900 mb-2">红包图标</div>
                 <div 
-                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-red-300 flex-shrink-0 flex items-center justify-center bg-red-500"
+                  onClick={() => redEnvelopeIconInputRef.current?.click()}
+                  className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-red-300 flex items-center justify-center bg-red-500 cursor-pointer hover:opacity-90 transition-opacity group"
                   style={{
                     backgroundImage: redEnvelopeIcon ? `url(${redEnvelopeIcon})` : 'none',
                     backgroundSize: 'cover',
@@ -711,44 +709,39 @@ const ChatSettings = () => {
                   }}
                 >
                   {!redEnvelopeIcon && (
-                    <span className="text-2xl text-white font-bold">领</span>
+                    <span className="text-5xl text-white font-bold">领</span>
                   )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 mb-1">红包图标</div>
-                  <div className="text-xs text-gray-500 mb-2">红包卡片上的"领"字图标</div>
-                  <div className="flex gap-2">
+                  {redEnvelopeIcon && (
                     <button
-                      onClick={() => redEnvelopeIconInputRef.current?.click()}
-                      className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg ios-button text-xs font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveRedEnvelopeIcon()
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                     >
-                      {redEnvelopeIcon ? '更换' : '上传'}
+                      ×
                     </button>
-                    {redEnvelopeIcon && (
-                      <button
-                        onClick={handleRemoveRedEnvelopeIcon}
-                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
-                      >
-                        移除
-                      </button>
-                    )}
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-xs text-center">点击{redEnvelopeIcon ? '更换' : '上传'}</p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-1 text-center">红包卡片上的“领”字图标</p>
               </div>
-            </div>
 
-            {/* 转账封面 */}
-            <div className="px-4 py-4 border-b border-gray-100">
-              <input
-                ref={transferCoverInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleTransferCoverUpload}
-                className="hidden"
-              />
-              <div className="flex items-center gap-3">
+              {/* 转账封面 */}
+              <div>
+                <input
+                  ref={transferCoverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleTransferCoverUpload}
+                  className="hidden"
+                />
+                <div className="text-sm font-medium text-gray-900 mb-2">转账封面</div>
                 <div 
-                  className="w-20 h-20 rounded-xl overflow-hidden border-2 border-orange-200 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-orange-400 to-yellow-400"
+                  onClick={() => transferCoverInputRef.current?.click()}
+                  className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-orange-200 flex items-center justify-center bg-gradient-to-br from-orange-400 to-yellow-400 cursor-pointer hover:opacity-90 transition-opacity group"
                   style={{
                     backgroundImage: transferCover ? `url(${transferCover})` : 'none',
                     backgroundSize: 'cover',
@@ -756,43 +749,39 @@ const ChatSettings = () => {
                   }}
                 >
                   {!transferCover && (
-                    <span className="text-3xl">💰</span>
+                    <span className="text-5xl">💰</span>
                   )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 mb-1">转账封面</div>
-                  <div className="flex gap-2">
+                  {transferCover && (
                     <button
-                      onClick={() => transferCoverInputRef.current?.click()}
-                      className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg ios-button text-xs font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveTransferCover()
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                     >
-                      {transferCover ? '更换' : '上传'}
+                      ×
                     </button>
-                    {transferCover && (
-                      <button
-                        onClick={handleRemoveTransferCover}
-                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
-                      >
-                        移除
-                      </button>
-                    )}
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-xs text-center">点击{transferCover ? '更换' : '上传'}</p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-1 text-center">自定义转账的背景图片</p>
               </div>
-            </div>
 
-            {/* 转账图标 */}
-            <div className="px-4 py-4">
-              <input
-                ref={transferIconInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleTransferIconUpload}
-                className="hidden"
-              />
-              <div className="flex items-center gap-3">
+              {/* 转账图标 */}
+              <div>
+                <input
+                  ref={transferIconInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleTransferIconUpload}
+                  className="hidden"
+                />
+                <div className="text-sm font-medium text-gray-900 mb-2">转账图标</div>
                 <div 
-                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-orange-300 flex-shrink-0 flex items-center justify-center bg-orange-500"
+                  onClick={() => transferIconInputRef.current?.click()}
+                  className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-orange-300 flex items-center justify-center bg-orange-500 cursor-pointer hover:opacity-90 transition-opacity group"
                   style={{
                     backgroundImage: transferIcon ? `url(${transferIcon})` : 'none',
                     backgroundSize: 'cover',
@@ -800,29 +789,24 @@ const ChatSettings = () => {
                   }}
                 >
                   {!transferIcon && (
-                    <span className="text-2xl text-white font-bold">¥</span>
+                    <span className="text-5xl text-white font-bold">¥</span>
                   )}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900 mb-1">转账图标</div>
-                  <div className="text-xs text-gray-500 mb-2">卡片左上角的圆形图标</div>
-                  <div className="flex gap-2">
+                  {transferIcon && (
                     <button
-                      onClick={() => transferIconInputRef.current?.click()}
-                      className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg ios-button text-xs font-medium"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveTransferIcon()
+                      }}
+                      className="absolute top-2 right-2 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                     >
-                      {transferIcon ? '更换' : '上传'}
+                      ×
                     </button>
-                    {transferIcon && (
-                      <button
-                        onClick={handleRemoveTransferIcon}
-                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
-                      >
-                        移除
-                      </button>
-                    )}
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-white text-xs text-center">点击{transferIcon ? '更换' : '上传'}</p>
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-1 text-center">卡片左上角的圆形图标</p>
               </div>
             </div>
           </div>

@@ -901,16 +901,16 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             // 表情包消息
             if (isEmoji && message.emojiIndex !== undefined) {
               return (
-                <div key={message.id} className={`flex gap-3 mb-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center shadow-lg overflow-hidden">
+                <div key={message.id} className={`flex gap-3 mb-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md overflow-hidden">
                       {isCustomAvatar ? (
                         <img src={message.senderAvatar} alt={message.senderName} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-xl">{message.senderAvatar || '🤖'}</span>
+                        <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-400">{message.time}</span>
+                    <span className="text-[9px] text-gray-400">{message.time}</span>
                   </div>
                   <div className={`max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
                     <img
@@ -937,16 +937,16 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
               if (!envelope) return null
 
               return (
-                <div key={message.id} className={`flex gap-3 mb-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-                  <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center shadow-lg overflow-hidden">
+                <div key={message.id} className={`flex gap-3 mb-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                  <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md overflow-hidden">
                       {isCustomAvatar ? (
                         <img src={message.senderAvatar} alt={message.senderName} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-xl">{message.senderAvatar || '🤖'}</span>
+                        <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-400">{message.time}</span>
+                    <span className="text-[9px] text-gray-400">{message.time}</span>
                   </div>
                   <div className={`max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
                     <div 
@@ -990,19 +990,19 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             return (
               <div
                 key={message.id}
-                className={`flex gap-3 mb-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                className={`flex gap-3 mb-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
               >
                 {/* 头像和时间 */}
-                <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                  <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center shadow-lg overflow-hidden">
+                <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md overflow-hidden">
                     {isCustomAvatar ? (
                       <img src={message.senderAvatar} alt={message.senderName} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xl">{message.senderAvatar || '🤖'}</span>
+                      <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                     )}
                   </div>
                   {/* 时间显示在头像下方 */}
-                  <span className="text-xs text-gray-400">{message.time}</span>
+                  <span className="text-[9px] text-gray-400">{message.time}</span>
                 </div>
 
                 {/* 消息内容 */}
@@ -1014,7 +1014,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
 
                   {/* 消息气泡 */}
                   <div
-                    className={`px-4 py-2 rounded-2xl shadow-md ${
+                    className={`px-3 py-2 rounded-xl shadow-sm text-sm ${
                       isUser
                         ? 'bg-wechat-primary text-white rounded-tr-sm'
                         : 'glass-card text-gray-900 rounded-tl-sm'
@@ -1032,10 +1032,10 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
           {/* AI输入中提示 */}
           {isAiTyping && (
             <div className="flex gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center shadow-lg">
-                <span className="text-xl">🤖</span>
+              <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md">
+                <span className="text-lg">🤖</span>
               </div>
-              <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-sm">
+              <div className="glass-card px-3 py-2 rounded-xl rounded-tl-sm">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                   <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>

@@ -11,6 +11,8 @@ import { BackgroundProvider } from './context/BackgroundContext'
 import { AccountingProvider } from './context/AccountingContext'
 import { GroupProvider } from './context/GroupContext'
 import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
+import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
+import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
 import MomentsSocialManager from './components/MomentsSocialManager'
@@ -64,10 +66,34 @@ import LiveRoom from './pages/LiveRoom'
 import SparkMoments from './pages/SparkMoments'
 import MemesLibrary from './pages/MemesLibrary'
 import MiniPrograms from './pages/MiniPrograms'
+import BubbleStore from './pages/BubbleStore'
+import FontCustomizer from './pages/FontCustomizer'
+import MusicPlayer from './pages/MusicPlayer'
+import UploadSong from './pages/UploadSong'
 import GomokuGame from './pages/GomokuGame'
 import GameCharacterSelect from './pages/GameCharacterSelect'
 import GameList from './pages/GameList'
 import UndercoverGame from './pages/UndercoverGame'
+
+// DynamicIsland包装组件
+const DynamicIslandWrapper = () => {
+  const musicPlayer = useMusicPlayer()
+  
+  // 只在有歌曲播放时显示灵动岛
+  if (!musicPlayer.currentSong) return null
+  
+  return (
+    <DynamicIsland
+      isPlaying={musicPlayer.isPlaying}
+      currentSong={musicPlayer.currentSong}
+      onPlayPause={musicPlayer.togglePlay}
+      onNext={musicPlayer.next}
+      onPrevious={musicPlayer.previous}
+      currentTime={musicPlayer.currentTime}
+      duration={musicPlayer.duration}
+    />
+  )
+}
 
 function App() {
   // 初始化性能监控
@@ -76,6 +102,58 @@ function App() {
       initPerformanceMonitor()
       console.log('📊 性能监控已启动')
     }
+  }, [])
+
+  // 加载自定义字体
+  useEffect(() => {
+    const loadCustomFonts = async () => {
+      try {
+        const savedFonts = localStorage.getItem('custom_fonts')
+        if (!savedFonts) return
+
+        const fonts = JSON.parse(savedFonts)
+        console.log(`🔄 开始加载 ${fonts.length} 个自定义字体...`)
+
+        // 并行加载所有字体
+        const loadPromises = fonts.map(async (font: any) => {
+          try {
+            // 检查字体是否已存在
+            const existingFont = Array.from(document.fonts).find(
+              (f: any) => f.family === font.fontFamily
+            )
+            if (existingFont) {
+              console.log(`⚡ 字体已存在: ${font.name}`)
+              return true
+            }
+
+            const fontFace = new FontFace(font.fontFamily, `url(${font.url})`)
+            await fontFace.load()
+            document.fonts.add(fontFace)
+            console.log(`✅ 字体加载成功: ${font.name}`)
+            return true
+          } catch (error) {
+            console.error(`❌ 字体加载失败: ${font.name}`, error)
+            return false
+          }
+        })
+
+        await Promise.all(loadPromises)
+        
+        // 应用当前字体
+        const currentFontValue = localStorage.getItem('chat_font_family_value')
+        const currentFontId = localStorage.getItem('chat_font_family')
+        if (currentFontValue && currentFontId !== 'system') {
+          document.documentElement.style.setProperty('--chat-font-family', currentFontValue)
+          console.log(`✅ 已应用字体: ${currentFontValue}`)
+        }
+        
+        console.log(`✅ 所有字体加载完成`)
+      } catch (error) {
+        console.error('字体加载失败:', error)
+      }
+    }
+
+    loadCustomFonts()
   }, [])
 
   return (
@@ -92,8 +170,10 @@ function App() {
                   <RedEnvelopeProvider>
                     <AccountingProvider>
                     <SettingsProvider>
-                      <OfflineIndicator />
-                      <Router>
+                      <MusicPlayerProvider>
+                        <Router>
+                          <OfflineIndicator />
+                          <DynamicIslandWrapper />
                 <Routes>
                   <Route path="/" element={<Layout />}>
                   <Route index element={<ChatList />} />
@@ -144,12 +224,17 @@ function App() {
               <Route path="/spark-moments" element={<SparkMoments />} />
               <Route path="/memes-library" element={<MemesLibrary />} />
               <Route path="/mini-programs" element={<MiniPrograms />} />
+              <Route path="/bubble-store" element={<BubbleStore />} />
+              <Route path="/font-customizer" element={<FontCustomizer />} />
+              <Route path="/music-player" element={<MusicPlayer />} />
+              <Route path="/upload-song" element={<UploadSong />} />
               <Route path="/gomoku/:id" element={<GomokuGame />} />
               <Route path="/game-select" element={<GameCharacterSelect />} />
               <Route path="/games" element={<GameList />} />
               <Route path="/undercover" element={<UndercoverGame />} />
                   </Routes>
                 </Router>
+                      </MusicPlayerProvider>
                     </SettingsProvider>
                     </AccountingProvider>
                   </RedEnvelopeProvider>

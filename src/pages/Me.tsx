@@ -4,6 +4,7 @@ import { useUser } from '../context/UserContext'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { getUserAvatar } from '../utils/avatarUtils'
 
 const Me = () => {
   const navigate = useNavigate()
@@ -56,11 +57,7 @@ const Me = () => {
             className="flex items-center px-5 py-5 ios-button cursor-pointer"
           >
             <div className="w-20 h-20 rounded-2xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-xl overflow-hidden">
-              {isCustomAvatar && currentUser?.avatar ? (
-                <img src={currentUser.avatar} alt="头像" className="w-full h-full object-cover" />
-              ) : (
-                <ImageIcon size={40} className="text-gray-400" />
-              )}
+              <img src={getUserAvatar(currentUser?.avatar)} alt="头像" className="w-full h-full object-cover" />
             </div>
             <div className="ml-4 flex-1">
               <h2 className="text-lg font-semibold text-gray-900 mb-1">

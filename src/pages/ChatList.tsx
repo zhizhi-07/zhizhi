@@ -7,6 +7,7 @@ import { useBackground } from '../context/BackgroundContext'
 import { getStreakData } from '../utils/streakSystem'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { getAiAvatar } from '../utils/avatarUtils'
 
 interface Chat {
   id: string
@@ -254,11 +255,7 @@ const ChatList = () => {
                   renderGroupAvatar(chat.groupId)
                 ) : (
                   <div className="w-14 h-14 rounded-2xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
-                    {isCustomAvatar ? (
-                      <img src={chat.avatar} alt={chat.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-3xl">{chat.avatar || '🤖'}</span>
-                    )}
+                    <img src={getAiAvatar(chat.avatar)} alt={chat.name} className="w-full h-full object-cover" />
                   </div>
                 )}
 
@@ -341,7 +338,6 @@ const ChatList = () => {
               ) : (
                 <div className="space-y-2">
                   {availableCharacters.map(character => {
-                    const isCustomAvatar = character.avatar && character.avatar.startsWith('data:image')
                     return (
                       <div
                         key={character.id}
@@ -349,11 +345,7 @@ const ChatList = () => {
                         className="flex items-center p-4 glass-card rounded-2xl ios-button cursor-pointer hover:bg-gray-50"
                       >
                         <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
-                          {isCustomAvatar ? (
-                            <img src={character.avatar} alt={character.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-2xl">{character.avatar || '🤖'}</span>
-                          )}
+                          <img src={getAiAvatar(character.avatar)} alt={character.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="ml-3 flex-1 overflow-hidden">
                           <h3 className="font-medium text-gray-900">{character.name}</h3>

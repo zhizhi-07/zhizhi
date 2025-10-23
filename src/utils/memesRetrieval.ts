@@ -714,40 +714,55 @@ export const memesData: Meme[] = [
 ]
 
 /**
- * 检索匹配的热梗
+ * 随机获取热梗
+ * @param count 获取的梗数量
+ * @returns 随机梗对象数组
+ */
+export function getRandomMemes(count: number = 3): Meme[] {
+  const shuffled = [...memesData].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, Math.min(count, memesData.length))
+}
+
+/**
+ * 检索匹配的热梗（同时包含匹配的和随机的）
  * @param userMessage 用户消息
- * @param maxResults 最多返回的梗数量（默认3个）
+ * @param maxResults 最多返回的梗数量（默认5个）
  * @returns 匹配到的梗对象数组
  */
 export async function retrieveMemes(
   userMessage: string,
-  maxResults: number = 3
+  maxResults: number = 5
 ): Promise<Meme[]> {
-  if (!userMessage || userMessage.trim().length === 0) {
-    return []
-  }
-
-  const matchedMemes: Meme[] = []
+  const allMemes: Meme[] = []
   const messageLower = userMessage.toLowerCase()
 
-  // 遍历梗库，查找匹配的梗
-  for (const meme of memesData) {
-    // 检查是否有任何关键词匹配
-    const hasMatch = meme.keywords.some(keyword => 
-      messageLower.includes(keyword.toLowerCase())
-    )
+  // 1. 首先查找匹配用户消息的梗（最多2个）
+  if (userMessage && userMessage.trim().length > 0) {
+    for (const meme of memesData) {
+      const hasMatch = meme.keywords.some(keyword => 
+        messageLower.includes(keyword.toLowerCase())
+      )
 
-    if (hasMatch) {
-      matchedMemes.push(meme)
-      
-      // 达到最大数量就停止
-      if (matchedMemes.length >= maxResults) {
-        break
+      if (hasMatch && allMemes.length < 2) {
+        allMemes.push(meme)
       }
     }
   }
 
-  return matchedMemes
+  // 2. 然后添加随机梗（补充到maxResults个）
+  const remainingCount = maxResults - allMemes.length
+  if (remainingCount > 0) {
+    const randomMemes = getRandomMemes(remainingCount)
+    // 去重：不添加已经匹配的梗
+    const matchedIds = new Set(allMemes.map(m => m.id))
+    randomMemes.forEach(meme => {
+      if (!matchedIds.has(meme.id)) {
+        allMemes.push(meme)
+      }
+    })
+  }
+
+  return allMemes
 }
 
 /**
@@ -761,9 +776,9 @@ export function generateMemesPrompt(memes: Meme[]): string {
   }
 
   let prompt = '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
-  prompt += '🔥 热梗提示（可选使用）\n'
+  prompt += '🔥 热梗库（你可以主动使用）\n'
   prompt += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n'
-  prompt += '检测到用户消息可能适合使用以下热梗，你可以自然地使用它们：\n\n'
+  prompt += '以下是一些网络热梗，你可以在合适的时候主动使用它们：\n\n'
 
   memes.forEach((meme, index) => {
     prompt += `${index + 1}. 【${meme.梗}】\n`
@@ -771,10 +786,11 @@ export function generateMemesPrompt(memes: Meme[]): string {
   })
 
   prompt += '⚠️ 使用建议：\n'
-  prompt += '• 只在合适的时候使用，不要强行使用\n'
-  prompt += '• 要符合你的人设和当前情境\n'
-  prompt += '• 可以不用，正常回复也完全OK\n'
-  prompt += '• 使用时要自然，不要显得刻意\n'
+  prompt += '• 你可以主动使用这些梗，不需要等用户先用\n'
+  prompt += '• 根据对话情境自然地融入，不要生硬\n'
+  prompt += '• 要符合你的人设（活泼的人设可以多用，高冷的少用）\n'
+  prompt += '• 不是每句话都要用梗，适度即可\n'
+  prompt += '• 用梗的时候要自然，就像真人聊天一样\n'
   prompt += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
 
   return prompt

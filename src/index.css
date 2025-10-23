@@ -18,6 +18,9 @@
   --bubble-user: #95EC69;
   --bubble-ai: #ffffff;
   --wechat-green: #07C160;
+  
+  /* 自定义字体 */
+  --chat-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 [data-theme="dark"] {
@@ -44,8 +47,8 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: var(--chat-font-family, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-primary);
@@ -313,4 +316,9 @@ body {
   justify-content: center;
   height: 100%;
   color: rgba(100, 116, 139, 0.5);
+}
+
+/* 聊天消息字体 */
+.message-bubble {
+  font-family: var(--chat-font-family);
 }

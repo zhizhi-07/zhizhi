@@ -1,5 +1,5 @@
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { BackIcon, MoreIcon, SendIcon, AddCircleIcon, EmojiIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
@@ -235,10 +235,10 @@ const ChatDetail = () => {
 
   // 读取气泡自定义设置 - 使用 state 以便响应变化
   const [userBubbleColor, setUserBubbleColor] = useState(() => {
-    return localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#95EC69'
+    return localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#FFD4E5'
   })
   const [aiBubbleColor, setAiBubbleColor] = useState(() => {
-    return localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF'
+    return localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#B3E5D8'
   })
   const [userBubbleCSS, setUserBubbleCSS] = useState(() => {
     return localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || ''
@@ -261,17 +261,27 @@ const ChatDetail = () => {
     return localStorage.getItem(`transfer_icon_${id}`) || ''
   })
   
-  // 监听 localStorage 变化，实时更新气泡样式和封面
+  // 监听 localStorage 变化，实时更新气泡样式、封面和字体
   useEffect(() => {
     const handleStorageChange = () => {
-      setUserBubbleColor(localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#95EC69')
-      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF')
+      setUserBubbleColor(localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#FFD4E5')
+      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#B3E5D8')
       setUserBubbleCSS(localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || '')
       setAiBubbleCSS(localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || '')
       setRedEnvelopeCover(localStorage.getItem(`red_envelope_cover_${id}`) || '')
       setRedEnvelopeIcon(localStorage.getItem(`red_envelope_icon_${id}`) || '')
       setTransferCover(localStorage.getItem(`transfer_cover_${id}`) || '')
       setTransferIcon(localStorage.getItem(`transfer_icon_${id}`) || '')
+      
+      // 应用自定义字体
+      const fontId = localStorage.getItem('chat_font_family')
+      const fontFamilyValue = localStorage.getItem('chat_font_family_value')
+      
+      if (fontId && fontId !== 'system' && fontFamilyValue) {
+        document.documentElement.style.setProperty('--chat-font-family', fontFamilyValue)
+      } else {
+        document.documentElement.style.removeProperty('--chat-font-family')
+      }
     }
     
     window.addEventListener('storage', handleStorageChange)
@@ -503,15 +513,16 @@ const ChatDetail = () => {
     }
   }, [id, messages])
 
-  // 从角色描述中提取初始记忆（只执行一次）
-  useEffect(() => {
-    if (character?.description && id) {
-      memorySystem.extractInitialMemories(character.description)
-        .catch((error: any) => {
-          console.error('❌ 初始记忆提取失败:', error)
-        })
-    }
-  }, [character?.description, id, memorySystem])
+  // 从角色描述中提取初始记忆（已禁用，避免不必要的API调用）
+  // useEffect(() => {
+  //   if (character?.description && id) {
+  //     memorySystem.extractInitialMemories(character.description)
+  //       .catch((error: any) => {
+  //         console.error('❌ 初始记忆提取失败:', error)
+  //       })
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [character?.description, id])
 
   // 背景设置现在由全局 BackgroundContext 管理
   
@@ -797,8 +808,8 @@ ${character.description || ''}
         updateStreak(id)
       }
       
-      // 触发AI回复
-      await getAIReply(updatedMessages)
+      // 不自动触发AI回复，让用户手动点击按钮触发
+      // await getAIReply(updatedMessages)
     }
   }
 
@@ -808,6 +819,11 @@ ${character.description || ''}
     // 如果是第一次对话（没有消息），让AI主动打招呼
     await getAIReply(messages)
   }
+
+  // 计算是否有输入内容（优化性能，避免重复计算）
+  const hasInputText = useMemo(() => {
+    return inputValue.trim().length > 0
+  }, [inputValue])
 
   // 领取AI发来的转账
   const handleReceiveTransfer = (messageId: number) => {
@@ -1530,11 +1546,12 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       const streakData = id ? getStreakData(id) : null
       const streakDays = streakData?.currentStreak || 0
       
-      // 🔥 检索热梗
+      // 🔥 检索热梗（包含匹配的和随机的）
       const { retrieveMemes } = await import('../utils/memesRetrieval')
       const lastUserMessage = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
       const userMessageContent = lastUserMessage?.content || ''
-      const matchedMemes = await retrieveMemes(userMessageContent, 3)
+      // 获取5个梗：最多2个匹配的 + 3个随机的
+      const matchedMemes = await retrieveMemes(userMessageContent, 5)
       
       // 转换为 RetrievedMeme 格式
       const retrievedMemes = matchedMemes.map(m => ({
@@ -1543,7 +1560,7 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       }))
       
       if (matchedMemes.length > 0) {
-        console.log('🔥 检测到热梗:', matchedMemes.map(m => m['梗']).join(', '))
+        console.log('🔥 热梗库:', matchedMemes.map(m => m['梗']).join(', '))
       }
       
       const systemPrompt = buildRoleplayPrompt(
@@ -1717,9 +1734,14 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
 📱 回复方式
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• 可以连续发多条消息（用\n分隔）
+• 可以连续发多条消息（用换行分隔，每条消息单独一行）
 • 根据心情决定回复长度
 • 像真人一样自然聊天
+
+💡 多条消息示例：
+第一条消息
+第二条消息
+第三条消息
 
 回复格式：
 1. 先写聊天内容（正常聊天）
@@ -2688,7 +2710,8 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 如果有文字回复
       if (cleanedResponse.trim()) {
-        // 将字面的 \n 转换为真正的换行符
+        // 将字面的 \n 转换为真正的换行符（处理AI可能输出的 \\n）
+        // 同时保留AI直接输出的真正换行符
         const normalizedResponse = cleanedResponse.replace(/\\n/g, '\n')
         const responseLines = normalizedResponse.trim().split('\n').filter(line => line.trim())
         
@@ -3254,7 +3277,7 @@ ${recentMessages.slice(-10).map((msg) => {
                                        const isUser = callMsg.type === 'user'
                                        return (
                                          <div key={idx} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                                           <div className={`max-w-[75%] px-2 py-1 rounded-lg text-[11px] ${
+                                           <div className={`max-w-[75%] px-1.5 py-0.5 rounded-md text-[10px] ${
                                              isUser 
                                                ? 'bg-green-500 text-white' 
                                                : 'glass-light text-gray-800'
@@ -3362,15 +3385,15 @@ ${recentMessages.slice(-10).map((msg) => {
                    {/* 对方消息：头像在左，气泡在右 */}
                    {message.type === 'received' && (
                      <div className="flex flex-col items-center mr-2">
-                       <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
+                       <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
                          {isCharacterCustomAvatar ? (
                            <img src={characterAvatar} alt="角色头像" className="w-full h-full object-cover" />
                          ) : (
-                           <span className="text-2xl">{characterAvatar || '🤖'}</span>
+                           <span className="text-lg">{characterAvatar || '🤖'}</span>
                          )}
                        </div>
                        {message.timestamp && (
-                         <span className="text-[10px] text-gray-400 mt-1">{message.time}</span>
+                         <span className="text-[9px] text-gray-400 mt-0.5">{message.time}</span>
                        )}
                      </div>
                    )}
@@ -3677,19 +3700,20 @@ ${recentMessages.slice(-10).map((msg) => {
                        {/* 文字内容 */}
                        {message.content && (
                          <div
-                           className="message-bubble"
+                           className="message-bubble px-3 py-2"
                            style={{
                              // 默认基础样式（会被 CSS 的 !important 覆盖）
                              backgroundColor: message.type === 'sent' ? userBubbleColor : (message.content.startsWith('[错误]') ? '#fee2e2' : aiBubbleColor),
-                             borderRadius: '16px',
-                             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                             overflow: 'visible',  // 改为 visible，让伪元素可以显示在气泡外
+                             borderRadius: '12px',
+                             boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                             overflow: 'visible',
                              wordBreak: 'break-word',
                              color: message.content.startsWith('[错误]') ? '#991b1b' : '#111827',
-                             position: 'relative'  // 添加相对定位，让伪元素的绝对定位生效
+                             position: 'relative',
+                             fontSize: '14px'
                            }}
                          >
-                           <div className="px-4 py-3" style={{ overflow: 'hidden', borderRadius: '16px' }}>
+                           <div style={{ position: 'relative', zIndex: 2 }}>
                              {/* 引用的消息 */}
                              {message.quotedMessage && (
                                <div 
@@ -3715,7 +3739,7 @@ ${recentMessages.slice(-10).map((msg) => {
                              )}
                              
                              {/* 消息内容 */}
-                             {message.content}
+                             <span style={{ position: 'relative', zIndex: 2 }}>{message.content}</span>
                            </div>
                          </div>
                        )}
@@ -3726,15 +3750,15 @@ ${recentMessages.slice(-10).map((msg) => {
                    {/* 自己消息：气泡在左，头像在右 */}
                   {message.type === 'sent' && (
                     <div className="flex flex-col items-center ml-2">
-                      <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
+                      <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
                         {isUserCustomAvatar ? (
                           <img src={userAvatar} alt="我的头像" className="w-full h-full object-cover" />
                         ) : (
-                          <span className="text-2xl">👤</span>
+                          <span className="text-lg">👤</span>
                         )}
                       </div>
                       {message.timestamp && (
-                        <span className="text-[10px] text-gray-400 mt-1">{message.time}</span>
+                        <span className="text-[9px] text-gray-400 mt-0.5">{message.time}</span>
                       )}
                     </div>
                   )}
@@ -3746,15 +3770,15 @@ ${recentMessages.slice(-10).map((msg) => {
              
              {/* AI正在输入 */}
              {isAiTyping && (
-               <div className="flex mb-4 justify-start">
-                 <div className="w-10 h-10 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 mr-2 shadow-lg overflow-hidden">
+               <div className="flex mb-3 justify-start">
+                 <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 mr-2 shadow-md overflow-hidden">
                    {isCharacterCustomAvatar ? (
                      <img src={characterAvatar} alt="角色头像" className="w-full h-full object-cover" />
                    ) : (
-                     <span className="text-2xl">{characterAvatar || '🤖'}</span>
+                     <span className="text-lg">{characterAvatar || '🤖'}</span>
                    )}
                  </div>
-                 <div className="glass-card px-4 py-3 rounded-2xl rounded-tl-sm shadow-lg">
+                 <div className="glass-card px-3 py-2 rounded-xl rounded-tl-sm shadow-md">
                    <div className="flex gap-1">
                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -3815,17 +3839,19 @@ ${recentMessages.slice(-10).map((msg) => {
           >
             <EmojiIcon size={22} />
           </button>
-          {inputValue.trim() ? (
+          {hasInputText ? (
             <button
               onClick={handleSend}
-              className="w-10 h-10 flex items-center justify-center ios-button bg-wechat-green text-white rounded-full shadow-lg"
+              disabled={isAiTyping}
+              className="w-10 h-10 flex items-center justify-center ios-button bg-wechat-green text-white rounded-full shadow-lg disabled:opacity-50 transition-all duration-200"
             >
               <SendIcon size={18} />
             </button>
           ) : (
             <button 
               onClick={handleAIReply}
-              className="w-10 h-10 flex items-center justify-center ios-button text-gray-700"
+              disabled={isAiTyping}
+              className="w-10 h-10 flex items-center justify-center ios-button text-gray-700 disabled:opacity-50 transition-all duration-200"
             >
               <SendIcon size={22} />
             </button>

@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import sparkIcon from '../assets/spark-icon.png'
 import memesIcon from '../assets/memes-icon.png'
+import musicIcon from '../assets/music-icon.png'
+import bubbleIcon from '../assets/bubble-icon.png'
+import fontIcon from '../assets/font-icon.png'
 
 const MiniPrograms = () => {
   const navigate = useNavigate()
@@ -25,6 +27,30 @@ const MiniPrograms = () => {
       icon: memesIcon,
       path: '/memes-library',
       color: 'bg-red-500'
+    },
+    {
+      id: 3,
+      name: '音乐',
+      description: '享受美妙的音乐时光',
+      icon: musicIcon,
+      path: '/music-player',
+      color: 'bg-gradient-to-br from-pink-500 to-purple-500'
+    },
+    {
+      id: 4,
+      name: '气泡商店',
+      description: '选择你喜欢的聊天气泡样式',
+      icon: bubbleIcon,
+      path: '/bubble-store',
+      color: 'bg-gradient-to-br from-purple-500 to-pink-500'
+    },
+    {
+      id: 5,
+      name: '字体设置',
+      description: '自定义聊天字体样式',
+      icon: fontIcon,
+      path: '/font-customizer',
+      color: 'bg-gradient-to-br from-blue-500 to-cyan-500'
     }
   ]
 
@@ -53,13 +79,7 @@ const MiniPrograms = () => {
               className="glass-card rounded-2xl p-5 ios-button cursor-pointer hover:shadow-lg transition-shadow"
             >
               <div className="flex items-center gap-4">
-                {typeof program.icon === 'string' ? (
-                  <img src={program.icon} alt={program.name} className="w-16 h-16 object-contain flex-shrink-0" />
-                ) : (
-                  <div className={`w-16 h-16 rounded-2xl ${program.color} flex items-center justify-center shadow-lg flex-shrink-0 text-white`}>
-                    <program.icon />
-                  </div>
-                )}
+                <img src={program.icon} alt={program.name} className="w-16 h-16 object-contain flex-shrink-0" />
                 <div className="flex-1">
                   <h3 className="font-bold text-gray-900 text-base mb-1">
                     {program.name}

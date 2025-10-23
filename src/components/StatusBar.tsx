@@ -54,7 +54,7 @@ const StatusBar = () => {
       {/* 左侧：时间（可自定义背景） */}
       <div className="flex items-center gap-2">
         <span 
-          className="tracking-tight px-3 py-1 rounded-full text-base font-bold"
+          className="tracking-tight px-2 py-0.5 rounded-full text-sm font-bold"
           style={{
             backgroundColor: timeSettings.showBg !== false ? (timeSettings.color || '#22c55e') : 'transparent',
             color: timeSettings.showBg !== false ? 'white' : '#111827'

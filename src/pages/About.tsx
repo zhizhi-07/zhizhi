@@ -12,6 +12,21 @@ const About = () => {
   // 更新日志数据（按时间倒序）
   const updateLogs = [
     {
+      version: 'v1.0.3',
+      date: '2025-10-23',
+      summary: '气泡商店与样式优化',
+      changes: [
+        '新增气泡商店：8种精美气泡样式可选',
+        '新增气泡颜色编辑功能：支持自定义主色调',
+        '优化气泡预览显示效果',
+        '新增字体自定义功能：支持上传字体链接（.woff2/.woff/.ttf/.otf）',
+        '优化导航栏时间背景：更精致的显示效果',
+        '新增音乐播放器功能：完整播放器功能',
+        '新增灵动岛功能：后台播放控制',
+        '预设6首歌曲：罗生门、浴室、特别的人、情人、舍得、如果爱忘了'
+      ]
+    },
+    {
       version: 'v1.0.2',
       date: '2025-10-22',
       summary: 'AI热梗系统上线',
@@ -122,7 +137,7 @@ const About = () => {
           <div className="text-center mb-4">
             <img src={appIcon} alt="汁汁" className="w-24 h-24 mx-auto mb-4 object-contain" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">汁汁</h2>
-            <div className="text-gray-500">v1.0.2</div>
+            <div className="text-gray-500">v1.0.3</div>
           </div>
         </div>
         

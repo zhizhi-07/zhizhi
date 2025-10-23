@@ -1,0 +1,81 @@
+/* ===== 修复后的气泡CSS ===== */
+
+/* --- 气泡通用设置 --- */
+.message-container .message-bubble {
+  position: relative;
+  border: 0px solid #4C6447 !important;
+  border-radius: 60% 40% 70% 30% / 50% 60% 40% 50% !important;
+  padding: 15px 20px !important;
+  margin: 5px 0 !important;  /* 改小margin，避免气泡间距太大 */
+  color: #4C6447 !important;
+  background-clip: padding-box !important;
+  /* 重要：确保文字在伪元素上方 */
+  z-index: 1 !important;
+}
+
+/* --- 用户气泡 --- */
+.message-container.sent .message-bubble {
+  background-color: #F3FFCA !important;
+  /* 给右侧留出空间放装饰图 */
+  margin-right: 80px !important;
+}
+
+/* 【核心】用户气泡装饰 - 修复版 */
+.message-container.sent .message-bubble::before {
+  content: "";
+  position: absolute;
+  /* ✅ 关键修复：不要设置 top/bottom，只设置宽高 */
+  width: 120px;
+  height: 150px;
+  top: 50%;
+  transform: translateY(-50%);  /* 垂直居中 */
+  right: -80px;  /* 放在气泡右侧外面 */
+  
+  /* 背景图片 */
+  background-image:
+    url("https://i.postimg.cc/DzwQb0PP/1756464584475.png"), /* 探头猫 */
+    url("https://i.postimg.cc/zB9TMjZx/1756464850501.png");  /* 大猫 */
+  
+  background-repeat: no-repeat;
+  
+  /* 站位 */
+  background-position:
+    right 0px top 8px,
+    right 30px bottom 18px; 
+    
+  /* 大小 */
+  background-size:
+    58px,
+    55px;
+  
+  /* 确保不遮挡文字 */
+  z-index: 0 !important;
+  pointer-events: none;  /* 不影响点击 */
+}
+
+/* --- AI气泡 --- */
+.message-container.received .message-bubble {
+  background-color: #B3E5D8 !important;
+  /* 给左侧留出空间（如果需要装饰） */
+  margin-left: 80px !important;
+}
+
+/* 如果AI气泡也要装饰，可以这样写 */
+.message-container.received .message-bubble::before {
+  content: "";
+  position: absolute;
+  width: 120px;
+  height: 150px;
+  top: 50%;
+  transform: translateY(-50%);
+  left: -80px;  /* 放在气泡左侧外面 */
+  
+  /* 这里可以放AI的装饰图 */
+  background-image: url("你的AI装饰图URL");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  
+  z-index: 0 !important;
+  pointer-events: none;
+}

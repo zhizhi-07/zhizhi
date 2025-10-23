@@ -810,6 +810,38 @@ const Settings = () => {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* 提示：前往气泡商店 */}
+              <div className="glass-card rounded-xl p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">想要更多气泡样式？</h3>
+                    <p className="text-xs text-gray-600">前往小程序 → 气泡商店，选择你喜欢的预设样式</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // 跳转到气泡商店
+                      window.location.href = '/#/bubble-store'
+                    }}
+                    className="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-xs font-medium whitespace-nowrap"
+                  >
+                    前往商店
+                  </button>
+                </div>
+              </div>
+
+              {/* 手动自定义说明 */}
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold text-gray-900">手动自定义</h3>
+                <p className="text-sm text-gray-600">
+                  如果你想完全自定义气泡样式，可以在下方输入CSS代码
+                </p>
+              </div>
+
               {/* 用户气泡设置 */}
               <div className="space-y-4">
                 <h3 className="text-base font-semibold text-gray-900">我的气泡（发送）</h3>

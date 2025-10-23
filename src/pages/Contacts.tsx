@@ -4,6 +4,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { getAiAvatar } from '../utils/avatarUtils'
 
 const Contacts = () => {
   const navigate = useNavigate()
@@ -80,21 +81,14 @@ const Contacts = () => {
         ) : (
           <div className="px-3">
             {characters.map((character) => {
-              const isCustomAvatar = character.avatar && character.avatar.startsWith('data:image')
               return (
                 <div
                   key={character.id}
                   onClick={() => navigate(`/character/${character.id}`)}
                   className="flex items-center px-4 py-3 ios-button glass-card mb-2 rounded-2xl cursor-pointer"
                 >
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden ${
-                    isCustomAvatar ? 'bg-gray-200' : 'bg-blue-200'
-                  }`}>
-                    {isCustomAvatar ? (
-                      <img src={character.avatar} alt={character.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-gray-700 text-lg font-bold">{character.avatar || '角'}</span>
-                    )}
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden bg-gray-200">
+                    <img src={getAiAvatar(character.avatar)} alt={character.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="ml-4 flex-1 overflow-hidden">
                     <h3 className="text-gray-900 font-medium">{character.name}</h3>
