@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { WalletIcon, BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import GlobalBackground from '../components/GlobalBackground'
 
 // 简单的SVG图标组件
 const ChevronRight = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
@@ -44,22 +45,25 @@ const Services = () => {
   ]
 
   return (
-    <div className="h-screen flex flex-col bg-[#EDEDED]">
-      {/* iOS状态栏 */}
-      {showStatusBar && <StatusBar />}
+    <div className="h-full flex flex-col relative overflow-hidden">
+      <GlobalBackground applyToAll={true} />
       
-      {/* 顶部标题栏 */}
-      <div className="glass-effect border-b border-gray-200/50 bg-white flex items-center">
-        <button 
-          onClick={handleBack}
-          className="px-4 py-4 active:opacity-50 cursor-pointer flex items-center justify-center"
-        >
-          <BackIcon size={24} className="text-gray-900" />
-        </button>
-        <h1 className="flex-1 text-center text-[17px] font-semibold text-gray-900 pr-14">服务</h1>
-      </div>
+      <div className="relative z-10 h-full flex flex-col">
+        {/* iOS状态栏 */}
+        {showStatusBar && <StatusBar />}
+        
+        {/* 顶部标题栏 */}
+        <div className="glass-effect border-b border-gray-200/50 bg-white flex items-center">
+          <button 
+            onClick={handleBack}
+            className="px-4 py-4 active:opacity-50 cursor-pointer flex items-center justify-center"
+          >
+            <BackIcon size={24} className="text-gray-900" />
+          </button>
+          <h1 className="flex-1 text-center text-[17px] font-semibold text-gray-900 pr-14">服务</h1>
+        </div>
 
-      {/* 服务列表 */}
+        {/* 服务列表 */}
       <div className="flex-1 overflow-y-auto px-3 pt-3">
         <div className="glass-card rounded-2xl overflow-hidden bg-white">
           {services.map((service, index) => {
@@ -88,6 +92,7 @@ const Services = () => {
             )
           })}
         </div>
+      </div>
       </div>
     </div>
   )

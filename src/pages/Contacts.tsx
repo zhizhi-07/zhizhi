@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { SearchIcon, AddIcon, EmptyIcon, NewFriendIcon, GroupIcon, TagIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
+import { useBackground } from '../context/BackgroundContext'
 
 const Contacts = () => {
   const navigate = useNavigate()
   const { characters } = useCharacter()
+  const { background, getBackgroundStyle } = useBackground()
 
   const specialContacts = [
     { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/create-character' },
@@ -13,7 +15,17 @@ const Contacts = () => {
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative overflow-hidden">
+      {/* 全局背景层 */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={background ? getBackgroundStyle() : {
+          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+        }}
+      />
+      
+      {/* 内容层 */}
+      <div className="relative z-10 h-full flex flex-col">
       {/* 顶部标题栏 - 玻璃效果 */}
       <div className="glass-effect px-5 py-4 flex items-center justify-between border-b border-gray-200/50 sticky top-0 z-50 bg-white/95 shadow-sm">
         <h1 className="text-xl font-semibold text-gray-900">通讯录</h1>
@@ -97,6 +109,7 @@ const Contacts = () => {
             })}
           </div>
         )}
+      </div>
       </div>
     </div>
   )

@@ -16,6 +16,15 @@ const TransferSender = ({ show, onClose, onSend, characterId, characterName }: T
   const [intimatePayAvailable, setIntimatePayAvailable] = useState(false)
   const [intimatePayRemaining, setIntimatePayRemaining] = useState(0)
   
+  // 每次打开弹窗时重置表单
+  useEffect(() => {
+    if (show) {
+      setAmount('')
+      setMessage('')
+      setUseIntimatePay(false)
+    }
+  }, [show])
+  
   // 检查是否有可用的亲密付
   useEffect(() => {
     if (show && characterId) {
@@ -70,7 +79,7 @@ const TransferSender = ({ show, onClose, onSend, characterId, characterName }: T
       }
     }
     
-    const finalMessage = message.trim() || '转账'
+    const finalMessage = message.trim()
     onSend(amountNum, finalMessage, useIntimatePay)
     
     // 重置表单
@@ -117,7 +126,7 @@ const TransferSender = ({ show, onClose, onSend, characterId, characterName }: T
             <input
               type="text"
               className="red-packet-input"
-              placeholder="转账"
+              placeholder="添加转账说明（可选）"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               maxLength={20}

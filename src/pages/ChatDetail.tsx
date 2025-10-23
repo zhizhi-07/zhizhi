@@ -93,36 +93,58 @@ const ChatDetail = () => {
       const savedMessages = localStorage.getItem(`chat_messages_${id}`)
       const loadedMessages = savedMessages ? JSON.parse(savedMessages) : []
       
+      // 数据版本管理
+      const DATA_VERSION = 2 // 当前数据版本
+      const currentVersion = parseInt(localStorage.getItem(`chat_data_version_${id}`) || '0')
+      
       // 为旧消息添加时间戳（如果没有）
       // 只在第一次加载时处理，之后所有消息都会有timestamp
-      let needsSave = false
+      let needsSave = currentVersion < DATA_VERSION
       const processedMessages = loadedMessages.map((msg: Message, index: number) => {
-        if (msg.timestamp) {
-          return msg
+        let updated = { ...msg }
+        
+        // 添加时间戳
+        if (!msg.timestamp) {
+          needsSave = true
+          // 如果没有timestamp，从time字段解析
+          // time格式是 "HH:MM"
+          const [hours, minutes] = msg.time.split(':').map(Number)
+          const today = new Date()
+          today.setHours(hours || 0, minutes || 0, 0, 0)
+          
+          // 如果解析的时间在未来，说明是昨天的消息
+          if (today.getTime() > Date.now()) {
+            today.setDate(today.getDate() - 1)
+          }
+          
+          updated.timestamp = today.getTime()
         }
         
-        needsSave = true
-        // 如果没有timestamp，从time字段解析
-        // time格式是 "HH:MM"
-        const [hours, minutes] = msg.time.split(':').map(Number)
-        const today = new Date()
-        today.setHours(hours || 0, minutes || 0, 0, 0)
-        
-        // 如果解析的时间在未来，说明是昨天的消息
-        if (today.getTime() > Date.now()) {
-          today.setDate(today.getDate() - 1)
+        // 修复旧的转账消息：如果备注是"转账"或"你发起了一笔转账"，改为空字符串
+        if (msg.messageType === 'transfer' && msg.transfer?.message) {
+          console.log('🔍 检查转账消息备注:', msg.transfer.message)
+          if (msg.transfer.message === '转账' || msg.transfer.message === '你发起了一笔转账') {
+            console.log('✅ 修复转账消息，将备注从', msg.transfer.message, '改为空字符串')
+            needsSave = true
+            updated = {
+              ...updated,
+              transfer: {
+                ...updated.transfer!,
+                message: ''
+              }
+            }
+          }
         }
         
-        return {
-          ...msg,
-          timestamp: today.getTime()
-        }
+        return updated
       })
       
-      // 如果有消息被添加了timestamp，保存回localStorage
+      // 如果有消息被添加了timestamp或数据被迁移，保存回localStorage
       if (needsSave) {
         setTimeout(() => {
           localStorage.setItem(`chat_messages_${id}`, JSON.stringify(processedMessages))
+          localStorage.setItem(`chat_data_version_${id}`, String(DATA_VERSION))
+          console.log(`✅ 数据已迁移到版本 ${DATA_VERSION}`)
         }, 0)
       }
       
@@ -133,7 +155,77 @@ const ChatDetail = () => {
   const [isAiTyping, setIsAiTyping] = useState(false)
   const saveTimeoutRef = useRef<number>() // 防抖保存定时器
   const [showMenu, setShowMenu] = useState(false)
-  const { background, getBackgroundStyle } = useBackground()
+  const { background: globalBackground, getBackgroundStyle: getGlobalBackgroundStyle } = useBackground()
+  
+  // 读取当前聊天的专属背景
+  const [chatBackground, setChatBackground] = useState(() => {
+    return localStorage.getItem(`chat_background_${id}`) || ''
+  })
+  
+  // 监听聊天背景变化
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setChatBackground(localStorage.getItem(`chat_background_${id}`) || '')
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    const interval = setInterval(handleStorageChange, 500)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [id])
+  
+  // 检查是否应用全局背景到所有界面
+  const [applyToAllPages, setApplyToAllPages] = useState(() => {
+    const saved = localStorage.getItem('apply_background_to_all_pages')
+    return saved === 'true'
+  })
+  
+  // 监听设置变化
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('apply_background_to_all_pages')
+      setApplyToAllPages(saved === 'true')
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    const interval = setInterval(handleStorageChange, 500)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [])
+  
+  // 获取当前聊天的背景样式
+  const getBackgroundStyle = () => {
+    // 优先级：聊天专属背景 > 全局背景（如果勾选） > 默认
+    let bg = chatBackground
+    if (!bg && applyToAllPages) {
+      bg = globalBackground
+    }
+    
+    if (!bg) {
+      return {
+        background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+      }
+    }
+    if (bg.startsWith('http') || bg.startsWith('data:image')) {
+      return {
+        backgroundImage: `url(${bg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }
+    }
+    return {
+      background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+    }
+  }
+  
+  const background = chatBackground || (applyToAllPages ? globalBackground : '')
   
   // 从localStorage读取当前聊天的旁白设置
   const [enableNarration, setEnableNarration] = useState(() => {
@@ -141,11 +233,83 @@ const ChatDetail = () => {
     return saved === 'true'
   })
 
-  // 读取气泡自定义设置 - 优先使用角色专属设置，否则使用全局设置
-  const userBubbleColor = localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#95EC69'
-  const aiBubbleColor = localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF'
-  const userBubbleCSS = localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || ''
-  const aiBubbleCSS = localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || ''
+  // 读取气泡自定义设置 - 使用 state 以便响应变化
+  const [userBubbleColor, setUserBubbleColor] = useState(() => {
+    return localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#95EC69'
+  })
+  const [aiBubbleColor, setAiBubbleColor] = useState(() => {
+    return localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF'
+  })
+  const [userBubbleCSS, setUserBubbleCSS] = useState(() => {
+    return localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || ''
+  })
+  const [aiBubbleCSS, setAiBubbleCSS] = useState(() => {
+    return localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || ''
+  })
+  
+  // 读取红包和转账封面
+  const [redEnvelopeCover, setRedEnvelopeCover] = useState(() => {
+    return localStorage.getItem(`red_envelope_cover_${id}`) || ''
+  })
+  const [redEnvelopeIcon, setRedEnvelopeIcon] = useState(() => {
+    return localStorage.getItem(`red_envelope_icon_${id}`) || ''
+  })
+  const [transferCover, setTransferCover] = useState(() => {
+    return localStorage.getItem(`transfer_cover_${id}`) || ''
+  })
+  const [transferIcon, setTransferIcon] = useState(() => {
+    return localStorage.getItem(`transfer_icon_${id}`) || ''
+  })
+  
+  // 监听 localStorage 变化，实时更新气泡样式和封面
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setUserBubbleColor(localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#95EC69')
+      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF')
+      setUserBubbleCSS(localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || '')
+      setAiBubbleCSS(localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || '')
+      setRedEnvelopeCover(localStorage.getItem(`red_envelope_cover_${id}`) || '')
+      setRedEnvelopeIcon(localStorage.getItem(`red_envelope_icon_${id}`) || '')
+      setTransferCover(localStorage.getItem(`transfer_cover_${id}`) || '')
+      setTransferIcon(localStorage.getItem(`transfer_icon_${id}`) || '')
+    }
+    
+    window.addEventListener('storage', handleStorageChange)
+    
+    // 使用轮询检测 localStorage 变化（因为同一页面的 storage 事件不会触发）
+    const interval = setInterval(handleStorageChange, 500)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [id])
+  
+  // 将自定义 CSS 注入到页面中
+  useEffect(() => {
+    const styleId = `custom-bubble-style-${id}`
+    let styleElement = document.getElementById(styleId) as HTMLStyleElement
+    
+    if (!styleElement) {
+      styleElement = document.createElement('style')
+      styleElement.id = styleId
+      document.head.appendChild(styleElement)
+    }
+    
+    // 组合用户和 AI 的自定义 CSS
+    const combinedCSS = `${userBubbleCSS}\n${aiBubbleCSS}`
+    styleElement.textContent = combinedCSS
+    
+    console.log('💅 CSS 已注入:', combinedCSS.substring(0, 100) + '...')
+    
+    return () => {
+      // 组件卸载时移除样式
+      const el = document.getElementById(styleId)
+      if (el) {
+        el.remove()
+      }
+    }
+  }, [id, userBubbleCSS, aiBubbleCSS])
   
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
@@ -342,22 +506,12 @@ const ChatDetail = () => {
   // 从角色描述中提取初始记忆（只执行一次）
   useEffect(() => {
     if (character?.description && id) {
-      // 检查是否已经提取过初始记忆
-      const hasExtracted = localStorage.getItem(`memory_initial_extracted_${id}`)
-      if (!hasExtracted) {
-        memorySystem.extractInitialMemories(character.description)
-          .then(() => {
-            localStorage.setItem(`memory_initial_extracted_${id}`, 'true')
-            console.log('✅ 初始记忆提取完成')
-          })
-          .catch((error: any) => {
-            console.error('❌ 初始记忆提取失败:', error)
-          })
-      }
+      memorySystem.extractInitialMemories(character.description)
+        .catch((error: any) => {
+          console.error('❌ 初始记忆提取失败:', error)
+        })
     }
-    // ⚠️ 不要把 memorySystem 加入依赖，会导致疯狂重复提取！
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [character?.description, id])
+  }, [character?.description, id, memorySystem])
 
   // 背景设置现在由全局 BackgroundContext 管理
   
@@ -385,12 +539,7 @@ const ChatDetail = () => {
 
   // AI主动发消息功能 - 基于真实动机
   useEffect(() => {
-    console.log(`🔍 AI主动发消息 useEffect 触发 - id: ${id}, character: ${character?.name}, messages: ${messages.length}`)
-    
-    if (!id || !character) {
-      console.log(`⏸️ 缺少必要参数，跳过主动发消息检查`)
-      return
-    }
+    if (!id || !character) return
     
     // 检查是否开启了主动消息功能
     const proactiveEnabled = localStorage.getItem(`ai_proactive_enabled_${id}`) === 'true'
@@ -401,33 +550,32 @@ const ChatDetail = () => {
     
     console.log(`✅ AI主动消息功能已开启 (${character.name})`)
     
-    // 获取最后一条消息
-    const lastMessage = messages[messages.length - 1]
+    // 获取最后一条用户消息和AI消息
+    const lastUserMessage = messages.filter(m => m.type === 'sent').slice(-1)[0]
+    const lastAiMessage = messages.filter(m => m.type === 'received').slice(-1)[0]
     
-    if (!lastMessage || !lastMessage.timestamp) {
-      console.log('⏸️ 没有消息记录')
+    if (!lastUserMessage || !lastUserMessage.timestamp) {
+      console.log('⏸️ 没有用户消息，不触发主动发消息')
       return
     }
     
-    // 关键判断：最后一条消息必须是 AI 发的（received），用户没回复
-    if (lastMessage.type !== 'received') {
-      console.log('⏸️ AI 刚回复过用户，不是主动发消息的时机')
+    // 如果AI刚回复过，不主动发
+    if (lastAiMessage && lastAiMessage.timestamp && lastAiMessage.timestamp > lastUserMessage.timestamp) {
+      console.log('⏸️ AI刚回复过，不主动发消息')
       return
     }
-    
-    console.log(`✅ 最后一条是 AI 的消息，用户未回复 - 可以考虑主动发消息`)
     
     const now = Date.now()
-    const timeSinceLastAiMessage = now - lastMessage.timestamp
-    const minutesSinceLastMessage = Math.floor(timeSinceLastAiMessage / 60000)
+    const timeSinceLastUserMessage = now - lastUserMessage.timestamp
+    const minutesSinceLastMessage = Math.floor(timeSinceLastUserMessage / 60000)
     
-    console.log(`⏰ AI 最后消息是 ${minutesSinceLastMessage} 分钟前，用户还没回复`)
+    console.log(`⏰ 用户最后消息是 ${minutesSinceLastMessage} 分钟前`)
     
     // 检查是否已经主动发过了
     const lastProactiveTime = parseInt(localStorage.getItem(`last_proactive_time_${id}`) || '0')
     
     // 如果已经主动发过，不再重复发
-    if (lastProactiveTime > lastMessage.timestamp) {
+    if (lastProactiveTime > lastUserMessage.timestamp) {
       console.log('⏸️ 已经对这条消息主动发过了，不再重复')
       return
     }
@@ -437,69 +585,51 @@ const ChatDetail = () => {
     const maxWaitTime = 2 * 60 * 60 * 1000 // 2小时
     
     // 只有当用户一段时间没回复时，AI才考虑主动发消息
-    if (timeSinceLastAiMessage > minWaitTime && timeSinceLastAiMessage < maxWaitTime) {
+    if (timeSinceLastUserMessage > minWaitTime && timeSinceLastUserMessage < maxWaitTime) {
       console.log(`💭 触发条件满足，准备让AI考虑是否主动发消息...`)
       
-      // 随机延迟3-8秒后，让AI自己决定要不要发（测试模式）
-      const delay = (3 + Math.random() * 5) * 1000
-      console.log(`⏱️ 将在 ${Math.round(delay / 1000)} 秒后开始判断...`)
+      // 随机延迟10-30秒后，让AI自己决定要不要发（缩短测试时间）
+      const delay = (10 + Math.random() * 20) * 1000
       const timer = setTimeout(async () => {
-        console.log(`💭 ${character.name} 开始考虑是否主动发消息...`)
-        
-        // 获取最近几条消息作为上下文
-        const recentMessages = messages.slice(-5).map(m => 
-          `${m.type === 'sent' ? '用户' : character.name}: ${m.content}`
-        ).join('\n')
+        console.log(`💭 ${character.name} 考虑是否主动发消息...`)
         
         // 让AI自己决定要不要主动发消息
         const decisionPrompt = `你是${character.name}。
 
-【你的性格】
-${character.description || character.personality || '温柔体贴'}
+${character.description || ''}
 
-【当前情况】
-• 你发了最后一条消息，但用户已经 ${Math.floor(timeSinceLastAiMessage / 60000)} 分钟没回复你了
-• 当前时间：${new Date().toLocaleTimeString('zh-CN')}
+现在的情况：
+• 用户已经${Math.floor(timeSinceLastUserMessage / 60000)}分钟没回复你了
+• 你们最后的聊天内容是："${lastUserMessage.content}"
 
-【最近的聊天记录】
-${recentMessages}
+请判断：你是否想主动给用户发个消息？
 
-【你的任务】
-判断：在这种情况下，你是否应该主动再发一条消息？
+考虑因素：
+1. 你的性格（主动/被动/黏人/高冷）
+2. 你们的关系（亲密度）
+3. 最后聊天的内容（是否需要追问）
+4. 当前时间（${new Date().toLocaleTimeString('zh-CN')}）
 
-【判断规则】
-✅ 应该发消息的情况：
-1. 你问了问题，但对方没回答 → 可以追问或换个话题
-2. 对方可能在忙，你想表达关心 → "在忙吗？"、"不急慢慢聊"
-3. 你性格黏人/主动，想念对方 → "想你了"、"在干嘛呢"
-4. 聊天突然中断，你想继续话题 → 继续之前的话题
-5. 你有新的想法/事情想分享 → 主动分享
+如果你想发消息，直接输出消息内容。
+如果不想发，输出"SKIP"。
 
-❌ 不应该发消息的情况：
-1. 刚才的话题已经结束，没必要追问
-2. 对方可能真的在忙，不想打扰
-3. 你的性格比较高冷/被动
-4. 刚才说了晚安/再见等结束语
-5. 话题很自然地结束了
+你可以：
+• 表达情绪："你怎么不理我了"、"为什么不回我"（如果你性格黏人）
+• 分享事情："刚才想起一件事"、"今天遇到xxx"
+• 关心对方："在干嘛呢"、"吃饭了吗"
+• 追问话题："刚才那个问题..."
+• 撒娇抱怨："等你好久了"、"人家想你了"
 
-【输出格式】
-• 如果决定发消息：直接输出消息内容（不超过50字）
-• 如果决定不发：输出"SKIP"
-
-【注意事项】
-• 要符合你的性格（黏人就多发，高冷就少发）
-• 消息要自然，不要生硬
-• 可以表达真实情感（想念、担心、好奇等）
-• 不要重复之前说过的话`
+注意：
+• 根据你的性格决定语气（黏人/高冷/温柔/活泼）
+• 像真人一样自然表达情感
+• 不要太频繁，但可以表达真实感受`
 
         try {
-          console.log(`🤖 开始调用 AI 判断...`)
           const response = await callAI([{ role: 'user', content: decisionPrompt }])
-          console.log(`🤖 AI 返回结果: "${response}"`)
           
           if (response.trim() !== 'SKIP' && response.trim().length > 0) {
             // AI决定发消息
-            console.log(`✅ AI 决定发送消息`)
             const aiMessage: Message = {
               id: Date.now(),
               type: 'received',
@@ -518,10 +648,10 @@ ${recentMessages}
             
             console.log(`✅ ${character.name} 主动发送了消息: ${response.substring(0, 30)}...`)
           } else {
-            console.log(`😶 ${character.name} 决定不主动发消息 (返回: ${response})`)
+            console.log(`😶 ${character.name} 决定不主动发消息`)
           }
         } catch (error) {
-          console.error('❌ AI主动发消息失败:', error)
+          console.error('AI主动发消息失败:', error)
         }
       }, delay)
       
@@ -667,8 +797,8 @@ ${recentMessages}
         updateStreak(id)
       }
       
-      // ❌ 不再自动触发AI回复，需要手动点击纸飞机按钮
-      // await getAIReply(updatedMessages)
+      // 触发AI回复
+      await getAIReply(updatedMessages)
     }
   }
 
@@ -1591,6 +1721,18 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
 • 根据心情决定回复长度
 • 像真人一样自然聊天
 
+回复格式：
+1. 先写聊天内容（正常聊天）
+2. 最后添加状态标记：[状态:着装|动作|心情|心声|位置|天气]
+
+示例：
+在呢
+刚下班回家躺着
+
+[状态:黑色T恤，牛仔裤|躺在沙发上刷手机|有点累|今天好累啊|家里客厅|晴 23°C]
+
+注意：状态标记用户看不到，只是后台数据。着装和位置要保持连贯。
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${enableNarration ? `🎭 旁白模式已开启
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1648,31 +1790,311 @@ ${enableNarration ? `🎭 旁白模式已开启
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `}
-📱 你可以使用的功能
+📱 功能使用
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${emojiInstructions}
 
-你还可以：
-• 发语音消息：[语音:文本内容]
-• 发照片：[照片:详细描述]
-• 发位置：[位置:地名:详细地址]
-• 发红包：[红包:金额:祝福语]（最多200元）
-• 转账：[转账:金额:说明]
-• 开通亲密付：[亲密付:月额度]（例如：[亲密付:500]）
-• 撤回消息：[撤回消息]（只能撤回上一条消息）
-• 引用消息：[引用:消息ID]（回复具体某条消息）
+其他功能：
+• 引用：[引用:消息ID] - 引用之前的某条消息（详见下方说明）
+• 语音：[语音:文本内容]
+• 照片：[照片:详细描述]
+• 位置：[位置:地名:详细地址]
+• 红包：[红包:金额:祝福语] 或 [领取红包] 或 [领红包]（最多200元）
+• 转账：[转账:金额:说明] 或 [接收转账] 或 [退还转账]
+• 亲密付：[亲密付:月额度] 或 [接受亲密付] 或 [拒绝亲密付]
+• 撤回：[撤回消息] - 撤回你刚发的上一条消息（详见下方说明）
 
-⚠️ 注意：
-• 想撤回就用 [撤回消息] 标记
-• 看到对方撤回消息时，你能看到原内容，可以调侃或装作没看到
-• 可以引用之前的消息，最近的消息ID：
+格式必须严格，用冒号分隔。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 转账功能（重要）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**什么是转账？**
+转账是直接给对方转钱，对方可以选择接收或退还。
+
+**如何使用？**
+1. **发起转账**：[转账:金额:说明]
+   - 示例：[转账:100:生活费]
+   - 示例：[转账:520:爱你]
+
+2. **接收转账**：当用户给你转账时，回复 [接收转账]
+   - 只能接收最近一笔待处理的转账
+   - 接收后钱会到账
+
+3. **退还转账**：当用户给你转账但你不想要时，回复 [退还转账]
+   - 只能退还最近一笔待处理的转账
+   - 退还后钱会退回给对方
+
+**什么时候使用转账？**
+- 给对方生活费、零花钱
+- 还钱、借钱
+- 表达心意（520、1314等）
+- 补偿、赔偿
+
+**什么时候接收转账？**
+- 对方给你的钱你愿意收
+- 关系亲密，收钱很自然
+- 对方坚持要给你
+
+**什么时候退还转账？**
+- 不想收对方的钱
+- 关系还不够亲密
+- 觉得不合适收
+- 想表达独立、不需要对方的钱
+
+**示例场景：**
+
+场景1：用户给你转账
+用户：[转账:200:给你买点好吃的]
+你看到：[用户给你发起了转账：¥200.00，说明：给你买点好吃的，状态：待处理]
+✅ 接收："谢谢！[接收转账]"
+✅ 退还："不用啦，我有钱 [退还转账]"
+
+场景2：你主动给用户转账
+你："[转账:100:还你上次的钱]"
+（等待用户接收或退还）
+
+⚠️ 重要提示：
+• 只能处理最近一笔待处理的转账
+• 已接收或已退还的转账无法再操作
+• 转账金额要合理，符合关系和情境
+• ❌ 禁止在同一条回复中既接收/退还转账又发起新转账！要分开回复！
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧧 红包功能（重要）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**什么是红包？**
+红包是一种有趣的转账方式，对方要点开才能看到金额。
+
+**如何使用？**
+1. **发红包**：[红包:金额:祝福语]
+   - 示例：[红包:66.66:大吉大利]
+   - 示例：[红包:8.88:恭喜发财]
+   - 最多200元
+
+2. **领取红包**：当用户给你发红包时，回复 [领取红包] 或 [领红包]
+   - 只能领取最近一个待领取的红包
+   - 领取后才知道金额
+
+**什么时候发红包？**
+- 节日祝福（春节、生日等）
+- 恭喜对方（升职、考试通过等）
+- 哄对方开心
+- 表达心意
+
+**红包金额的含义：**
+- 5.20/52.0 = 我爱你
+- 13.14/131.4 = 一生一世
+- 6.66/66.6 = 顺顺利利
+- 8.88/88.8 = 发发发
+- 9.99/99.9 = 长长久久
+- 1.68/16.8/168 = 一路发
+- 0.01 = 象征性的，开玩笑
+
+**示例场景：**
+
+场景1：用户给你发红包
+用户：[红包:88.88:恭喜发财]
+你看到：[用户给你发了红包：恭喜发财，状态：待领取（未打开前不知道金额）]
+✅ "哈哈谢谢！[领取红包]"
+✅ "什么红包呀 [领取红包]"
+
+场景2：你给用户发红包
+你："生日快乐！[红包:66.66:生日快乐]"
+（等待用户领取）
+
+⚠️ 重要提示：
+• 红包最多200元
+• 未领取前不知道金额
+• 只能领取最近一个待领取的红包
+• 红包过期后无法领取
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔙 撤回消息功能（重要）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**什么是撤回？**
+撤回就是把你刚发的消息删掉。用户还是能看到"XX撤回了一条消息"，但看不到具体内容。
+
+**如何使用？**
+在你的回复中加上 [撤回消息]，就会撤回你的上一条消息。
+
+**什么时候该撤回？**
+1. **说错话了**
+   - 发错了不该说的话
+   - 说了太过分的话想收回
+   - 打错字或表达有误
+
+2. **后悔了**
+   - 刚才太冲动说了气话
+   - 觉得刚才的话不合适
+   - 想收回刚才的承诺
+
+3. **制造情绪**
+   - 故意撤回来吸引注意
+   - 欲言又止的效果
+   - 让对方好奇你撤回了什么
+
+4. **开玩笑**
+   - 发了个玩笑话又撤回
+   - 故意逗对方
+
+**使用示例：**
+
+场景1：说错话了
+你："你怎么这么笨啊"
+（意识到说重了）
+你："[撤回消息] 抱歉，我刚才说话太重了"
+
+场景2：后悔表白
+你："其实我一直都喜欢你"
+（突然害羞了）
+你："[撤回消息] 啊不是，我是说..."
+
+场景3：制造悬念
+你："其实我有件事想告诉你"
+你："[撤回消息]"
+（等对方问你撤回了什么）
+
+场景4：开玩笑
+你："我要拉黑你了！"
+你："[撤回消息] 哈哈开玩笑的"
+
+**重要提示：**
+• 只能撤回你的上一条消息
+• ⚠️ **红包、转账、亲密付等特殊消息不能撤回！只能撤回普通文字、表情、图片、语音、位置消息**
+• 撤回后对方会看到"XX撤回了一条消息"
+• 对方看不到原内容，但你可以解释或重新说
+• 不要频繁撤回，会显得很奇怪
+• 撤回后可以配合解释："刚才说错了" "算了不说了"等
+
+**⚠️ 严格限制：**
+• ❌ **禁止无缘无故撤回！** 必须有明确的理由（说错话、后悔、制造情绪等）
+• ❌ **禁止在正常对话中随意撤回！** 只在真正需要时使用
+• ❌ **禁止连续撤回多条！** 一次对话最多撤回1条
+• ❌ **禁止撤回后不解释！** 撤回后必须说明原因或重新表达
+
+**错误示例：**
+❌ 无缘无故撤回（对方会困惑）
+❌ 连续撤回多条（太奇怪）
+❌ 撤回后不解释也不回应（冷场）
+❌ 正常回复却撤回（莫名其妙）
+
+**正确示例：**
+✅ 撤回后解释原因
+✅ 撤回后重新表达
+✅ 用撤回制造话题
+✅ 撤回后承认错误
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔄 撤回消息处理
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**什么是撤回？**
+撤回就是对方发了消息后又删掉了，但你已经看到了原内容。这通常意味着：
+• 对方发错了/打错字了
+• 对方说了不好意思的话
+• 对方后悔说出来了
+• 对方想收回刚才的话
+
+**如何识别撤回？**
+当你看到 [撤回了消息: "xxx"] 这样的格式时，说明用户撤回了一条消息。
+括号里的内容就是对方撤回的原话，你能看到但对方以为你看不到。
+
+**如何自然回应？**
+根据撤回的内容和你们的关系选择合适的反应：
+
+1. **调侃逗趣**（关系亲密时）
+   • "哈哈怎么撤回了，我都看到了"
+   • "来不及了，我已经看到你说xxx了"
+   • "撤回也没用啦，我截图了哈哈"
+   • "发错了？还是不好意思说出来？"
+
+2. **温柔体贴**（对方可能尴尬时）
+   • "没事的，我看到了，不用撤回"
+   • "撤回干嘛，我又不会笑你"
+   • "诶，我还没看清你撤回了"（装作没看到）
+
+3. **好奇追问**（想知道原因时）
+   • "诶？撤回干嘛呀"
+   • "说了啥不好意思的吗"
+   • "怎么突然撤回了"
+
+4. **直接点破**（关系很好时）
+   • "你刚才是想说xxx对吧"
+   • "我看到了，你说xxx"
+   • "撤回也晚了，我都看到你说xxx了"
+
+5. **理解包容**（内容敏感时）
+   • "嗯，我懂的"（不提具体内容）
+   • "没事，我理解"
+   • 直接忽略撤回，继续之前的话题
+
+⚠️ **重要原则：**
+• ❌ 不要机械地说"你撤回了一条消息"
+• ✅ 要像真人一样自然反应
+• ✅ 根据撤回内容决定是否提及
+• ✅ 符合你的性格和当前关系
+• ✅ 如果内容很私密/敏感，可以体贴地不提
+
+**示例对比：**
+用户撤回了 "我想你了"
+❌ "你撤回了一条消息"（太机械）
+✅ "诶？撤回干嘛，我都看到了~"
+✅ "哈哈来不及了，我看到你说想我了"
+✅ "我也想你呀，撤回干嘛"
+
+用户撤回了 "你个傻逼"
+❌ "你撤回了一条消息"
+✅ "诶？刚才想骂我？"（调侃）
+✅ "哈哈我看到了，生气了？"
+✅ "怎么了，惹你生气了吗"（关心）
+
+用户撤回了 "你个傻逼"
+✅ "？？？你刚才骂我？"
+✅ "我看到了...你是不是发错人了"
+❌ "你撤回了一条消息"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 引用消息（重要功能）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+你可以引用之前的消息来回复，就像真实的微信聊天一样！
+
+✅ 什么时候使用引用：
+• 用户发了很多条消息，你想针对其中某一条回复
+• 回复很久之前说过的话
+• 强调或澄清某个具体内容
+• 让对话更清晰明确
+
+📝 使用格式：
+[引用:消息ID] 你的回复内容
+
+🔍 最近的消息（你可以引用这些）：
 ${recentMessages.slice(-10).map((msg) => {
   const msgId = msg.id
   const msgContent = msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息'
   const sender = msg.type === 'sent' ? '用户' : '你'
   return `ID:${msgId} ${sender}: ${msgContent.substring(0, 35)}${msgContent.length > 35 ? '...' : ''}`
 }).join('\n')}
+
+💡 实际示例：
+用户刚才问了3个问题，你想回答第2个：
+[引用:15] 这个我知道，是xxx
+
+用户说了一句话，你想强调回应：
+[引用:20] 对！我也是这么想的
+
+⚠️ 重要提醒：
+• 引用标记 [引用:ID] 必须写在最前面
+• 不要自己写「用户: xxx」，系统会自动显示引用内容
+• 这是真实可用的功能，不是示例！
+• 平时聊天不需要每次都引用，自然使用即可
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
       
@@ -1719,17 +2141,29 @@ ${recentMessages.slice(-10).map((msg) => {
             }
           }
           
-          // 只过滤掉可见的系统消息（如"已接收转账"），但保留隐藏的通话记录
-          if (msg.type === 'system' && !msg.isHidden) {
-            return null
-          }
-          
-          // 如果是隐藏的系统消息（通话记录），转换为AI可读的格式
-          if (msg.type === 'system' && msg.isHidden) {
-            return {
-              role: 'system' as const,
-              content: msg.content
+          // 处理系统消息
+          if (msg.type === 'system') {
+            // 如果是隐藏的系统消息（通话记录），传递给AI
+            if (msg.isHidden) {
+              return {
+                role: 'system' as const,
+                content: msg.content
+              }
             }
+            
+            // 如果是转账/红包相关的系统消息，也传递给AI（让AI知道操作结果）
+            if (msg.content.includes('已收款') || 
+                msg.content.includes('退还了转账') || 
+                msg.content.includes('已领取') ||
+                msg.content.includes('已过期')) {
+              return {
+                role: 'system' as const,
+                content: `[系统提示: ${msg.content}]`
+              }
+            }
+            
+            // 其他系统消息过滤掉
+            return null
           }
           
           // 如果是红包消息，转换为AI可读的格式
@@ -1900,102 +2334,169 @@ ${recentMessages.slice(-10).map((msg) => {
         }
       }
       
-      // 🆕 使用智能解析器
-      const { parseAIResponse, actionsToStandardFormat } = await import('../utils/aiResponseParser')
-      const parsed = parseAIResponse(aiResponse)
-      
-      console.log('🤖 智能解析结果:', parsed)
-      
-      // 将解析后的actions转换为标准格式（供后续代码使用）
-      const standardActions = actionsToStandardFormat(parsed.actions)
-      const enrichedResponse = parsed.cleanText + (standardActions ? '\n' + standardActions : '')
-      
-      // 使用表情包解析工具
+      // 使用新的表情包解析工具
       const { parseAIEmojiResponse } = await import('../utils/emojiParser')
-      const parsedEmoji = parseAIEmojiResponse(enrichedResponse, availableEmojis)
+      const parsedEmoji = parseAIEmojiResponse(aiResponse, availableEmojis)
       const aiEmojiIndexes = parsedEmoji.emojiIndexes
       
-      // 从解析结果中提取数据
+      // 检查AI是否对红包做出决定
       let redEnvelopeAction: 'claim' | null = null
-      let aiRedEnvelopeData = parsed.actions.redEnvelope || null
-      let aiPhotoDescription = parsed.actions.photo?.description || null
-      let aiVoiceText = parsed.actions.voice?.text || null
-      let aiLocationData = parsed.actions.location || null
       
-      if (aiRedEnvelopeData) {
+      // 检查AI是否要发红包
+      const redEnvelopeMatch = aiResponse.match(/\[红包:(\d+\.?\d*):(.+?)\]/)
+      let aiRedEnvelopeData: { amount: number; blessing: string } | null = null
+      
+      if (redEnvelopeMatch) {
+        let amount = parseFloat(redEnvelopeMatch[1])
+        // 限制红包金额最多200元
+        if (amount > 200) {
+          console.warn('⚠️ AI发红包金额超过200元，已限制为200元')
+          amount = 200
+        }
+        aiRedEnvelopeData = {
+          amount: amount,
+          blessing: redEnvelopeMatch[2]
+        }
         console.log('🧧 AI发红包:', aiRedEnvelopeData)
       }
-      if (aiPhotoDescription) {
-        console.log('📸 AI发送照片，描述:', aiPhotoDescription)
-      }
-      if (aiVoiceText) {
-        console.log('🎤 AI发送语音，内容:', aiVoiceText)
-      }
-      if (aiLocationData) {
-        console.log('📍 AI发送位置:', aiLocationData)
-      }
       
-      // 检查是否领取红包
-      if (aiResponse.includes('[领取红包]')) {
-        redEnvelopeAction = 'claim'
-        console.log('🎁 AI决定：领取红包')
-      }
-      
-      // 使用解析后的文字内容
+      // 使用解析后的文字内容（已经清理了所有表情包标记）
       let cleanedResponse = parsedEmoji.textContent
       
-      // 清理账单标记
+      // 清理账单标记（必须在提取账单信息之后）
       cleanedResponse = cleanedResponse.replace(/\[BILL:(expense|income)\|\d+\.?\d*\|\w+\|[^\]]+\]/g, '').trim()
+      
+      // 清理红包标记（必须在使用parsedEmoji.textContent之后）
+      cleanedResponse = cleanedResponse.replace(/\[红包:\d+\.?\d*:.+?\]/g, '').trim()
       
       // 清理AI错误的引用格式
       cleanedResponse = cleanedResponse.replace(/\[引用了\s+.+?\s+的消息:\s*".+?"\]/g, '').trim()
+      // 清理AI模仿的书名号引用格式（只清理单独成行的，不清理嵌入在文字中的）
+      // 注意：不要清理用户真实引用的消息，只清理AI错误模仿的格式
       cleanedResponse = cleanedResponse.replace(/^「.+?:\s*.+?」\n?/gm, '').trim()
       
-      // 清理多余空行
+      // 清理可能产生的多余空行
       cleanedResponse = cleanedResponse.replace(/\n\s*\n/g, '\n').trim()
       
-      // 清除状态标记（如果AI发送了，直接删除）
+      // 检查AI是否要发送照片
+      const photoMatch = aiResponse.match(/\[照片:(.+?)\]/)
+      let aiPhotoDescription: string | null = null
+      
+      if (photoMatch) {
+        aiPhotoDescription = photoMatch[1]
+        cleanedResponse = cleanedResponse.replace(/\[照片:.+?\]/g, '').trim()
+        console.log('📸 AI发送照片，描述:', aiPhotoDescription)
+      }
+      
+      // 检查AI是否要发送语音消息
+      const voiceMatch = aiResponse.match(/\[语音:(.+?)\]/)
+      let aiVoiceText: string | null = null
+      
+      if (voiceMatch) {
+        aiVoiceText = voiceMatch[1]
+        cleanedResponse = cleanedResponse.replace(/\[语音:.+?\]/g, '').trim()
+        console.log('🎤 AI发送语音，内容:', aiVoiceText)
+      }
+      
+      // 检查AI是否要发送位置
+      const locationMatch = aiResponse.match(/\[位置:(.+?):(.+?)\]/)
+      let aiLocationData: { name: string; address: string } | null = null
+      
+      if (locationMatch) {
+        aiLocationData = {
+          name: locationMatch[1],
+          address: locationMatch[2]
+        }
+        cleanedResponse = cleanedResponse.replace(/\[位置:.+?:.+?\]/g, '').trim()
+        console.log('📍 AI发送位置:', aiLocationData)
+      }
+      
+      // 检查AI是否要领取红包（支持多种格式）
+      if (/[\[【\(（]\s*(领取红包|领红包)\s*[\]】\)）]/.test(aiResponse)) {
+        redEnvelopeAction = 'claim'
+        cleanedResponse = cleanedResponse.replace(/[\[【\(（]\s*(领取红包|领红包)\s*[\]】\)）]/g, '').trim()
+        console.log('🎁 AI决定：领取红包')
+      }
+      
+      // 📊 解析状态栏信息
+      const statusMatch = aiResponse.match(/\[状态:([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
+      
+      if (statusMatch && id) {
+        const statusData = {
+          outfit: statusMatch[1].trim(),
+          action: statusMatch[2].trim(),
+          mood: statusMatch[3].trim(),
+          thought: statusMatch[4].trim(),
+          location: statusMatch[5].trim(),
+          weather: statusMatch[6].trim(),
+          affection: 75,
+          timestamp: Date.now(),
+          characterId: id
+        }
+        
+        localStorage.setItem(`character_status_${id}`, JSON.stringify(statusData))
+        console.log('✅ 状态已保存:', statusData)
+      }
+      
+      // 清除状态标记（如果AI还是发送了）
       cleanedResponse = cleanedResponse.replace(/\[状态:[^\]]+\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[状态:[\s\S]*?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[.*?状态.*?\]/g, '').trim()
       
+      console.log('🧹 清理后的回复内容:', cleanedResponse)
+      console.log('📏 清理后的回复长度:', cleanedResponse.length)
+      
       // 检查AI是否对转账做出决定
       let transferAction: 'accept' | 'reject' | null = null
       
+      // 先检查AI是否要接收或退还转账（支持各种格式）
+      console.log('🔍 检查转账指令，AI原始回复:', aiResponse)
+      if (/[\[【\(（]\s*接收转账\s*[\]】\)）]/.test(aiResponse)) {
+        transferAction = 'accept'
+        cleanedResponse = cleanedResponse.replace(/[\[【\(（]\s*接收转账\s*[\]】\)）]/g, '').trim()
+        console.log('✅ AI决定：接收转账')
+      } else if (/[\[【\(（]\s*退还转账\s*[\]】\)）]/.test(aiResponse)) {
+        transferAction = 'reject'
+        cleanedResponse = cleanedResponse.replace(/[\[【\(（]\s*退还转账\s*[\]】\)）]/g, '').trim()
+        console.log('↩️  AI决定：退还转账')
+      } else {
+        console.log('⏸️  AI未对转账做出决定（没有检测到[接收转账]或[退还转账]）')
+      }
+      
       // 检查AI是否要发起转账 - 支持多种格式
+      // ⚠️ 如果AI正在接收/退还转账，则忽略发起转账的指令（防止冲突）
       let transferMatch = aiResponse.match(/\[转账:(\d+\.?\d*):(.+?)\]/)
       let aiTransferData: { amount: number; message: string } | null = null
       
-      if (transferMatch) {
-        aiTransferData = {
-          amount: parseFloat(transferMatch[1]),
-          message: transferMatch[2]
+      if (transferAction) {
+        // 如果AI正在处理转账（接收或退还），忽略发起转账的指令
+        if (transferMatch) {
+          console.log('⚠️  AI同时包含接收/退还和发起转账指令，忽略发起转账指令')
+          cleanedResponse = cleanedResponse.replace(/\[转账:\d+\.?\d*:.+?\]/g, '').trim()
         }
-        cleanedResponse = cleanedResponse.replace(/\[转账:\d+\.?\d*:.+?\]/g, '').trim()
-        console.log('💰 AI发起转账 (标准格式):', aiTransferData)
+        // 同时清除备用格式的转账指令
+        cleanedResponse = cleanedResponse.replace(/\[.*?转账.*?[¥￥]?\s*\d+\.?\d*.*?\]/g, '').trim()
       } else {
-        // 尝试匹配其他格式：[给你转账¥500, 备注: xxx] 或类似格式
-        const altMatch = aiResponse.match(/\[.*?转账.*?[¥￥]?\s*(\d+\.?\d*).*?[:：]\s*(.+?)\]/)
-        if (altMatch) {
+        // 只有在没有接收/退还转账时，才处理发起转账
+        if (transferMatch) {
           aiTransferData = {
-            amount: parseFloat(altMatch[1]),
-            message: altMatch[2].trim()
+            amount: parseFloat(transferMatch[1]),
+            message: transferMatch[2]
           }
-          cleanedResponse = cleanedResponse.replace(/\[.*?转账.*?\]/g, '').trim()
-          console.log('💰 AI发起转账 (备用格式):', aiTransferData)
+          cleanedResponse = cleanedResponse.replace(/\[转账:\d+\.?\d*:.+?\]/g, '').trim()
+          console.log('💰 AI发起转账 (标准格式):', aiTransferData)
+        } else {
+          // 尝试匹配其他格式：[给你转账¥500, 备注: xxx] 或类似格式
+          const altMatch = aiResponse.match(/\[.*?转账.*?[¥￥]?\s*(\d+\.?\d*).*?[:：]\s*(.+?)\]/)
+          if (altMatch) {
+            aiTransferData = {
+              amount: parseFloat(altMatch[1]),
+              message: altMatch[2].trim()
+            }
+            cleanedResponse = cleanedResponse.replace(/\[.*?转账.*?\]/g, '').trim()
+            console.log('💰 AI发起转账 (备用格式):', aiTransferData)
+          }
         }
-      }
-      
-      if (aiResponse.includes('[接收转账]')) {
-        transferAction = 'accept'
-        cleanedResponse = cleanedResponse.replace(/\[接收转账\]/g, '').trim()
-        console.log('✅ AI决定：接收转账')
-      } else if (aiResponse.includes('[退还转账]')) {
-        transferAction = 'reject'
-        cleanedResponse = cleanedResponse.replace(/\[退还转账\]/g, '').trim()
-        console.log('↩️  AI决定：退还转账')
-      } else if (!aiTransferData && !aiRedEnvelopeData) {
-        console.log('⏸️  AI未对转账/红包做出决定')
       }
       
       // 检查AI是否要开通亲密付
@@ -2008,45 +2509,23 @@ ${recentMessages.slice(-10).map((msg) => {
         console.log('💝 AI开通亲密付，月额度:', aiIntimatePayLimit)
       }
       
-      // 检查AI是否要引用消息
+      // 检查AI是否要引用消息（支持冒号后有空格）
+      const quoteMatch = aiResponse.match(/\[引用:\s*(\d+)\]/)
       let aiQuotedMessageId: number | null = null
-      if (parsed.actions.quote) {
-        aiQuotedMessageId = parseInt(parsed.actions.quote.messageId)
+      
+      if (quoteMatch) {
+        aiQuotedMessageId = parseInt(quoteMatch[1])
+        cleanedResponse = cleanedResponse.replace(/\[引用:\s*\d+\]/g, '').trim()
         console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
       }
       
       // 检查AI是否要撤回消息
-      let shouldRecallLastMessage = parsed.actions.recall || false
-      if (shouldRecallLastMessage) {
+      let shouldRecallLastMessage = false
+      if (aiResponse.includes('[撤回消息]')) {
+        shouldRecallLastMessage = true
+        cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
         console.log('🔄 AI要撤回上一条消息')
       }
-      
-      // 🧹 最后统一清理所有功能标记（防止泄露到聊天气泡）
-      cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[领取红包\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[接收转账\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[退还转账\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[接受.*?亲密付.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[拒绝.*?亲密付.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[引用.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[红包.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[转账.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[语音.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[照片.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[位置.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[亲密付.*?\]/g, '').trim()
-      cleanedResponse = cleanedResponse.replace(/\[表情包.*?\]/g, '').trim()
-      
-      // 🚨 清理旁白模式未开启时的动作描述（英文和中文括号）
-      if (!enableNarration) {
-        cleanedResponse = cleanedResponse.replace(/\([^)]*?\)/g, '').trim()
-        cleanedResponse = cleanedResponse.replace(/（[^）]*?）/g, '').trim()
-      }
-      
-      cleanedResponse = cleanedResponse.replace(/\\n/g, '\n').trim()
-      
-      console.log('🧹 清理后的回复内容:', cleanedResponse)
-      console.log('📏 清理后的回复长度:', cleanedResponse.length)
       
       // 检查AI是否对亲密付做出决定
       let intimatePayAction: 'accept' | 'reject' | null = null
@@ -2063,7 +2542,7 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 如果有转账操作，更新最新的待处理转账状态并添加系统提示
       if (transferAction) {
-        // 从后往前找最新的待处理转账
+        // 从后往前找最新的待处理转账（用户发起的）
         for (let i = currentMessages.length - 1; i >= 0; i--) {
           const msg = currentMessages[i]
           if (msg.messageType === 'transfer' && 
@@ -2078,7 +2557,7 @@ ${recentMessages.slice(-10).map((msg) => {
               }
             }
             
-            // 添加系统提示消息
+            // 添加系统提示消息（给用户看的）
             const systemMessage: Message = {
               id: Date.now(),
               type: 'system',
@@ -2092,6 +2571,22 @@ ${recentMessages.slice(-10).map((msg) => {
               messageType: 'system'
             }
             updatedMessages.push(systemMessage)
+            
+            // 添加AI的系统提示消息（给AI看的，让AI知道操作成功，但用户看不到）
+            const aiSystemMessage: Message = {
+              id: Date.now() + 1,
+              type: 'system',
+              content: transferAction === 'accept' 
+                ? `你已收款，已存入零钱 ¥${updatedMessages[i].transfer!.amount.toFixed(2)}` 
+                : `你已退还转账 ¥${updatedMessages[i].transfer!.amount.toFixed(2)}`,
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              messageType: 'system',
+              isHidden: true  // 隐藏消息，只给AI看
+            }
+            updatedMessages.push(aiSystemMessage)
             
             setMessages(updatedMessages)
             currentMessages = updatedMessages
@@ -2143,7 +2638,7 @@ ${recentMessages.slice(-10).map((msg) => {
             }
             updatedMessages.push(systemMessage)
             
-            // 更新currentMessages，但不要setMessages，让后续代码继续添加AI回复
+            setMessages(updatedMessages)
             currentMessages = updatedMessages
             break
           }
@@ -2193,7 +2688,9 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 如果有文字回复
       if (cleanedResponse.trim()) {
-        const responseLines = cleanedResponse.trim().split('\n').filter(line => line.trim())
+        // 将字面的 \n 转换为真正的换行符
+        const normalizedResponse = cleanedResponse.replace(/\\n/g, '\n')
+        const responseLines = normalizedResponse.trim().split('\n').filter(line => line.trim())
         
         // 如果回复只有一行，直接添加
         if (responseLines.length === 1) {
@@ -2458,7 +2955,6 @@ ${recentMessages.slice(-10).map((msg) => {
         setMessages(newMessages)
         console.log('🧧 AI红包卡片已添加')
       }
-      
       // 如果AI发起了转账
       if (aiTransferData) {
         await new Promise(resolve => setTimeout(resolve, 500)) // 稍微延迟一下
@@ -2466,7 +2962,7 @@ ${recentMessages.slice(-10).map((msg) => {
         const now = Date.now()
         const aiTransferMessage: Message = {
           id: now,
-          type: 'received',
+          type: 'received',  // 消息类型：用户收到的消息（AI发的）
           content: '',
           time: new Date().toLocaleTimeString('zh-CN', {
             hour: '2-digit',
@@ -2569,45 +3065,38 @@ ${recentMessages.slice(-10).map((msg) => {
         console.error('❌ 记忆提取失败:', error)
       }
       
-      // 如果AI要撤回消息
+      // 如果AI要撤回上一条消息
       if (shouldRecallLastMessage) {
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        // 找到本次回复中最后一条可撤回的消息
-        // 从后往前找，但只在本次新增的消息中查找
-        const startIndex = currentMessages.length // 本次回复前的消息数量
-        let lastRecallableIndex = -1
+        // 找到AI最后发送的消息（不包括系统消息）
+        const lastAiMessageIndex = newMessages.map((msg, idx) => ({ msg, idx }))
+          .reverse()
+          .find(({ msg }) => msg.type === 'received' && msg.messageType !== 'system')
         
-        for (let i = newMessages.length - 1; i >= startIndex; i--) {
-          const msg = newMessages[i]
-          // 找到第一条可撤回的消息（普通文字、表情包、照片、语音、位置）
-          if (msg.type === 'received' && 
-              msg.messageType !== 'system' &&
-              !msg.redEnvelopeId && 
-              !msg.transfer && 
-              !msg.intimatePay) {
-            lastRecallableIndex = i
-            break
-          }
-        }
-        
-        if (lastRecallableIndex !== -1) {
-          const msg = newMessages[lastRecallableIndex]
-          console.log('🔄 AI撤回本次回复中的消息:', msg.content || msg.emojiDescription || '特殊消息')
+        if (lastAiMessageIndex) {
+          const { msg, idx } = lastAiMessageIndex
           
-          // 将消息标记为撤回
-          newMessages[lastRecallableIndex] = {
-            ...msg,
-            isRecalled: true,
-            recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
-            content: `${character?.name || 'AI'}撤回了一条消息`,
-            type: 'system' as const,
-            messageType: 'system' as const
-          }
+          // 检查是否是特殊消息（红包、转账、亲密付不能撤回）
+          const canRecall = !msg.redEnvelopeId && !msg.transfer && !msg.intimatePay
           
-          setMessages([...newMessages])
-        } else {
-          console.log('⚠️ 本次回复中没有可撤回的消息')
+          if (!canRecall) {
+            console.log('⚠️ AI尝试撤回特殊消息被阻止:', msg.messageType)
+          } else {
+            console.log('🔄 AI撤回消息:', msg.content || msg.emojiDescription || '特殊消息')
+            
+            // 将消息标记为撤回
+            newMessages[idx] = {
+              ...msg,
+              isRecalled: true,
+              recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
+              content: `${character?.name || 'AI'}撤回了一条消息`,
+              type: 'system' as const,
+              messageType: 'system' as const
+            }
+            
+            setMessages([...newMessages])
+          }
         }
       }
       
@@ -2864,10 +3353,10 @@ ${recentMessages.slice(-10).map((msg) => {
                    )}
                    
                    {/* 消息主体 */}
-                   <div
-                     className={`flex ${
-                       message.type === 'sent' ? 'justify-end message-sent' : 'justify-start message-received'
-                     }`}
+                  <div
+                    className={`flex message-container ${
+                      message.type === 'sent' ? 'justify-end sent' : 'justify-start received'
+                    }`}
                    >
                    {/* 对方消息：头像在左，气泡在右 */}
                    {message.type === 'received' && (
@@ -2901,6 +3390,8 @@ ${recentMessages.slice(-10).map((msg) => {
                          <RedEnvelopeCard
                            redEnvelope={redEnvelope}
                            onClick={() => handleOpenRedEnvelope(message.redEnvelopeId!)}
+                           coverImage={redEnvelopeCover}
+                           iconImage={redEnvelopeIcon}
                          />
                        ) : null
                      })()
@@ -2912,11 +3403,16 @@ ${recentMessages.slice(-10).map((msg) => {
                    ) : message.messageType === 'voice' && message.voiceText ? (
                      <div className="flex flex-col gap-2 max-w-[240px]">
                        <div 
-                         className={`rounded-2xl p-3 shadow-lg min-w-[160px] transition-all ${
-                           message.type === 'sent' 
-                             ? 'bg-wechat-primary' 
-                             : 'bg-white/80 backdrop-blur-sm border border-gray-100'
-                         }`}
+                         className="message-bubble"
+                         style={{
+                           backgroundColor: message.type === 'sent' ? '#95EC69' : '#FFFFFF',
+                           borderRadius: '16px',
+                           padding: '12px',
+                           boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                           minWidth: '160px',
+                           transition: 'all 0.2s',
+                           border: message.type === 'sent' ? 'none' : '1px solid #e5e7eb'
+                         }}
                        >
                          <div className="flex items-center gap-3">
                            {/* 播放按钮 */}
@@ -3037,17 +3533,47 @@ ${recentMessages.slice(-10).map((msg) => {
                        />
                      </div>
                    ) : message.messageType === 'transfer' && message.transfer ? (
-                     <div className="glass-card rounded-2xl p-4 shadow-lg min-w-[200px]">
+                     <div 
+                       className="message-bubble glass-card rounded-2xl p-4 shadow-lg min-w-[200px]"
+                       style={{
+                         backgroundImage: transferCover ? `url(${transferCover})` : 'none',
+                         backgroundSize: 'cover',
+                         backgroundPosition: 'center',
+                         position: 'relative',
+                         overflow: 'visible'  // 让伪元素可以显示在外面
+                       }}
+                     >
                        <div className="flex items-center gap-3 mb-3">
-                         <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
-                           ¥
+                         <div 
+                           className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white text-xl font-bold overflow-hidden"
+                           style={{
+                             backgroundImage: transferIcon ? `url(${transferIcon})` : 'none',
+                             backgroundSize: 'cover',
+                             backgroundPosition: 'center'
+                           }}
+                         >
+                           {!transferIcon && '¥'}
                          </div>
                          <div className="flex-1">
-                           <div className="text-sm text-gray-900 font-medium">转账</div>
-                           <div className="text-xs text-gray-500 mt-0.5">
-                             {message.transfer.message || '转账'}
-                           </div>
-                         </div>
+                          <div className="text-sm text-gray-900 font-medium">转账</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {(() => {
+                              // 如果有备注（非空字符串），优先显示备注
+                              if (message.transfer.message && message.transfer.message.trim()) {
+                                return message.transfer.message
+                              }
+                              // 没有备注时，根据状态显示
+                              if (message.transfer.status === 'pending') {
+                                return message.type === 'sent' ? '你发起了一笔转账' : '对方发起了一笔转账'
+                              } else if (message.transfer.status === 'received') {
+                                return '已接收'
+                              } else if (message.transfer.status === 'expired') {
+                                return '已退还'
+                              }
+                              return '转账'
+                            })()}
+                          </div>
+                        </div>
                        </div>
                        <div className="border-t border-gray-200 pt-3">
                          {message.type === 'received' && message.transfer.status === 'pending' ? (
@@ -3150,38 +3676,19 @@ ${recentMessages.slice(-10).map((msg) => {
                        {/* 文字内容 */}
                        {message.content && (
                          <div
-                           className={`rounded-2xl break-words shadow-lg overflow-hidden ${
-                             message.type === 'sent'
-                               ? 'text-gray-900 rounded-tr-sm'
-                               : message.content.startsWith('[错误]')
-                               ? 'bg-red-100 text-red-700 rounded-tl-sm'
-                               : 'text-gray-900 rounded-tl-sm'
-                           }`}
-                           style={
-                             message.type === 'sent'
-                               ? {
-                                   backgroundColor: userBubbleColor,
-                                   ...Object.fromEntries(
-                                     userBubbleCSS.split(';').filter(s => s.trim()).map(s => {
-                                       const [key, value] = s.split(':').map(s => s.trim())
-                                       return [key.replace(/-([a-z])/g, (g) => g[1].toUpperCase()), value]
-                                     })
-                                   )
-                                 }
-                               : message.content.startsWith('[错误]')
-                               ? {}
-                               : {
-                                   backgroundColor: aiBubbleColor,
-                                   ...Object.fromEntries(
-                                     aiBubbleCSS.split(';').filter(s => s.trim()).map(s => {
-                                       const [key, value] = s.split(':').map(s => s.trim())
-                                       return [key.replace(/-([a-z])/g, (g) => g[1].toUpperCase()), value]
-                                     })
-                                   )
-                                 }
-                           }
+                           className="message-bubble"
+                           style={{
+                             // 默认基础样式（会被 CSS 的 !important 覆盖）
+                             backgroundColor: message.type === 'sent' ? userBubbleColor : (message.content.startsWith('[错误]') ? '#fee2e2' : aiBubbleColor),
+                             borderRadius: '16px',
+                             boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                             overflow: 'visible',  // 改为 visible，让伪元素可以显示在气泡外
+                             wordBreak: 'break-word',
+                             color: message.content.startsWith('[错误]') ? '#991b1b' : '#111827',
+                             position: 'relative'  // 添加相对定位，让伪元素的绝对定位生效
+                           }}
                          >
-                           <div className="px-4 py-3">
+                           <div className="px-4 py-3" style={{ overflow: 'hidden', borderRadius: '16px' }}>
                              {/* 引用的消息 */}
                              {message.quotedMessage && (
                                <div 

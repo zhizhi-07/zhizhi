@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { SearchIcon, AddIcon, EmptyIcon } from '../components/Icons'
 import { useState, useEffect } from 'react'
 import { useCharacter } from '../context/CharacterContext'
-import { useBackground } from '../context/BackgroundContext'
 import { useGroup } from '../context/GroupContext'
+import { useBackground } from '../context/BackgroundContext'
 import { getStreakData } from '../utils/streakSystem'
 
 interface Chat {
@@ -31,13 +31,6 @@ const ChatList = () => {
   })
   const [showMenu, setShowMenu] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-
-  // 调试：打印背景信息
-  useEffect(() => {
-    console.log('📱 ChatList 背景状态:')
-    console.log('  background:', background)
-    console.log('  style:', getBackgroundStyle())
-  }, [background, getBackgroundStyle])
 
   // 保存聊天列表到localStorage
   useEffect(() => {
@@ -163,10 +156,12 @@ const ChatList = () => {
 
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
-      {/* 壁纸背景层 - 固定在底层 */}
+      {/* 默认使用全局背景 */}
       <div 
         className="absolute inset-0 z-0"
-        style={getBackgroundStyle()}
+        style={background ? getBackgroundStyle() : {
+          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+        }}
       />
       
       {/* 内容层 - 在背景上方 */}

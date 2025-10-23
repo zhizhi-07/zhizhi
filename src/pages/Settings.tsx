@@ -2,17 +2,40 @@ import { useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { BackIcon, ImageIcon } from '../components/Icons'
 import { useSettings } from '../context/SettingsContext'
+import { useBackground } from '../context/BackgroundContext'
 import { getStorageInfo, manualCleanStorage, compressStorageData } from '../utils/storage'
+import { saveImage, getImage, deleteImage } from '../utils/imageStorage'
 
 const Settings = () => {
   const navigate = useNavigate()
   const { showStatusBar, toggleStatusBar } = useSettings()
+  const { setBackground } = useBackground()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 全局背景设置
-  const [globalBackground, setGlobalBackground] = useState(() => {
-    const saved = localStorage.getItem('global_background')
-    return saved || ''
+  const [globalBackground, setGlobalBackground] = useState('')
+  
+  // 从 IndexedDB 加载背景
+  useEffect(() => {
+    const loadBackground = async () => {
+      try {
+        const saved = await getImage('global_background')
+        if (saved) {
+          setGlobalBackground(saved)
+          // 只同步到 BackgroundContext，让各个页面自己决定是否使用
+          setBackground(saved)
+        }
+      } catch (error) {
+        console.error('加载背景失败:', error)
+      }
+    }
+    loadBackground()
+  }, [setBackground])
+  
+  // 全局背景应用范围设置
+  const [applyToAllPages, setApplyToAllPages] = useState(() => {
+    const saved = localStorage.getItem('apply_background_to_all_pages')
+    return saved === 'true'
   })
 
   const [isUploading, setIsUploading] = useState(false)
@@ -38,8 +61,49 @@ const Settings = () => {
     setBackgroundPreview(globalBackground)
   }, [globalBackground])
 
+  // 压缩图片
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+          
+          // 限制最大尺寸为 1920px
+          const maxSize = 1920
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize
+              width = maxSize
+            } else {
+              width = (width / height) * maxSize
+              height = maxSize
+            }
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+          
+          // 压缩质量 0.7
+          const compressed = canvas.toDataURL('image/jpeg', 0.7)
+          resolve(compressed)
+        }
+        img.onerror = reject
+        img.src = e.target?.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // 处理背景上传
-  const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -48,34 +112,62 @@ const Settings = () => {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('图片大小不能超过5MB')
-      return
-    }
-
     setIsUploading(true)
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
-      setBackgroundPreview(base64String)
-      setGlobalBackground(base64String)
-      localStorage.setItem('global_background', base64String)
+    try {
+      // 不压缩，直接保存原图到 IndexedDB
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const base64String = reader.result as string
+        try {
+          // 保存到 IndexedDB（支持大图片）
+          await saveImage('global_background', base64String)
+          setBackgroundPreview(base64String)
+          setGlobalBackground(base64String)
+          // 同步到 BackgroundContext
+          setBackground(base64String)
+          setIsUploading(false)
+          alert('全局背景已保存！（使用 IndexedDB，无大小限制）')
+        } catch (error) {
+          console.error('保存失败:', error)
+          alert('保存失败，请重试')
+          setIsUploading(false)
+        }
+      }
+      reader.onerror = () => {
+        alert('图片读取失败')
+        setIsUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('图片处理失败:', error)
+      alert('图片处理失败，请重试')
       setIsUploading(false)
     }
-    reader.onerror = () => {
-      alert('图片读取失败')
-      setIsUploading(false)
-    }
-    reader.readAsDataURL(file)
   }
 
   // 删除背景
-  const handleRemoveBackground = () => {
-    setGlobalBackground('')
-    setBackgroundPreview('')
-    localStorage.removeItem('global_background')
-    setStorageInfo(getStorageInfo())
+  const handleRemoveBackground = async () => {
+    try {
+      await deleteImage('global_background')
+      setGlobalBackground('')
+      setBackgroundPreview('')
+      localStorage.removeItem('global_background')
+      // 同步到 BackgroundContext
+      setBackground('')
+      setStorageInfo(getStorageInfo())
+      alert('全局背景已删除！')
+    } catch (error) {
+      console.error('删除失败:', error)
+      alert('删除失败，请重试')
+    }
+  }
+  
+  // 切换背景应用范围
+  const handleToggleApplyToAllPages = () => {
+    const newValue = !applyToAllPages
+    setApplyToAllPages(newValue)
+    localStorage.setItem('apply_background_to_all_pages', String(newValue))
   }
 
   // 清理缓存
@@ -247,7 +339,7 @@ const Settings = () => {
             <div className="px-4 py-4">
               <div className="mb-3">
                 <div className="text-gray-900 font-medium mb-0.5">全局背景</div>
-                <div className="text-xs text-gray-500">应用于微信、联系人、发现等主界面</div>
+                <div className="text-xs text-gray-500">默认应用于微信、通讯录、发现、我四个主界面</div>
               </div>
               
               <input
@@ -293,6 +385,36 @@ const Settings = () => {
                   )}
                 </div>
               </div>
+              
+              {/* 应用范围选项 */}
+              {backgroundPreview && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={handleToggleApplyToAllPages}
+                    className="w-full flex items-center justify-between ios-button"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="text-left">
+                        <div className="text-sm font-medium text-gray-900">应用到所有界面</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {applyToAllPages ? '已应用到所有界面（包括聊天、小程序等）' : '仅应用到微信、通讯录、发现、我'}
+                        </div>
+                      </div>
+                    </div>
+                    <div 
+                      className={`w-12 h-7 rounded-full transition-all ${
+                        applyToAllPages ? 'bg-wechat-primary' : 'bg-gray-300'
+                      }`}
+                    >
+                      <div 
+                        className={`w-5 h-5 bg-white rounded-full mt-1 transition-all shadow-md ${
+                          applyToAllPages ? 'ml-6' : 'ml-1'
+                        }`}
+                      />
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

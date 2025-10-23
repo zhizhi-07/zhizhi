@@ -7,7 +7,6 @@ import memoryIcon from '../assets/memory-icon.png'
 import memorySummaryIcon from '../assets/memory-summary-icon.png'
 import diaryIcon from '../assets/diary-icon.png'
 import { blacklistManager } from '../utils/blacklistManager'
-import { ScheduleSettings } from '../components/ScheduleSettings'
 
 // 拉黑图标 - 使用绝对路径
 const blockedIcon = '/拉黑.png'
@@ -62,7 +61,7 @@ const ChatSettings = () => {
     return localStorage.getItem(`ai_bubble_css_${id}`) || ''
   })
   const [showBubbleSettings, setShowBubbleSettings] = useState(false)
-  const [showScheduleSettings, setShowScheduleSettings] = useState(false)
+  const [unifiedCSS, setUnifiedCSS] = useState('')
 
   // 拉黑状态
   const [isBlocked, setIsBlocked] = useState(() => {
@@ -73,13 +72,72 @@ const ChatSettings = () => {
 
   const [isUploading, setIsUploading] = useState(false)
   const [backgroundPreview, setBackgroundPreview] = useState(background)
+  
+  // 红包和转账封面
+  const redEnvelopeCoverInputRef = useRef<HTMLInputElement>(null)
+  const redEnvelopeIconInputRef = useRef<HTMLInputElement>(null)
+  const transferCoverInputRef = useRef<HTMLInputElement>(null)
+  const transferIconInputRef = useRef<HTMLInputElement>(null)
+  const [redEnvelopeCover, setRedEnvelopeCover] = useState(() => {
+    return localStorage.getItem(`red_envelope_cover_${id}`) || ''
+  })
+  const [redEnvelopeIcon, setRedEnvelopeIcon] = useState(() => {
+    return localStorage.getItem(`red_envelope_icon_${id}`) || ''
+  })
+  const [transferCover, setTransferCover] = useState(() => {
+    return localStorage.getItem(`transfer_cover_${id}`) || ''
+  })
+  const [transferIcon, setTransferIcon] = useState(() => {
+    return localStorage.getItem(`transfer_icon_${id}`) || ''
+  })
 
   useEffect(() => {
     setBackgroundPreview(background)
   }, [background])
 
+  // 压缩图片
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let width = img.width
+          let height = img.height
+          
+          // 限制最大尺寸为 1920px
+          const maxSize = 1920
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize
+              width = maxSize
+            } else {
+              width = (width / height) * maxSize
+              height = maxSize
+            }
+          }
+          
+          canvas.width = width
+          canvas.height = height
+          
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+          
+          // 压缩质量 0.7
+          const compressed = canvas.toDataURL('image/jpeg', 0.7)
+          resolve(compressed)
+        }
+        img.onerror = reject
+        img.src = e.target?.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // 处理壁纸上传
-  const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -88,34 +146,189 @@ const ChatSettings = () => {
       return
     }
 
-    // 限制图片大小为2MB，防止存储空间溢出
-    if (file.size > 2 * 1024 * 1024) {
-      alert('图片大小不能超过2MB，请压缩后上传')
-      return
-    }
-
     setIsUploading(true)
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const base64String = reader.result as string
-      setBackgroundPreview(base64String)
-      setBackground(base64String)
-      console.log('🎨 壁纸已上传并保存到全局背景')
+    try {
+      const compressed = await compressImage(file)
+      setBackgroundPreview(compressed)
+      // 保存到当前聊天的专属背景
+      if (id) {
+        localStorage.setItem(`chat_background_${id}`, compressed)
+      }
+      console.log('🎨 聊天壁纸已上传')
+      setIsUploading(false)
+      alert('聊天壁纸已保存！')
+    } catch (error) {
+      console.error('图片压缩失败:', error)
+      alert('图片处理失败，请重试')
       setIsUploading(false)
     }
-    reader.onerror = () => {
-      alert('图片读取失败')
-      setIsUploading(false)
-    }
-    reader.readAsDataURL(file)
   }
 
   // 删除壁纸
   const handleRemoveBackground = () => {
-    setBackground('')
     setBackgroundPreview('')
-    console.log('🎨 壁纸已删除')
+    if (id) {
+      localStorage.removeItem(`chat_background_${id}`)
+    }
+    console.log('🎨 聊天壁纸已删除')
+    alert('聊天壁纸已删除，将使用全局背景')
+  }
+
+  // 处理红包封面上传
+  const handleRedEnvelopeCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('图片大小不能超过2MB')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setRedEnvelopeCover(base64String)
+      if (id) {
+        localStorage.setItem(`red_envelope_cover_${id}`, base64String)
+      }
+      alert('红包封面已保存！')
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 处理转账封面上传
+  const handleTransferCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('图片大小不能超过2MB')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setTransferCover(base64String)
+      if (id) {
+        localStorage.setItem(`transfer_cover_${id}`, base64String)
+      }
+      alert('转账封面已保存！')
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 删除红包封面
+  const handleRemoveRedEnvelopeCover = () => {
+    setRedEnvelopeCover('')
+    if (id) {
+      localStorage.removeItem(`red_envelope_cover_${id}`)
+    }
+    alert('红包封面已删除')
+  }
+
+  // 处理红包图标上传
+  const handleRedEnvelopeIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 1 * 1024 * 1024) {
+      alert('图片大小不能超过1MB')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setRedEnvelopeIcon(base64String)
+      if (id) {
+        localStorage.setItem(`red_envelope_icon_${id}`, base64String)
+      }
+      alert('红包图标已保存！')
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 删除红包图标
+  const handleRemoveRedEnvelopeIcon = () => {
+    setRedEnvelopeIcon('')
+    if (id) {
+      localStorage.removeItem(`red_envelope_icon_${id}`)
+    }
+    alert('红包图标已删除')
+  }
+
+  // 删除转账封面
+  const handleRemoveTransferCover = () => {
+    setTransferCover('')
+    if (id) {
+      localStorage.removeItem(`transfer_cover_${id}`)
+    }
+    alert('转账封面已删除')
+  }
+
+  // 处理转账图标上传
+  const handleTransferIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 1 * 1024 * 1024) {
+      alert('图片大小不能超过1MB')
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setTransferIcon(base64String)
+      if (id) {
+        localStorage.setItem(`transfer_icon_${id}`, base64String)
+      }
+      alert('转账图标已保存！')
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // 删除转账图标
+  const handleRemoveTransferIcon = () => {
+    setTransferIcon('')
+    if (id) {
+      localStorage.removeItem(`transfer_icon_${id}`)
+    }
+    alert('转账图标已删除')
   }
 
   // 切换旁白功能
@@ -160,6 +373,29 @@ const ChatSettings = () => {
       localStorage.setItem(`memory_summary_interval_${id}`, String(value))
       // 触发storage事件，通知ChatDetail页面
       window.dispatchEvent(new Event('storage'))
+    }
+  }
+
+  // 解析统一的 CSS 输入
+  const handleParseUnifiedCSS = () => {
+    if (!unifiedCSS.trim()) {
+      alert('请输入 CSS 代码')
+      return
+    }
+
+    try {
+      // 直接保存整段 CSS，包含所有选择器和伪元素
+      // 这样可以支持 ::before, ::after 等伪元素
+      const cleanedCSS = unifiedCSS.trim()
+      
+      // 将完整的 CSS 保存到两个输入框
+      // 用户气泡和 AI 气泡都使用相同的完整 CSS
+      setUserBubbleCSS(cleanedCSS)
+      setAiBubbleCSS(cleanedCSS)
+      
+      alert('✅ CSS 已导入！\n\n包含的样式将自动应用到气泡上。\n支持伪元素（::before, ::after）和所有 CSS 属性。')
+    } catch (error) {
+      alert('CSS 解析失败，请检查格式')
     }
   }
 
@@ -399,6 +635,193 @@ const ChatSettings = () => {
           </div>
         </div>
 
+        {/* 红包和转账封面 */}
+        <div className="mb-3">
+          <div className="px-4 py-2">
+            <span className="text-sm text-gray-600 font-medium">红包 & 转账封面</span>
+            <p className="text-xs text-gray-400 mt-1">自定义红包和转账的背景图片</p>
+          </div>
+          <div className="glass-card rounded-2xl overflow-hidden">
+            {/* 红包封面 */}
+            <div className="px-4 py-4 border-b border-gray-100">
+              <input
+                ref={redEnvelopeCoverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleRedEnvelopeCoverUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-20 h-20 rounded-xl overflow-hidden border-2 border-red-200 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-red-500 to-orange-500"
+                  style={{
+                    backgroundImage: redEnvelopeCover ? `url(${redEnvelopeCover})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {!redEnvelopeCover && (
+                    <span className="text-3xl">🧧</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 mb-1">红包封面</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => redEnvelopeCoverInputRef.current?.click()}
+                      className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg ios-button text-xs font-medium"
+                    >
+                      {redEnvelopeCover ? '更换' : '上传'}
+                    </button>
+                    {redEnvelopeCover && (
+                      <button
+                        onClick={handleRemoveRedEnvelopeCover}
+                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 红包图标 */}
+            <div className="px-4 py-4 border-b border-gray-100">
+              <input
+                ref={redEnvelopeIconInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleRedEnvelopeIconUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-red-300 flex-shrink-0 flex items-center justify-center bg-red-500"
+                  style={{
+                    backgroundImage: redEnvelopeIcon ? `url(${redEnvelopeIcon})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {!redEnvelopeIcon && (
+                    <span className="text-2xl text-white font-bold">领</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 mb-1">红包图标</div>
+                  <div className="text-xs text-gray-500 mb-2">红包卡片上的"领"字图标</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => redEnvelopeIconInputRef.current?.click()}
+                      className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg ios-button text-xs font-medium"
+                    >
+                      {redEnvelopeIcon ? '更换' : '上传'}
+                    </button>
+                    {redEnvelopeIcon && (
+                      <button
+                        onClick={handleRemoveRedEnvelopeIcon}
+                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 转账封面 */}
+            <div className="px-4 py-4 border-b border-gray-100">
+              <input
+                ref={transferCoverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleTransferCoverUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-20 h-20 rounded-xl overflow-hidden border-2 border-orange-200 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-orange-400 to-yellow-400"
+                  style={{
+                    backgroundImage: transferCover ? `url(${transferCover})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {!transferCover && (
+                    <span className="text-3xl">💰</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 mb-1">转账封面</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => transferCoverInputRef.current?.click()}
+                      className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg ios-button text-xs font-medium"
+                    >
+                      {transferCover ? '更换' : '上传'}
+                    </button>
+                    {transferCover && (
+                      <button
+                        onClick={handleRemoveTransferCover}
+                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 转账图标 */}
+            <div className="px-4 py-4">
+              <input
+                ref={transferIconInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleTransferIconUpload}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                <div 
+                  className="w-16 h-16 rounded-full overflow-hidden border-2 border-orange-300 flex-shrink-0 flex items-center justify-center bg-orange-500"
+                  style={{
+                    backgroundImage: transferIcon ? `url(${transferIcon})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  }}
+                >
+                  {!transferIcon && (
+                    <span className="text-2xl text-white font-bold">¥</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 mb-1">转账图标</div>
+                  <div className="text-xs text-gray-500 mb-2">卡片左上角的圆形图标</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => transferIconInputRef.current?.click()}
+                      className="flex-1 px-3 py-2 bg-orange-500 text-white rounded-lg ios-button text-xs font-medium"
+                    >
+                      {transferIcon ? '更换' : '上传'}
+                    </button>
+                    {transferIcon && (
+                      <button
+                        onClick={handleRemoveTransferIcon}
+                        className="px-3 py-2 glass-card text-gray-700 rounded-lg ios-button text-xs font-medium"
+                      >
+                        移除
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 旁白功能 */}
         <div className="mb-3">
           <div className="px-4 py-2">
@@ -507,7 +930,7 @@ const ChatSettings = () => {
           <div className="glass-card rounded-2xl overflow-hidden">
             <button
               onClick={handleToggleAiProactive}
-              className="w-full px-4 py-4 flex items-center justify-between ios-button border-b border-gray-100"
+              className="w-full px-4 py-4 flex items-center justify-between ios-button"
             >
               <div className="flex items-center gap-3">
                 <div className="text-left">
@@ -528,23 +951,6 @@ const ChatSettings = () => {
                   }`}
                 />
               </div>
-            </button>
-
-            {/* 定时消息设置 */}
-            <button
-              onClick={() => setShowScheduleSettings(true)}
-              className="w-full px-4 py-4 flex items-center justify-between ios-button"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">⏰</span>
-                <div className="text-left">
-                  <div className="font-medium text-gray-900">定时消息设置</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    设置早安、晚安等定时问候
-                  </div>
-                </div>
-              </div>
-              <span className="text-gray-400 text-xl">›</span>
             </button>
           </div>
         </div>
@@ -682,6 +1088,38 @@ const ChatSettings = () => {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* 统一 CSS 输入框 */}
+              <div className="space-y-4 p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">✨</span>
+                  <h3 className="text-base font-semibold text-gray-900">快速导入 CSS</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  可以一次性粘贴整段 CSS 代码，支持完整的 CSS 语法（选择器、伪元素、动画等）。
+                  <br />
+                  <strong>⚡ 重要：</strong>所有 CSS 属性都需要加 <code className="bg-white px-1 rounded">!important</code> 才能覆盖默认样式。
+                  <br />
+                  <strong>💡 提示：</strong>粘贴后点击下方按钮导入，然后点击底部"保存设置"。
+                </p>
+                <textarea
+                  value={unifiedCSS}
+                  onChange={(e) => setUnifiedCSS(e.target.value)}
+                  className="w-full h-48 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs resize-none"
+                  placeholder="粘贴你的 CSS 代码，例如：&#10;&#10;.message-container.sent .message-bubble {&#10;  background-color: #522f1c !important;&#10;  border: 4px solid #B8EFED !important;&#10;}&#10;&#10;.message-container.received .message-bubble {&#10;  background-color: #B8EFED !important;&#10;  border: 4px solid #522f1c !important;&#10;}"
+                />
+                <button
+                  onClick={handleParseUnifiedCSS}
+                  className="w-full px-4 py-3 bg-blue-500 text-white rounded-xl ios-button font-medium hover:bg-blue-600 transition-colors"
+                >
+                  🔍 自动识别并应用
+                </button>
+              </div>
+
+              {/* 分隔线 */}
+              <div className="border-t border-gray-200 relative">
+                <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-3 text-sm text-gray-500">或手动设置</span>
+              </div>
+
               {/* 用户气泡设置 */}
               <div className="space-y-4">
                 <h3 className="text-base font-semibold text-gray-900">我的气泡（发送）</h3>
@@ -721,26 +1159,12 @@ const ChatSettings = () => {
                   />
                 </div>
 
-                {/* 预览 */}
+                {/* 预览提示 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    预览效果
-                  </label>
-                  <div className="flex justify-end">
-                    <div
-                      className="px-4 py-3 rounded-2xl text-gray-900 max-w-xs"
-                      style={{
-                        backgroundColor: userBubbleColor || '#95EC69',
-                        ...Object.fromEntries(
-                          userBubbleCSS.split(';').filter(s => s.trim()).map(s => {
-                            const [key, value] = s.split(':').map(s => s.trim())
-                            return [key.replace(/-([a-z])/g, (g) => g[1].toUpperCase()), value]
-                          })
-                        )
-                      }}
-                    >
-                      这是我发送的消息
-                    </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs text-yellow-800">
+                      💡 <strong>预览提示：</strong>完整的 CSS（包含选择器和伪元素）无法在此预览，请保存后在聊天页面查看实际效果。
+                    </p>
                   </div>
                 </div>
               </div>
@@ -787,26 +1211,12 @@ const ChatSettings = () => {
                   />
                 </div>
 
-                {/* 预览 */}
+                {/* 预览提示 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    预览效果
-                  </label>
-                  <div className="flex justify-start">
-                    <div
-                      className="px-4 py-3 rounded-2xl text-gray-900 max-w-xs"
-                      style={{
-                        backgroundColor: aiBubbleColor || '#FFFFFF',
-                        ...Object.fromEntries(
-                          aiBubbleCSS.split(';').filter(s => s.trim()).map(s => {
-                            const [key, value] = s.split(':').map(s => s.trim())
-                            return [key.replace(/-([a-z])/g, (g) => g[1].toUpperCase()), value]
-                          })
-                        )
-                      }}
-                    >
-                      这是对方发送的消息
-                    </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-xs text-yellow-800">
+                      💡 <strong>预览提示：</strong>完整的 CSS（包含选择器和伪元素）无法在此预览，请保存后在聊天页面查看实际效果。
+                    </p>
                   </div>
                 </div>
               </div>
@@ -829,11 +1239,6 @@ const ChatSettings = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* 定时消息设置弹窗 */}
-      {showScheduleSettings && (
-        <ScheduleSettings onClose={() => setShowScheduleSettings(false)} />
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MomentsIcon, VideoChannelIcon, LiveIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon, ShakeIcon } from '../components/Icons'
 import EmojiManagement from '../components/EmojiManagement'
+import { useBackground } from '../context/BackgroundContext'
 
 // 表情包图标组件
 const EmojiIcon = ({ size = 24, className = '' }: { size?: number; className?: string }) => (
@@ -26,6 +27,7 @@ const GameIcon = ({ size = 24, className = '' }: { size?: number; className?: st
 const Discover = () => {
   const navigate = useNavigate()
   const [showEmojiManagement, setShowEmojiManagement] = useState(false)
+  const { background, getBackgroundStyle } = useBackground()
   
   const menuGroups = [
     {
@@ -65,7 +67,17 @@ const Discover = () => {
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative overflow-hidden">
+      {/* 全局背景层 */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={background ? getBackgroundStyle() : {
+          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+        }}
+      />
+      
+      {/* 内容层 */}
+      <div className="relative z-10 h-full flex flex-col">
       {/* 顶部标题栏 - 玻璃效果 */}
       <div className="glass-effect px-5 py-4 border-b border-gray-200/50">
         <h1 className="text-xl font-semibold text-gray-900">发现</h1>
@@ -114,6 +126,7 @@ const Discover = () => {
         show={showEmojiManagement}
         onClose={() => setShowEmojiManagement(false)}
       />
+      </div>
     </div>
   )
 }

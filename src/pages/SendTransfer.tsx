@@ -20,7 +20,7 @@ const SendTransfer = () => {
       state: {
         transfer: {
           amount: parseFloat(amount),
-          message: message || '你发起了一笔转账'
+          message: message.trim()
         }
       }
     })

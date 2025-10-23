@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom'
 import { ServiceIcon, FavoriteIcon, MomentsIcon, WalletIcon, SettingsIcon, ImageIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
+import { useBackground } from '../context/BackgroundContext'
 
 const Me = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
+  const { background, getBackgroundStyle } = useBackground()
 
   // 检查是否是自定义头像（base64图片）
   const isCustomAvatar = currentUser?.avatar && currentUser.avatar.startsWith('data:image')
@@ -29,7 +31,17 @@ const Me = () => {
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative overflow-hidden">
+      {/* 全局背景层 */}
+      <div 
+        className="absolute inset-0 z-0"
+        style={background ? getBackgroundStyle() : {
+          background: 'linear-gradient(to bottom, #f9fafb, #f3f4f6)'
+        }}
+      />
+      
+      {/* 内容层 */}
+      <div className="relative z-10 h-full flex flex-col">
       {/* 顶部标题栏 - 玻璃效果 */}
       <div className="glass-effect px-5 py-4 border-b border-gray-200/50">
         <h1 className="text-xl font-semibold text-gray-900">我</h1>
@@ -90,6 +102,7 @@ const Me = () => {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   )

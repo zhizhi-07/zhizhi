@@ -1,0 +1,57 @@
+/* 仿照图片的气泡样式 - 白色圆角带阴影 */
+
+/* 用户消息气泡 */
+.message-container.sent .message-bubble {
+    background-color: #FFFFFF !important;
+    color: #333333 !important;
+    border-radius: 20px !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+    position: relative !important;
+    padding: 12px 16px !important;
+}
+
+/* AI消息气泡 */
+.message-container.received .message-bubble {
+    background-color: #F5F5F7 !important;
+    color: #333333 !important;
+    border-radius: 20px !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    position: relative !important;
+    padding: 12px 16px !important;
+}
+
+/* 可选：添加悬停效果 */
+.message-bubble:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+    transform: translateY(-1px) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* 可选：添加小尾巴（像微信那样） */
+.message-container.sent .message-bubble::after {
+    content: '' !important;
+    position: absolute !important;
+    right: -8px !important;
+    top: 12px !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-style: solid !important;
+    border-width: 8px 0 8px 8px !important;
+    border-color: transparent transparent transparent #FFFFFF !important;
+    filter: drop-shadow(2px 0 2px rgba(0, 0, 0, 0.05)) !important;
+}
+
+.message-container.received .message-bubble::after {
+    content: '' !important;
+    position: absolute !important;
+    left: -8px !important;
+    top: 12px !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-style: solid !important;
+    border-width: 8px 8px 8px 0 !important;
+    border-color: transparent #F5F5F7 transparent transparent !important;
+    filter: drop-shadow(-2px 0 2px rgba(0, 0, 0, 0.03)) !important;
+}
