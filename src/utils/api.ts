@@ -89,8 +89,11 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
   let model = settings.model || 'gemini-1.5-flash'
   let baseUrl = settings.baseUrl.replace(/\/$/, '')
   
-  // 确保URL包含版本号
-  if (!baseUrl.includes('/v1') && !baseUrl.endsWith('v1beta')) {
+  // 如果是反代地址，不需要添加版本号
+  const isProxy = baseUrl.includes('workers.dev') || baseUrl.includes('cloudflare') || baseUrl.includes('netlify/functions')
+  
+  // 确保URL包含版本号（官方API需要）
+  if (!isProxy && !baseUrl.includes('/v1') && !baseUrl.endsWith('v1beta')) {
     baseUrl = `${baseUrl}/v1beta`
   }
   
@@ -98,7 +101,10 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
     model = model.replace('models/', '')
   }
   
-  const url = `${baseUrl}/models/${model}:generateContent?key=${settings.apiKey}`
+  // 反代不需要 key 参数，官方 API 需要
+  const url = isProxy 
+    ? `${baseUrl}/v1beta/models/${model}:generateContent`
+    : `${baseUrl}/models/${model}:generateContent?key=${settings.apiKey}`
   
   console.log('📡 请求URL:', `${baseUrl}/models/${model}:generateContent`)
   console.log('🤖 使用模型:', model)
@@ -183,7 +189,10 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
   const baseUrl = settings.baseUrl || ''
   let actualProvider = settings.provider || 'custom'
   
-  if (baseUrl.includes('generativelanguage.googleapis.com')) {
+  if (baseUrl.includes('generativelanguage.googleapis.com') || 
+      baseUrl.includes('zhizhi.2373922440jhj.workers.dev') ||
+      baseUrl.includes('netlify/functions/gemini-proxy')) {
+    // Google Gemini 官方 API 或你的 Gemini 反代
     actualProvider = 'google'
   } else if (baseUrl.includes('api.openai.com')) {
     actualProvider = 'openai'

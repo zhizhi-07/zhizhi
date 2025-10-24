@@ -217,6 +217,10 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/edit-profile" element={<EditProfile />} />
+            <Route path="/api-config" element={<ApiConfig />} />
+            <Route path="/api-list" element={<ApiList />} />
+            <Route path="/add-api" element={<AddApi />} />
+            <Route path="/edit-api/:id" element={<EditApi />} />
             
             <Route path="/services" element={<Services />} />
             <Route path="/wallet" element={<Wallet />} />

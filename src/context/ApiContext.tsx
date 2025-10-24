@@ -28,10 +28,23 @@ interface ApiContextType {
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined)
 
-// 内置API配置 - 硅基流动
+// 内置API配置 - Gemini 反代（你的专属 - Netlify）
+const geminiProxyConfig: ApiConfig = {
+  id: 'default-gemini-proxy',
+  name: 'Gemini 反代（免费）',
+  baseUrl: window.location.origin + '/.netlify/functions/gemini-proxy',
+  apiKey: 'not-needed', // Gemini 反代不需要 API Key
+  model: 'gemini-2.5-flash-preview-05-20',
+  provider: 'google',
+  temperature: 0.7,
+  maxTokens: 2000,
+  createdAt: new Date().toISOString()
+}
+
+// 内置API配置 - 硅基流动（备用）
 const defaultApiConfig: ApiConfig = {
   id: 'default-siliconflow',
-  name: '硅基流动（内置）',
+  name: '硅基流动（备用）',
   baseUrl: 'https://api.siliconflow.cn/v1',
   apiKey: 'sk-dfyuqxuizfdxqjlbovnaeebcvptbqzzvqcdahtggzrovktmo',
   model: 'deepseek-ai/DeepSeek-V3',
@@ -46,16 +59,19 @@ export const ApiProvider = ({ children }: { children: ReactNode }) => {
     const saved = localStorage.getItem('apiConfigs')
     if (saved) {
       const configs = JSON.parse(saved)
-      // 查找并更新内置API配置（强制更新到最新版本）
-      const otherConfigs = configs.filter((c: ApiConfig) => c.id !== 'default-siliconflow')
-      return [defaultApiConfig, ...otherConfigs]
+      // 过滤掉内置配置，然后添加最新的内置配置
+      const otherConfigs = configs.filter((c: ApiConfig) => 
+        c.id !== 'default-siliconflow' && c.id !== 'default-gemini-proxy'
+      )
+      return [geminiProxyConfig, defaultApiConfig, ...otherConfigs]
     }
-    return [defaultApiConfig]
+    return [geminiProxyConfig, defaultApiConfig]
   })
 
   const [currentApiId, setCurrentApiId] = useState<string | null>(() => {
     const saved = localStorage.getItem('currentApiId')
-    return saved || 'default-siliconflow'
+    // 默认使用 Gemini 反代
+    return saved || 'default-gemini-proxy'
   })
 
   useEffect(() => {
@@ -100,7 +116,7 @@ export const ApiProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteApiConfig = (id: string) => {
     // 防止删除内置API
-    if (id === 'default-siliconflow') {
+    if (id === 'default-siliconflow' || id === 'default-gemini-proxy') {
       alert('内置API配置无法删除')
       return
     }
@@ -108,7 +124,7 @@ export const ApiProvider = ({ children }: { children: ReactNode }) => {
     setApiConfigs(prev => prev.filter(api => api.id !== id))
     if (currentApiId === id) {
       const remaining = apiConfigs.filter(api => api.id !== id)
-      setCurrentApiId(remaining.length > 0 ? remaining[0].id : 'default-siliconflow')
+      setCurrentApiId(remaining.length > 0 ? remaining[0].id : 'default-gemini-proxy')
     }
   }
 
