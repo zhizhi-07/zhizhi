@@ -370,7 +370,7 @@ const ChatList = () => {
                   <button
                     onClick={() => {
                       setShowAddModal(false)
-                      navigate('/contacts')
+                      navigate('/wechat/contacts')
                     }}
                     className="text-sm text-primary ios-button"
                   >

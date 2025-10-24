@@ -27,7 +27,7 @@ const CharacterDetail = () => {
   const handleDelete = () => {
     if (confirm(`确定要删除角色"${character.name}"吗？`)) {
       deleteCharacter(character.id)
-      navigate('/contacts')
+      navigate('/wechat/contacts')
     }
   }
 
@@ -38,7 +38,7 @@ const CharacterDetail = () => {
         {showStatusBar && <StatusBar />}
         <div className="px-4 py-3 flex items-center justify-between">
         <button
-          onClick={() => navigate('/contacts')}
+          onClick={() => navigate('/wechat/contacts')}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
         >
           <BackIcon size={24} />

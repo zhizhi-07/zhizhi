@@ -57,6 +57,9 @@ body {
   margin: 0 auto;
   box-shadow: 0 0 50px var(--shadow-color);
   transition: background-color 0.3s ease, color 0.3s ease;
+  /* 防止字体切换时布局变化 */
+  line-height: 1.5;
+  font-size: 16px;
 }
 
 #root {
@@ -321,4 +324,15 @@ body {
 /* 聊天消息字体 */
 .message-bubble {
   font-family: var(--chat-font-family);
+  /* 确保字体切换时布局稳定 */
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 防止字体加载时的布局抖动 */
+@supports (font-display: swap) {
+  body {
+    font-display: swap;
+  }
 }

@@ -6,6 +6,7 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { toPinyin } from '../utils/pinyin'
 import { extractCharacterCardFromPNG, convertCharacterCardToInternal } from '../utils/characterCardParser'
+import { lorebookManager } from '../utils/lorebookSystem'
 
 const CreateCharacter = () => {
   const navigate = useNavigate()
@@ -93,6 +94,14 @@ const CreateCharacter = () => {
         // 转换为内部格式
         const converted = convertCharacterCardToInternal(characterCard, imageDataUrl)
         
+        // 调试：检查世界书数据
+        console.log('Character Card 数据:', characterCard)
+        console.log('转换后的数据:', converted)
+        console.log('世界书数据:', converted.characterBook)
+        if (converted.characterBook) {
+          console.log('世界书条目数:', converted.characterBook.entries?.length || 0)
+        }
+        
         // 填充表单
         setFormData({
           name: converted.name,
@@ -114,9 +123,47 @@ const CreateCharacter = () => {
         setAvatarPreview(imageDataUrl)
         setIsImporting(false)
         
+        // 如果包含世界书，询问是否导入
+        let lorebookImported = false
+        if (converted.characterBook && converted.characterBook.entries && converted.characterBook.entries.length > 0) {
+          const entryCount = converted.characterBook.entries.length
+          const shouldImport = confirm(
+            `检测到角色卡包含世界书（${entryCount} 个条目）\n\n是否同时导入到世界书系统？\n\n` +
+            `• 点击"确定"：导入世界书并关联到该角色\n` +
+            `• 点击"取消"：仅保存在角色数据中`
+          )
+          
+          if (shouldImport) {
+            try {
+              // 转换为世界书格式
+              const lorebookData = {
+                name: `${converted.name}的世界书`,
+                description: `从 Character Card 导入的世界书`,
+                entries: converted.characterBook.entries || [],
+                scan_depth: converted.characterBook.scan_depth || 10,
+                token_budget: converted.characterBook.token_budget || 2000,
+                recursive_scanning: converted.characterBook.recursive_scanning || false,
+                is_global: false,
+                character_ids: [] // 保存后会自动关联
+              }
+              
+              // 导入世界书
+              const importedLorebook = lorebookManager.importLorebook(JSON.stringify(lorebookData))
+              if (importedLorebook) {
+                lorebookImported = true
+                console.log('世界书导入成功:', importedLorebook.name)
+              }
+            } catch (error) {
+              console.error('世界书导入失败:', error)
+              alert('世界书导入失败，但角色数据已保留')
+            }
+          }
+        }
+        
         // 显示成功提示
         const cardVersion = (characterCard as any).spec === 'chara_card_v2' ? 'V2' : 'V1'
-        alert(`✅ 成功导入 Character Card ${cardVersion}!\n\n角色名: ${converted.name}\n创建者: ${converted.creator || '未知'}`)
+        const lorebookMsg = lorebookImported ? '\n✅ 世界书已导入' : ''
+        alert(`✅ 成功导入 Character Card ${cardVersion}!\n\n角色名: ${converted.name}\n创建者: ${converted.creator || '未知'}${lorebookMsg}`)
       }
       
       reader.onerror = () => {
@@ -166,7 +213,7 @@ const CreateCharacter = () => {
     const avatar = formData.avatar || '🤖'
 
     try {
-      addCharacter({
+      const characterData = {
         name: formData.name,
         username,
         avatar,
@@ -182,11 +229,39 @@ const CreateCharacter = () => {
         characterBook: formData.characterBook,
         tags: formData.tags.length > 0 ? formData.tags : undefined,
         creator: formData.creator || undefined
-      })
-      navigate('/contacts')
-    } catch (error) {
+      }
+      
+      // 检查数据大小
+      let dataSize = 0
+      try {
+        dataSize = JSON.stringify(characterData).length
+        console.log('角色数据大小:', (dataSize / 1024).toFixed(2), 'KB')
+      } catch (stringifyError) {
+        console.error('JSON序列化失败:', stringifyError)
+        throw new Error('角色数据包含无法序列化的内容')
+      }
+      
+      if (dataSize > 5 * 1024 * 1024) { // 5MB
+        throw new Error('角色数据过大（超过5MB），请减少内容或移除世界书')
+      }
+      
+      console.log('准备保存角色...')
+      addCharacter(characterData)
+      console.log('角色保存成功，准备跳转...')
+      
+      // 使用 setTimeout 确保状态更新完成
+      setTimeout(() => {
+        navigate('/wechat/contacts')
+      }, 100)
+    } catch (error: any) {
       console.error('创建角色失败:', error)
-      alert('创建失败！可能是存储空间不足，请到设置中清理缓存。')
+      if (error.message) {
+        alert(`创建失败：${error.message}`)
+      } else if (error.name === 'QuotaExceededError') {
+        alert('存储空间不足！请到设置中清理缓存。')
+      } else {
+        alert('创建失败！请查看控制台了解详情。')
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { setItem as safeSetItem } from '../utils/storage'
+import * as IDB from '../utils/indexedDB'
 
 export interface Character {
   id: string
@@ -114,22 +115,81 @@ const DEFAULT_TEST_ASSISTANT: Character = {
 }
 
 export const CharacterProvider = ({ children }: { children: ReactNode }) => {
-  const [characters, setCharacters] = useState<Character[]>(() => {
-    const saved = localStorage.getItem('characters')
-    const savedCharacters = saved ? JSON.parse(saved) : []
-    
-    // 如果没有测试助手，添加一个
-    const hasTestAssistant = savedCharacters.some((c: Character) => c.id === DEFAULT_TEST_ASSISTANT.id)
-    if (!hasTestAssistant) {
-      return [DEFAULT_TEST_ASSISTANT, ...savedCharacters]
+  const [characters, setCharacters] = useState<Character[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  // 初始化：从 IndexedDB 加载数据
+  useEffect(() => {
+    const loadCharacters = async () => {
+      try {
+        // 初始化数据库
+        await IDB.initDB()
+        
+        // 尝试从 IndexedDB 加载
+        let loadedCharacters = await IDB.getAllItems<Character>(IDB.STORES.CHARACTERS)
+        
+        // 如果 IndexedDB 为空，尝试从 localStorage 迁移
+        if (loadedCharacters.length === 0) {
+          const saved = localStorage.getItem('characters')
+          if (saved) {
+            console.log('检测到 localStorage 数据，开始迁移...')
+            const savedCharacters = JSON.parse(saved)
+            for (const character of savedCharacters) {
+              await IDB.setItem(IDB.STORES.CHARACTERS, character)
+            }
+            loadedCharacters = savedCharacters
+            console.log(`✅ 迁移了 ${savedCharacters.length} 个角色`)
+          }
+        }
+        
+        // 如果没有测试助手，添加一个
+        const hasTestAssistant = loadedCharacters.some((c: Character) => c.id === DEFAULT_TEST_ASSISTANT.id)
+        if (!hasTestAssistant) {
+          await IDB.setItem(IDB.STORES.CHARACTERS, DEFAULT_TEST_ASSISTANT)
+          loadedCharacters = [DEFAULT_TEST_ASSISTANT, ...loadedCharacters]
+        }
+        
+        setCharacters(loadedCharacters)
+      } catch (error) {
+        console.error('加载角色失败:', error)
+        // 降级到 localStorage
+        const saved = localStorage.getItem('characters')
+        const savedCharacters = saved ? JSON.parse(saved) : []
+        const hasTestAssistant = savedCharacters.some((c: Character) => c.id === DEFAULT_TEST_ASSISTANT.id)
+        if (!hasTestAssistant) {
+          setCharacters([DEFAULT_TEST_ASSISTANT, ...savedCharacters])
+        } else {
+          setCharacters(savedCharacters)
+        }
+      } finally {
+        setIsLoading(false)
+      }
     }
     
-    return savedCharacters
-  })
+    loadCharacters()
+  }, [])
 
+  // 保存到 IndexedDB（同时备份到 localStorage）
   useEffect(() => {
-    safeSetItem('characters', characters)
-  }, [characters])
+    if (isLoading) return
+    
+    const saveCharacters = async () => {
+      try {
+        // 保存到 IndexedDB
+        for (const character of characters) {
+          await IDB.setItem(IDB.STORES.CHARACTERS, character)
+        }
+        // 备份到 localStorage（仅保存 ID 列表，节省空间）
+        safeSetItem('characters_backup', characters.map(c => c.id))
+      } catch (error) {
+        console.error('保存角色失败:', error)
+        // 降级到 localStorage
+        safeSetItem('characters', characters)
+      }
+    }
+    
+    saveCharacters()
+  }, [characters, isLoading])
 
   const addCharacter = (characterData: Omit<Character, 'id' | 'createdAt'>) => {
     const newCharacter: Character = {

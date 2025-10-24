@@ -25,6 +25,8 @@ const Desktop = () => {
   const [currentTime, setCurrentTime] = useState(new Date())
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
+  const touchStartY = useRef(0)
+  const touchEndY = useRef(0)
 
   // 更新时间
   useEffect(() => {
@@ -40,7 +42,7 @@ const Desktop = () => {
     { id: 'preset', name: '预设', icon: SettingsIcon, color: 'glass-card', route: '/preset' },
     { id: 'worldbook', name: '世界书', icon: FileIcon, color: 'glass-card', route: '/worldbook' },
     { id: 'music-app', name: '音乐', icon: MusicIcon, color: 'glass-card', route: '/music-player' },
-    { id: 'settings', name: '设置', icon: SettingsIcon, color: 'glass-card', route: '/wechat/settings' },
+    { id: 'settings', name: '应用设置', icon: SettingsIcon, color: 'glass-card', route: '/wechat/settings' },
   ]
 
   // 第二页应用
@@ -61,7 +63,9 @@ const Desktop = () => {
     { id: 'browser', name: '浏览器', icon: BrowserIcon, color: 'glass-card', route: '/browser' },
   ]
 
-  const handleAppClick = (app: AppItem) => {
+  const handleAppClick = (e: React.MouseEvent, app: AppItem) => {
+    e.preventDefault()
+    e.stopPropagation()
     if (app.onClick) {
       app.onClick()
     } else if (app.route) {
@@ -72,19 +76,32 @@ const Desktop = () => {
   // 触摸开始
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
   }
 
   // 触摸移动
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.touches[0].clientX
+    touchEndY.current = e.touches[0].clientY
+    
+    // 计算滑动距离
+    const diffX = Math.abs(touchEndX.current - touchStartX.current)
+    const diffY = Math.abs(touchEndY.current - touchStartY.current)
+    
+    // 如果是水平滑动（X方向移动大于Y方向），阻止默认行为（防止浏览器返回）
+    if (diffX > diffY && diffX > 10) {
+      e.preventDefault()
+    }
   }
 
   // 触摸结束 - 判断滑动方向
   const handleTouchEnd = () => {
     const diffX = touchStartX.current - touchEndX.current
+    const diffY = Math.abs(touchEndY.current - touchStartY.current)
     const minSwipeDistance = 50
 
-    if (Math.abs(diffX) > minSwipeDistance) {
+    // 只在水平滑动时切换页面（X方向移动大于Y方向）
+    if (Math.abs(diffX) > minSwipeDistance && Math.abs(diffX) > diffY) {
       if (diffX > 0 && currentPage < 1) {
         setCurrentPage(1)
       } else if (diffX < 0 && currentPage > 0) {
@@ -216,7 +233,7 @@ const Desktop = () => {
                   return (
                     <div
                       key={app.id}
-                      onClick={() => handleAppClick(app)}
+                      onClick={(e) => handleAppClick(e, app)}
                       className={`flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform ${isWechat ? 'col-span-2 row-span-2' : ''}`}
                     >
                       {isImageIcon ? (
@@ -275,7 +292,7 @@ const Desktop = () => {
                   return (
                     <div
                       key={app.id}
-                      onClick={() => handleAppClick(app)}
+                      onClick={(e) => handleAppClick(e, app)}
                       className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform"
                     >
                       {isImageIcon ? (
@@ -322,7 +339,7 @@ const Desktop = () => {
                 return (
                   <div
                     key={app.id}
-                    onClick={() => handleAppClick(app)}
+                    onClick={(e) => handleAppClick(e, app)}
                     className="flex flex-col items-center cursor-pointer active:scale-95 transition-transform"
                   >
                     {isImageIcon ? (

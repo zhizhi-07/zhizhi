@@ -24,7 +24,7 @@ import Contacts from './pages/Contacts'
 import Discover from './pages/Discover'
 import Me from './pages/Me'
 import ChatDetail from './pages/ChatDetail'
-import Settings from './pages/SettingsNew'
+import Settings from './pages/Settings'
 import Profile from './pages/Profile'
 import EditProfile from './pages/EditProfile'
 import UserList from './pages/UserList'
@@ -77,6 +77,8 @@ import UndercoverGame from './pages/UndercoverGame'
 import Desktop from './pages/Desktop'
 import StoryMode from './pages/StoryMode'
 import PromptTemplates from './pages/PromptTemplates'
+import WorldBook from './pages/WorldBook'
+import EditWorldBook from './pages/EditWorldBook'
 
 // DynamicIsland包装组件
 const DynamicIslandWrapper = () => {
@@ -129,7 +131,9 @@ function App() {
               return true
             }
 
-            const fontFace = new FontFace(font.fontFamily, `url(${font.url})`)
+            const fontFace = new FontFace(font.fontFamily, `url(${font.url})`, {
+              display: 'swap'
+            })
             await fontFace.load()
             document.fonts.add(fontFace)
             console.log(`✅ 字体加载成功: ${font.name}`)
@@ -254,6 +258,9 @@ function App() {
               <Route path="/games" element={<GameList />} />
               <Route path="/undercover" element={<UndercoverGame />} />
               <Route path="/prompt-templates" element={<PromptTemplates />} />
+              <Route path="/worldbook" element={<WorldBook />} />
+              <Route path="/worldbook/create" element={<EditWorldBook />} />
+              <Route path="/worldbook/edit/:id" element={<EditWorldBook />} />
                   </Routes>
                 </Router>
                       </MusicPlayerProvider>

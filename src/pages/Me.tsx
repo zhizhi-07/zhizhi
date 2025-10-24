@@ -28,7 +28,7 @@ const Me = () => {
     },
     {
       id: 3,
-      items: [{ id: 31, name: '设置', Icon: SettingsIcon, path: '/wechat/settings' }],
+      items: [{ id: 31, name: '设置', Icon: SettingsIcon, path: '/settings' }],
     },
   ]
 

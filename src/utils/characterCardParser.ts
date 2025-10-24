@@ -95,9 +95,38 @@ export async function extractCharacterCardFromPNG(file: File): Promise<Character
         
         if (charaData) {
           try {
-            // Base64 解码
-            const jsonString = atob(charaData)
+            // Base64 解码 - 正确处理 UTF-8
+            const binaryString = atob(charaData)
+            
+            // 将二进制字符串转换为字节数组
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            
+            // 使用 TextDecoder 正确解码 UTF-8
+            const decoder = new TextDecoder('utf-8')
+            const jsonString = decoder.decode(bytes)
+            
+            console.log('解码后 JSON 前200字符:', jsonString.substring(0, 200))
+            
             const characterData = JSON.parse(jsonString)
+            
+            // 详细调试：查看完整结构
+            console.log('=== Character Card 完整数据 ===')
+            console.log('spec:', characterData.spec)
+            console.log('data 对象:', characterData.data)
+            if (characterData.data) {
+              console.log('data 的所有键:', Object.keys(characterData.data))
+              console.log('是否有 character_book:', 'character_book' in characterData.data)
+              console.log('是否有 characterBook:', 'characterBook' in characterData.data)
+              if (characterData.data.character_book) {
+                console.log('character_book 内容:', characterData.data.character_book)
+              }
+              if (characterData.data.characterBook) {
+                console.log('characterBook 内容:', characterData.data.characterBook)
+              }
+            }
             
             // 验证基本结构
             if (!characterData || typeof characterData !== 'object') {
@@ -170,8 +199,9 @@ function extractTextChunk(uint8Array: Uint8Array, keyword: string): string | nul
     const length = readUint32BE(uint8Array, offset)
     offset += 4
     
-    // 读取 chunk 类型（4 字节）
-    const type = String.fromCharCode(...uint8Array.slice(offset, offset + 4))
+    // 读取 chunk 类型（4 字节）- 使用 latin1 解码 ASCII
+    const typeDecoder = new TextDecoder('latin1')
+    const type = typeDecoder.decode(uint8Array.slice(offset, offset + 4))
     offset += 4
     
     // 如果是 tEXt chunk
@@ -181,11 +211,14 @@ function extractTextChunk(uint8Array: Uint8Array, keyword: string): string | nul
       // 查找 null 分隔符
       const nullIndex = chunkData.indexOf(0)
       if (nullIndex !== -1) {
-        const key = String.fromCharCode(...chunkData.slice(0, nullIndex))
+        // 关键词使用 latin1 (ASCII)
+        const keyDecoder = new TextDecoder('latin1')
+        const key = keyDecoder.decode(chunkData.slice(0, nullIndex))
         
         if (key === keyword) {
-          // 找到了！提取数据
-          const value = String.fromCharCode(...chunkData.slice(nullIndex + 1))
+          // 找到了！Base64 数据使用 latin1 解码
+          const valueDecoder = new TextDecoder('latin1')
+          const value = valueDecoder.decode(chunkData.slice(nullIndex + 1))
           return value
         }
       }
@@ -214,6 +247,50 @@ function readUint32BE(uint8Array: Uint8Array, offset: number): number {
 }
 
 /**
+ * 清理对象中的循环引用和不必要的字段
+ */
+function cleanObject(obj: any, maxDepth: number = 10, currentDepth: number = 0, seen = new WeakSet()): any {
+  // 防止无限递归
+  if (currentDepth > maxDepth) {
+    return undefined
+  }
+  
+  // 处理 null 和基本类型
+  if (obj === null || typeof obj !== 'object') {
+    return obj
+  }
+  
+  // 检测循环引用
+  if (seen.has(obj)) {
+    return undefined
+  }
+  
+  seen.add(obj)
+  
+  // 处理数组
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanObject(item, maxDepth, currentDepth + 1, seen)).filter(item => item !== undefined)
+  }
+  
+  // 处理对象
+  const cleaned: any = {}
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      // 跳过 extensions 等可能包含循环引用的字段
+      if (key === 'extensions' && currentDepth > 2) {
+        continue
+      }
+      const value = cleanObject(obj[key], maxDepth, currentDepth + 1, seen)
+      if (value !== undefined) {
+        cleaned[key] = value
+      }
+    }
+  }
+  
+  return cleaned
+}
+
+/**
  * 将 Character Card 转换为应用内部格式
  */
 export function convertCharacterCardToInternal(
@@ -235,9 +312,12 @@ export function convertCharacterCardToInternal(
   tags?: string[]
   creator?: string
 } {
-  // 检测是否为 V2 格式
-  const isV2 = 'spec' in card && card.spec === 'chara_card_v2'
-  const data = isV2 ? (card as CharacterCardV2).data : (card as CharacterCardV1)
+  // 检测是否为 V2/V3 格式（都有 spec 和 data 字段）
+  const isV2OrV3 = 'spec' in card && 'data' in card && (card.spec === 'chara_card_v2' || card.spec === 'chara_card_v3')
+  const data = isV2OrV3 ? (card as CharacterCardV2).data : (card as CharacterCardV1)
+  
+  console.log('🔍 检测格式:', isV2OrV3 ? `V2/V3 (${card.spec})` : 'V1')
+  console.log('🔍 使用的 data 对象键:', Object.keys(data))
   
   // 验证必要字段
   if (!data.name || !data.name.trim()) {
@@ -251,7 +331,44 @@ export function convertCharacterCardToInternal(
     data.scenario ? `\n\n【场景】\n${data.scenario}` : '',
   ].filter(Boolean).join('').trim()
   
-  return {
+  // 清理 character_book 中的循环引用
+  let cleanedCharacterBook = undefined
+  if ('character_book' in data && data.character_book) {
+    console.log('✅ 检测到 character_book:', data.character_book)
+    console.log('条目数量:', data.character_book.entries?.length || 0)
+    try {
+      // 增加深度限制到 15，避免世界书被清理掉
+      cleanedCharacterBook = cleanObject(data.character_book, 15)
+      console.log('清理后的 character_book:', cleanedCharacterBook)
+      console.log('清理后条目数量:', cleanedCharacterBook?.entries?.length || 0)
+      
+      // 验证清理是否成功
+      if (!cleanedCharacterBook || !cleanedCharacterBook.entries) {
+        console.warn('⚠️ 清理后 character_book 为空，使用原始数据')
+        cleanedCharacterBook = data.character_book
+      }
+    } catch (error) {
+      console.warn('清理 character_book 失败，使用原始数据:', error)
+      cleanedCharacterBook = data.character_book
+    }
+  } else {
+    console.log('未检测到 character_book，data 的键:', Object.keys(data))
+    // 检查是否有其他可能的字段名
+    if ('characterBook' in data) {
+      console.log('发现 characterBook (驼峰):', data.characterBook)
+      cleanedCharacterBook = data.characterBook
+    }
+    if ('world_book' in data) {
+      console.log('发现 world_book:', data.world_book)
+      cleanedCharacterBook = data.world_book
+    }
+    if ('lorebook' in data) {
+      console.log('发现 lorebook:', data.lorebook)
+      cleanedCharacterBook = data.lorebook
+    }
+  }
+  
+  const result = {
     name: data.name.trim(),
     username: `wxid_${Date.now().toString().slice(-8)}`, // 自动生成
     avatar: imageDataUrl, // 使用 PNG 本身作为头像
@@ -262,9 +379,14 @@ export function convertCharacterCardToInternal(
     firstMessage: data.first_mes,
     exampleMessages: data.mes_example,
     systemPrompt: 'system_prompt' in data ? data.system_prompt : undefined,
-    characterBook: 'character_book' in data ? data.character_book : undefined,
+    characterBook: cleanedCharacterBook,
     alternateGreetings: 'alternate_greetings' in data ? data.alternate_greetings : undefined,
     tags: 'tags' in data ? data.tags : undefined,
     creator: 'creator' in data ? data.creator : undefined,
   }
+  
+  console.log('🎯 最终返回的 characterBook:', result.characterBook)
+  console.log('🎯 characterBook 是否有 entries:', result.characterBook?.entries?.length)
+  
+  return result
 }

@@ -65,7 +65,9 @@ const FontCustomizer = () => {
         return true
       }
       
-      const fontFace = new FontFace(font.fontFamily, `url(${font.url})`)
+      const fontFace = new FontFace(font.fontFamily, `url(${font.url})`, {
+        display: 'swap'
+      })
       await fontFace.load()
       document.fonts.add(fontFace)
       loadedFontsCache.current.add(font.id)

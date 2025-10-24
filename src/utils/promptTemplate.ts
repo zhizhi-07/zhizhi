@@ -21,6 +21,7 @@ export interface TemplateVariables {
   // 动态内容
   history?: string                // 历史对话
   message?: string                // 当前消息
+  memes?: string                  // 热梗库
   
   // 时间相关
   date?: string                   // 当前日期
@@ -62,6 +63,7 @@ export function buildTemplateVariables(
   options?: {
     history?: string
     message?: string
+    memes?: Array<{梗: string, 含义: string}>
   }
 ): TemplateVariables {
   const now = new Date()
@@ -86,6 +88,12 @@ export function buildTemplateVariables(
   else if (hour >= 18 && hour < 22) timeOfDay = '晚上'
   else timeOfDay = '深夜'
   
+  // 构建热梗提示词
+  let memesPrompt = ''
+  if (options?.memes && options.memes.length > 0) {
+    memesPrompt = `## 网络用语参考\n${options.memes.map(meme => `"${meme.梗}" - ${meme.含义}`).join('\n')}\n\n这些是流行的网络用语。使用原则：\n1. 先理解含义，判断是否符合你现在的情绪和想说的话\n2. 如果合适就用，不合适就不用，完全看情况\n3. 像真人一样自然地融入对话，不要刻意`
+  }
+  
   return {
     char: character.name,
     user: userName,
@@ -97,6 +105,7 @@ export function buildTemplateVariables(
     systemPrompt: character.systemPrompt,
     history: options?.history,
     message: options?.message,
+    memes: memesPrompt,
     date: dateStr,
     time: timeStr,
     timeOfDay: timeOfDay
@@ -116,6 +125,8 @@ export const PRESET_TEMPLATES = {
 ## 当前情况
 现在是 {{date}} {{timeOfDay}} {{time}}
 你正在和 {{user}} 聊天。
+
+{{memes}}
 
 ## 对话历史
 {{history}}
@@ -138,6 +149,8 @@ export const PRESET_TEMPLATES = {
 
 示例对话:
 {{exampleMessages}}
+
+{{memes}}
 
 [当前对话]
 {{history}}
@@ -164,12 +177,14 @@ export const PRESET_TEMPLATES = {
 ## App功能
 [表情包:数字] = 发送表情包
 [语音:内容] = 发送语音消息
-[照片:描述] = 发送照片
+[照片:描述] = 发送照片（**重要**：直接描述画面，不要用人称！包括：场景、角度、光线、氛围、动作。例如：[照片:游艇甲板上，夕阳把海面染成金色，微风吹起头发，举着香槟对着镜头笑] 或 [照片:山道上的跑车，车窗外树影模糊，仪表盘显示180码，单手握方向盘自拍]）
 [位置:地名:地址] = 发送位置
 [红包:金额:祝福语] = 发红包
 [转账:金额:说明] = 转账
 [撤回消息] 或 [撤回:消息ID] = 撤回消息（不写ID就撤回上一条，写ID就撤回指定消息。红包、转账、亲密付不能撤回）
 [引用:消息ID] 回复内容 = 引用回复
+
+{{memes}}
 
 ## 当前
 时间：{{date}} {{timeOfDay}} {{time}}
@@ -182,6 +197,8 @@ export const PRESET_TEMPLATES = {
 
   // 简洁模板
   simple: `你是{{char}}。{{description}}
+
+{{memes}}
 
 {{history}}
 
@@ -196,6 +213,8 @@ export const PRESET_TEMPLATES = {
 
 【故事场景】
 {{scenario}}
+
+{{memes}}
 
 【时间】{{date}} {{timeOfDay}}
 
@@ -215,6 +234,8 @@ Scenario: {{scenario}}
 
 Example Dialogue:
 {{exampleMessages}}
+
+{{memes}}
 
 <START>
 {{history}}
@@ -259,7 +280,8 @@ export function buildPromptFromTemplate(
   character: CharacterWithTemplate,
   userName: string,
   history: string,
-  currentMessage: string
+  currentMessage: string,
+  retrievedMemes?: Array<{梗: string, 含义: string}>
 ): string {
   // 获取模板
   let template = character.customTemplate
@@ -273,7 +295,8 @@ export function buildPromptFromTemplate(
   // 构建变量
   const variables = buildTemplateVariables(character, userName, {
     history,
-    message: currentMessage
+    message: currentMessage,
+    memes: retrievedMemes
   })
   
   // 替换变量

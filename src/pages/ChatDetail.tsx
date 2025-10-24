@@ -41,6 +41,7 @@ interface Message {
   timestamp?: number  // 添加时间戳字段（毫秒）
   isRecalled?: boolean  // 是否已撤回
   recalledContent?: string  // 撤回前的原始内容（供AI查看）
+  originalType?: 'received' | 'sent'  // 撤回前的原始消息类型（用于判断是谁撤回的）
   quotedMessage?: {  // 引用的消息
     id: number
     content: string
@@ -1314,6 +1315,7 @@ ${character.description || ''}
               ...msg, 
               isRecalled: true, // 标记为已撤回
               recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息', // 保存原始内容供AI查看
+              originalType: msg.type as 'received' | 'sent', // 保存原始消息类型，用于判断撤回者
               content: isUserMessage ? '你撤回了一条消息' : `${character?.name || '对方'}撤回了一条消息`, // 用户界面显示的内容
               type: 'system' as const, 
               messageType: 'system' as const 
@@ -1640,7 +1642,8 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           characterWithTemplate as any,
           currentUser?.name || '用户',
           historyText,
-          userMessageContent
+          userMessageContent,
+          retrievedMemes // 传入热梗
         )
         
         console.log('✅ 使用模板系统构建提示词')
@@ -2079,12 +2082,16 @@ ${emojiInstructions}
 • ❌ **禁止在正常对话中随意撤回！** 只在真正需要时使用
 • ❌ **禁止连续撤回多条！** 一次对话最多撤回1条
 • ❌ **禁止撤回后不解释！** 撤回后必须说明原因或重新表达
+• ❌ **禁止描述撤回动作！** 不要写"(心跳加快)" "(手指颤抖)" 等动作描述，直接撤回即可
+• ❌ **禁止撤回普通正常的消息！** 只撤回真正不合适的内容
 
 **错误示例：**
 ❌ 无缘无故撤回（对方会困惑）
 ❌ 连续撤回多条（太奇怪）
 ❌ 撤回后不解释也不回应（冷场）
 ❌ 正常回复却撤回（莫名其妙）
+❌ "（心跳突然加快，手指微微发颤）[撤回消息]" ← 不要描述动作！
+❌ 撤回一条正常的问候或回复 ← 没必要撤回！
 
 **正确示例：**
 ✅ 撤回后解释原因
@@ -2097,10 +2104,11 @@ ${emojiInstructions}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **什么是撤回？**
-当你看到 [撤回了消息: "xxx"] 这样的格式时，说明用户撤回了一条消息。
-括号里的内容就是对方撤回的原话，你能看到但对方以为你看不到。
+当你看到 [撤回了消息: "xxx"] 这样的格式时，说明**用户**撤回了一条消息。
+当你看到 [我撤回了消息: "xxx"] 这样的格式时，说明**你自己**撤回了一条消息。
+括号里的内容就是撤回的原话。
 
-撤回就是对方发了消息后又删掉了。用户界面会显示"XX撤回了一条消息"。
+撤回就是发了消息后又删掉了。用户界面会显示"XX撤回了一条消息"。
 
 你可以根据自己的性格和你们的关系，自然地回应这个撤回行为。
 
@@ -2166,11 +2174,11 @@ ${recentMessages.slice(-10).map((msg) => {
         ...recentMessages.map(msg => {
           // 优先处理撤回的消息
           if (msg.isRecalled && msg.recalledContent) {
-            // 判断是用户撤回还是AI撤回
-            const isUserRecalled = msg.content.includes('你撤回了')
-            const isAIRecalled = msg.content.includes('撤回了一条消息') && !isUserRecalled
+            // 使用 originalType 判断是用户撤回还是AI撤回（更准确）
+            const isUserRecalled = msg.originalType === 'sent'
+            const isAIRecalled = msg.originalType === 'received'
             
-            console.log('🔄 发现撤回消息，原内容:', msg.recalledContent, '撤回者:', isUserRecalled ? '用户' : 'AI')
+            console.log('🔄 发现撤回消息，原内容:', msg.recalledContent, '撤回者:', isUserRecalled ? '用户' : 'AI', 'originalType:', msg.originalType)
             
             if (isUserRecalled) {
               // 用户撤回消息：以特殊格式告诉AI
@@ -2415,6 +2423,11 @@ ${recentMessages.slice(-10).map((msg) => {
       // 清理红包标记（必须在使用parsedEmoji.textContent之后）
       cleanedResponse = cleanedResponse.replace(/\[红包:\d+\.?\d*:.+?\]/g, '').trim()
       
+      // 清理系统警告标记
+      cleanedResponse = cleanedResponse.replace(/\[系统警告[：:][^\]]*\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/【系统警告[：:][^】]*】/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/系统警告[：:][^\n]*/g, '').trim()
+      
       // 清理AI错误的引用格式
       cleanedResponse = cleanedResponse.replace(/\[引用了\s+.+?\s+的消息:\s*".+?"\]/g, '').trim()
       // 清理AI模仿的书名号引用格式（只清理单独成行的，不清理嵌入在文字中的）
@@ -2580,6 +2593,14 @@ ${recentMessages.slice(-10).map((msg) => {
         shouldRecallLastMessage = true
         cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
         console.log('🔄 AI要撤回上一条消息')
+      }
+      
+      // 如果AI要撤回消息，清除掉可能的动作描述（括号内容）
+      // 防止AI输出类似 "(心跳加快) [撤回消息]" 这样的内容
+      if (shouldRecallLastMessage || recallMessageId) {
+        // 移除中文括号内的动作描述
+        cleanedResponse = cleanedResponse.replace(/[（(][^）)]*[）)]/g, '').trim()
+        console.log('🧹 清除撤回时的动作描述')
       }
       
       // 检查AI是否对亲密付做出决定
@@ -3159,6 +3180,7 @@ ${recentMessages.slice(-10).map((msg) => {
               ...msg,
               isRecalled: true,
               recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息',
+              originalType: msg.type as 'received' | 'sent', // 保存原始消息类型，用于判断撤回者
               content: `${character?.name || 'AI'}撤回了一条消息`,
               type: 'system' as const,
               messageType: 'system' as const
@@ -3742,7 +3764,7 @@ ${recentMessages.slice(-10).map((msg) => {
                        </div>
                      </div>
                    ) : (
-                    <div style={{ maxWidth: '70vw', display: 'inline-block' }}>
+                    <div style={{ maxWidth: '280px', display: 'inline-block', wordBreak: 'break-word' }}>
                        {/* 文字内容 */}
                        {message.content && (
                         <div
@@ -3756,8 +3778,8 @@ ${recentMessages.slice(-10).map((msg) => {
                             whiteSpace: 'pre-wrap',
                             color: message.content.startsWith('[错误]') ? '#991b1b' : '#111827',
                             fontSize: '14px',
-                            display: 'inline-block',
-                            minWidth: 'fit-content'
+                            maxWidth: '100%',
+                            overflowWrap: 'break-word'
                           }}
                         >
                            <div style={{ position: 'relative', zIndex: 2 }}>
