@@ -770,7 +770,7 @@ const BubbleStore = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {showStatusBar && <StatusBar />}
       
       {/* 顶部导航栏 */}

@@ -54,7 +54,7 @@ const Profile = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* 顶部：StatusBar + 导航栏一体化 */}
       <div className="glass-effect sticky top-0 z-50">
         {showStatusBar && <StatusBar />}

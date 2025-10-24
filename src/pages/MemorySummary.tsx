@@ -111,29 +111,30 @@ const MemorySummary = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {showStatusBar && <StatusBar />}
-      
-      {/* 顶部导航栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
-        <button
-          onClick={() => navigate(-1)}
-          className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
-        >
-          <BackIcon size={24} />
-        </button>
-        <h1 className="text-base font-semibold text-gray-900">记忆总结</h1>
-        <button
-          onClick={handleManualSummary}
-          disabled={isGenerating}
-          className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors ${
-            isGenerating 
-              ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
-              : 'text-wechat-primary bg-wechat-primary/10 hover:bg-wechat-primary/20'
-          }`}
-        >
-          {isGenerating ? '生成中...' : '手动总结'}
-        </button>
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
+          >
+            <BackIcon size={24} />
+          </button>
+          <h1 className="text-base font-semibold text-gray-900">记忆总结</h1>
+          <button
+            onClick={handleManualSummary}
+            disabled={isGenerating}
+            className={`text-sm font-medium px-3 py-1 rounded-lg transition-colors ${
+              isGenerating 
+                ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                : 'text-wechat-primary bg-wechat-primary/10 hover:bg-wechat-primary/20'
+            }`}
+          >
+            {isGenerating ? '生成中...' : '手动总结'}
+          </button>
+        </div>
       </div>
 
       {/* 内容区域 */}

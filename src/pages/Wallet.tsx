@@ -79,7 +79,7 @@ const Wallet = () => {
   ]
 
   return (
-    <div className="h-screen flex flex-col bg-[#EDEDED]">
+    <div className="h-full flex flex-col bg-[#EDEDED]">
       {/* iOS状态栏 */}
       {showStatusBar && <StatusBar />}
       

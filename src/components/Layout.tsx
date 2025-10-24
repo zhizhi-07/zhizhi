@@ -10,10 +10,10 @@ const Layout = () => {
   const { background: globalBackground } = useBackground()
 
   const tabs = [
-    { name: '微信', path: '/', Icon: ChatIcon },
-    { name: '通讯录', path: '/contacts', Icon: ContactIcon },
-    { name: '发现', path: '/discover', Icon: DiscoverIcon },
-    { name: '我', path: '/me', Icon: ProfileIcon }
+    { name: '微信', path: '/wechat', Icon: ChatIcon },
+    { name: '通讯录', path: '/wechat/contacts', Icon: ContactIcon },
+    { name: '发现', path: '/wechat/discover', Icon: DiscoverIcon },
+    { name: '我', path: '/wechat/me', Icon: ProfileIcon }
   ]
 
   useEffect(() => {

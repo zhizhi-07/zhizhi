@@ -102,33 +102,34 @@ const MemoryViewer = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {showStatusBar && <StatusBar />}
-      
-      {/* 顶部导航 */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <BackIcon size={20} />
-          </button>
-          <div>
-            <h1 className="text-lg font-semibold">{character?.name} 的记忆</h1>
-            {stats && (
-              <p className="text-xs text-gray-500">
-                共 {stats.total} 条记忆
-              </p>
-            )}
+    <div className="h-full flex flex-col bg-gray-50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="ios-button text-gray-700 hover:text-gray-900"
+            >
+              <BackIcon size={24} />
+            </button>
+            <div>
+              <h1 className="text-base font-semibold text-gray-900">{character?.name} 的记忆</h1>
+              {stats && (
+                <p className="text-xs text-gray-500">
+                  共 {stats.total} 条记忆
+                </p>
+              )}
+            </div>
           </div>
+          <button
+            onClick={handleExport}
+            className="text-sm text-blue-500 hover:text-blue-600"
+          >
+            导出
+          </button>
         </div>
-        <button
-          onClick={handleExport}
-          className="text-sm text-blue-500 hover:text-blue-600"
-        >
-          导出
-        </button>
       </div>
 
       {/* 统计卡片 */}

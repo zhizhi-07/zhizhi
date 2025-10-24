@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useApi } from '../context/ApiContext'
 import { fetchModels, testApiConnection } from '../utils/api'
 import { setItem, STORAGE_KEYS } from '../utils/storage'
+import StatusBar from '../components/StatusBar'
+import { BackIcon } from '../components/Icons'
 
 const AddApi = () => {
   const navigate = useNavigate()
@@ -48,7 +50,13 @@ const AddApi = () => {
       return
     }
 
+    if (fetchingModels) {
+      console.warn('⚠️ 正在拉取模型，请勿重复点击')
+      return
+    }
+
     setFetchingModels(true)
+    console.log('🚀 开始拉取模型列表...')
     setTestResult(null)
 
     try {
@@ -119,24 +127,27 @@ const AddApi = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
-        <button
-          onClick={() => navigate(-1)}
-          className="ios-button text-gray-700 hover:text-gray-900"
-        >
-          取消
-        </button>
-        <h1 className="text-base font-semibold text-gray-900">
-          新增API
-        </h1>
-        <button
-          onClick={handleSave}
-          className="ios-button text-primary font-medium"
-        >
-          保存
-        </button>
+    <div className="h-full flex flex-col bg-[#f5f7fa]">
+      {/* 状态栏 + 导航栏一体 */}
+      <div className="glass-effect border-b border-gray-200/50">
+        <StatusBar />
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="ios-button text-blue-500 -ml-2"
+          >
+            <BackIcon size={24} />
+          </button>
+          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+            新增API
+          </h1>
+          <button
+            onClick={handleSave}
+            className="ios-button text-blue-500 font-medium"
+          >
+            保存
+          </button>
+        </div>
       </div>
 
       {/* 配置表单 */}

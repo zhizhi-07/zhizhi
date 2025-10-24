@@ -24,7 +24,7 @@ import Contacts from './pages/Contacts'
 import Discover from './pages/Discover'
 import Me from './pages/Me'
 import ChatDetail from './pages/ChatDetail'
-import Settings from './pages/Settings'
+import Settings from './pages/SettingsNew'
 import Profile from './pages/Profile'
 import EditProfile from './pages/EditProfile'
 import UserList from './pages/UserList'
@@ -74,6 +74,9 @@ import GomokuGame from './pages/GomokuGame'
 import GameCharacterSelect from './pages/GameCharacterSelect'
 import GameList from './pages/GameList'
 import UndercoverGame from './pages/UndercoverGame'
+import Desktop from './pages/Desktop'
+import StoryMode from './pages/StoryMode'
+import PromptTemplates from './pages/PromptTemplates'
 
 // DynamicIsland包装组件
 const DynamicIslandWrapper = () => {
@@ -175,24 +178,42 @@ function App() {
                           <OfflineIndicator />
                           <DynamicIslandWrapper />
                 <Routes>
-                  <Route path="/" element={<Layout />}>
-                  <Route index element={<ChatList />} />
-                  <Route path="contacts" element={<Contacts />} />
-                  <Route path="discover" element={<Discover />} />
-                  <Route path="me" element={<Me />} />
-                  <Route path="settings" element={<Settings />} />
-                  <Route path="profile" element={<Profile />} />
-                  <Route path="edit-profile" element={<EditProfile />} />
-                  <Route path="user-list" element={<UserList />} />
-                  <Route path="create-user" element={<CreateUser />} />
-                  <Route path="create-character" element={<CreateCharacter />} />
-                  <Route path="character/:id" element={<CharacterDetail />} />
-                  <Route path="edit-character/:id" element={<EditCharacter />} />
-                  <Route path="api-config" element={<ApiConfig />} />
-                  <Route path="api-list" element={<ApiList />} />
-                  <Route path="add-api" element={<AddApi />} />
-                  <Route path="edit-api/:id" element={<EditApi />} />
-                </Route>
+                  {/* 桌面首页 */}
+                  <Route index element={<Desktop />} />
+                  
+                  {/* 故事模式 */}
+                  <Route path="/story" element={<StoryMode />} />
+                  
+                  {/* 微信应用 - 带底部导航栏的页面 */}
+                  <Route path="/wechat" element={<Layout />}>
+                    <Route index element={<ChatList />} />
+                    <Route path="contacts" element={<Contacts />} />
+                    <Route path="discover" element={<Discover />} />
+                    <Route path="me" element={<Me />} />
+                  </Route>
+                  
+                  {/* 微信应用 - 独立页面 */}
+                  <Route path="/wechat/settings" element={<Settings />} />
+                  <Route path="/wechat/profile" element={<Profile />} />
+                  <Route path="/wechat/edit-profile" element={<EditProfile />} />
+                  <Route path="/wechat/user-list" element={<UserList />} />
+                  <Route path="/wechat/create-user" element={<CreateUser />} />
+                  <Route path="/wechat/create-character" element={<CreateCharacter />} />
+                  <Route path="/wechat/character/:id" element={<CharacterDetail />} />
+                  <Route path="/wechat/edit-character/:id" element={<EditCharacter />} />
+                  <Route path="/wechat/api-config" element={<ApiConfig />} />
+                  <Route path="/wechat/api-list" element={<ApiList />} />
+                  <Route path="/wechat/add-api" element={<AddApi />} />
+                  <Route path="/wechat/edit-api/:id" element={<EditApi />} />
+            
+            {/* 兼容旧路由 - 不带 /wechat 前缀 */}
+            <Route path="/create-character" element={<CreateCharacter />} />
+            <Route path="/character/:id" element={<CharacterDetail />} />
+            <Route path="/edit-character/:id" element={<EditCharacter />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/edit-profile" element={<EditProfile />} />
+            
             <Route path="/services" element={<Services />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/transaction-history" element={<TransactionHistory />} />
@@ -232,6 +253,7 @@ function App() {
               <Route path="/game-select" element={<GameCharacterSelect />} />
               <Route path="/games" element={<GameList />} />
               <Route path="/undercover" element={<UndercoverGame />} />
+              <Route path="/prompt-templates" element={<PromptTemplates />} />
                   </Routes>
                 </Router>
                       </MusicPlayerProvider>

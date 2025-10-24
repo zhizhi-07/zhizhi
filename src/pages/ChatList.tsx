@@ -174,7 +174,12 @@ const ChatList = () => {
         <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
           {showStatusBar && <StatusBar />}
           <div className="px-5 py-4 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">微信</h1>
+            <button 
+              onClick={() => navigate('/')}
+              className="text-xl font-semibold text-gray-900 ios-button"
+            >
+              微信
+            </button>
             <div className="flex items-center gap-4">
           <button className="ios-button text-gray-700 hover:text-gray-900">
             <SearchIcon size={22} />

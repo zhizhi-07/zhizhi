@@ -109,22 +109,22 @@ const DiaryPage = () => {
   }
   
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      {showStatusBar && <StatusBar />}
+    <div className="h-full flex flex-col bg-gray-50">
       <div className="fixed inset-0 bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex flex-col">
-        {/* 顶部导航 */}
+        {/* 顶部：StatusBar + 导航栏一体化 */}
         <div className="glass-effect shadow-sm bg-white/80 backdrop-blur-lg flex-shrink-0">
+          {showStatusBar && <StatusBar />}
           <div className="flex items-center justify-between px-4 py-3">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-white/50 rounded-full transition-colors"
+              className="ios-button text-gray-700 hover:text-gray-900"
             >
-              <BackIcon className="w-6 h-6 text-gray-700" />
+              <BackIcon size={24} />
             </button>
             
             <div className="flex items-center gap-2">
               <img src={diaryIcon} alt="日记" className="w-6 h-6 object-contain" />
-              <h1 className="text-lg font-semibold text-gray-900">
+              <h1 className="text-base font-semibold text-gray-900">
                 {character?.name || 'TA'}的日记本
               </h1>
             </div>

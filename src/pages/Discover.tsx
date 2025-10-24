@@ -77,7 +77,12 @@ const Discover = () => {
         <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
           {showStatusBar && <StatusBar />}
           <div className="px-5 py-4">
-            <h1 className="text-xl font-semibold text-gray-900">发现</h1>
+            <button 
+              onClick={() => navigate('/')}
+              className="text-xl font-semibold text-gray-900 ios-button"
+            >
+              发现
+            </button>
           </div>
         </div>
 

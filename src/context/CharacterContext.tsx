@@ -9,6 +9,19 @@ export interface Character {
   signature: string  // 个性签名，显示在资料页
   description: string  // AI角色描述：背景、性格等，用于AI角色扮演
   createdAt: string
+  
+  // Character Card V2 扩展字段（酒馆兼容）
+  personality?: string              // 性格描述
+  scenario?: string                 // 场景设定
+  firstMessage?: string             // 第一条消息
+  exampleMessages?: string          // 示例对话
+  systemPrompt?: string             // 系统提示词
+  postHistoryInstructions?: string  // 历史后指令
+  alternateGreetings?: string[]     // 备用问候语
+  characterBook?: any               // Lorebook 世界书
+  tags?: string[]                   // 标签
+  creator?: string                  // 创建者
+  characterVersion?: string         // 角色版本
 }
 
 interface CharacterContextType {

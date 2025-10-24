@@ -13,7 +13,7 @@ const Contacts = () => {
   const { showStatusBar } = useSettings()
 
   const specialContacts = [
-    { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/create-character' },
+    { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/wechat/create-character' },
     { id: 2, name: '群聊', Icon: GroupIcon, path: '/group-list' },
     { id: 3, name: '标签', Icon: TagIcon, path: '' },
   ]
@@ -26,7 +26,12 @@ const Contacts = () => {
           <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
             {showStatusBar && <StatusBar />}
             <div className="px-5 py-4 flex items-center justify-between">
-              <h1 className="text-xl font-semibold text-gray-900">通讯录</h1>
+              <button 
+                onClick={() => navigate('/')}
+                className="text-xl font-semibold text-gray-900 ios-button"
+              >
+                通讯录
+              </button>
               <div className="flex items-center gap-4">
           <button 
             onClick={() => console.log('搜索联系人')}
@@ -35,7 +40,7 @@ const Contacts = () => {
             <SearchIcon size={22} />
           </button>
           <button 
-            onClick={() => navigate('/create-character')}
+            onClick={() => navigate('/wechat/create-character')}
             className="ios-button text-gray-700 hover:text-gray-900 cursor-pointer"
           >
             <AddIcon size={22} />

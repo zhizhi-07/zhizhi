@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { BackIcon } from '../components/Icons'
 import { getItem, setItem, STORAGE_KEYS } from '../utils/storage'
 import { testApiConnection, ApiSettings, fetchModels } from '../utils/api'
+import StatusBar from '../components/StatusBar'
 
 const ApiConfig = () => {
   const navigate = useNavigate()
@@ -46,23 +47,33 @@ const ApiConfig = () => {
       return
     }
 
+    // 防止重复请求
+    if (testing) {
+      console.warn('⚠️ 正在测试连接，请勿重复点击')
+      return
+    }
+
     // 先保存配置
     setItem(STORAGE_KEYS.API_SETTINGS, settings)
 
     setTesting(true)
     setTestResult(null)
+    console.log('🚀 开始测试API连接...')
 
     try {
       const success = await testApiConnection()
+      console.log('✅ 测试结果:', success)
       if (success) {
         setTestResult({ success: true, message: 'API连接成功' })
       } else {
         setTestResult({ success: false, message: 'API连接失败，请检查配置' })
       }
     } catch (error: any) {
+      console.error('❌ 测试失败:', error)
       setTestResult({ success: false, message: error.message || 'API连接失败' })
     } finally {
       setTesting(false)
+      console.log('🏁 测试完成')
     }
   }
 
@@ -83,11 +94,19 @@ const ApiConfig = () => {
       return
     }
 
+    // 防止重复请求
+    if (fetchingModels) {
+      console.warn('⚠️ 正在拉取模型，请勿重复点击')
+      return
+    }
+
     setFetchingModels(true)
     setTestResult(null)
+    console.log('🚀 开始拉取模型列表...')
 
     try {
       const models = await fetchModels(settings)
+      console.log('✅ 拉取模型成功:', models)
       if (models.length === 0) {
         setTestResult({ success: false, message: '未找到可用模型，请手动输入' })
       } else {
@@ -96,9 +115,11 @@ const ApiConfig = () => {
         setTestResult({ success: true, message: `成功拉取 ${models.length} 个模型` })
       }
     } catch (error: any) {
+      console.error('❌ 拉取模型失败:', error)
       setTestResult({ success: false, message: error.message || '拉取模型失败' })
     } finally {
       setFetchingModels(false)
+      console.log('🏁 拉取模型完成')
     }
   }
 
@@ -108,24 +129,27 @@ const ApiConfig = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
-        <button
-          onClick={() => navigate(-1)}
-          className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
-        >
-          <BackIcon size={24} />
-        </button>
-        <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
-          API配置
-        </h1>
-        <button
-          onClick={handleSave}
-          className="ios-button text-primary font-medium"
-        >
-          保存
-        </button>
+    <div className="h-full flex flex-col bg-[#f5f7fa]">
+      {/* 状态栏 + 导航栏一体 */}
+      <div className="glass-effect border-b border-gray-200/50">
+        <StatusBar />
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="ios-button text-blue-500 -ml-2"
+          >
+            <BackIcon size={24} />
+          </button>
+          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+            API配置
+          </h1>
+          <button
+            onClick={handleSave}
+            className="ios-button text-blue-500 font-medium"
+          >
+            保存
+          </button>
+        </div>
       </div>
 
       {/* 配置内容 */}

@@ -736,30 +736,29 @@ export async function retrieveMemes(
   const allMemes: Meme[] = []
   const messageLower = userMessage.toLowerCase()
 
-  // 1. 首先查找匹配用户消息的梗（最多2个）
+  // 匹配相关的梗
   if (userMessage && userMessage.trim().length > 0) {
+    // 计算每个梗的匹配度
+    const memsWithScore: Array<{meme: Meme, score: number}> = []
+    
     for (const meme of memesData) {
-      const hasMatch = meme.keywords.some(keyword => 
-        messageLower.includes(keyword.toLowerCase())
-      )
-
-      if (hasMatch && allMemes.length < 2) {
-        allMemes.push(meme)
+      let score = 0
+      meme.keywords.forEach(keyword => {
+        if (messageLower.includes(keyword.toLowerCase())) {
+          score++
+        }
+      })
+      
+      if (score > 0) {
+        memsWithScore.push({ meme, score })
       }
     }
-  }
-
-  // 2. 然后添加随机梗（补充到maxResults个）
-  const remainingCount = maxResults - allMemes.length
-  if (remainingCount > 0) {
-    const randomMemes = getRandomMemes(remainingCount)
-    // 去重：不添加已经匹配的梗
-    const matchedIds = new Set(allMemes.map(m => m.id))
-    randomMemes.forEach(meme => {
-      if (!matchedIds.has(meme.id)) {
-        allMemes.push(meme)
-      }
-    })
+    
+    // 按匹配度排序，取前N个
+    memsWithScore
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxResults)
+      .forEach(item => allMemes.push(item.meme))
   }
 
   return allMemes

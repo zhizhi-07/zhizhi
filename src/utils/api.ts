@@ -87,7 +87,12 @@ async function callOpenAIFormatAPI(messages: Message[], settings: ApiSettings): 
  */
 async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promise<string> {
   let model = settings.model || 'gemini-1.5-flash'
-  const baseUrl = settings.baseUrl.replace(/\/$/, '')
+  let baseUrl = settings.baseUrl.replace(/\/$/, '')
+  
+  // 确保URL包含版本号
+  if (!baseUrl.includes('/v1') && !baseUrl.endsWith('v1beta')) {
+    baseUrl = `${baseUrl}/v1beta`
+  }
   
   if (model.startsWith('models/')) {
     model = model.replace('models/', '')
@@ -288,7 +293,16 @@ export async function fetchModels(settings: ApiSettings): Promise<string[]> {
   try {
     if (provider === 'google') {
       // Google Gemini API - 真实拉取
-      const url = `${baseUrl}/models?key=${apiKey}`
+      let cleanBaseUrl = baseUrl.replace(/\/$/, '')
+      
+      // 确保URL包含版本号
+      if (!cleanBaseUrl.includes('/v1') && !cleanBaseUrl.endsWith('v1beta')) {
+        cleanBaseUrl = `${cleanBaseUrl}/v1beta`
+      }
+      
+      const url = `${cleanBaseUrl}/models?key=${apiKey}`
+      console.log('📡 拉取Google模型列表:', url.replace(apiKey, 'API_KEY_HIDDEN'))
+      
       const response = await fetchWithTimeout(url, {
         method: 'GET',
         headers: {
@@ -297,8 +311,16 @@ export async function fetchModels(settings: ApiSettings): Promise<string[]> {
       }, 10000)
 
       if (!response.ok) {
-        console.warn('Google API拉取失败，使用预设列表')
-        // 如果拉取失败，返回预设列表
+        const errorText = await response.text()
+        console.warn('Google API拉取失败:', response.status, errorText)
+        
+        // 如果是认证错误，抛出明确错误
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Google API认证失败，请检查API密钥是否正确`)
+        }
+        
+        // 其他错误返回预设列表
+        console.warn('使用预设模型列表')
         return [
           'gemini-2.0-flash-exp',
           'gemini-1.5-flash',
@@ -309,10 +331,21 @@ export async function fetchModels(settings: ApiSettings): Promise<string[]> {
       }
 
       const data = await response.json()
+      console.log('✅ Google API返回数据:', data)
+      
       if (data.models && Array.isArray(data.models)) {
-        return data.models
+        const models = data.models
           .filter((m: any) => m.name && m.supportedGenerationMethods?.includes('generateContent'))
           .map((m: any) => m.name.replace('models/', ''))
+        
+        console.log(`✅ 成功拉取 ${models.length} 个Google模型`)
+        return models.length > 0 ? models : [
+          'gemini-2.0-flash-exp',
+          'gemini-1.5-flash',
+          'gemini-1.5-flash-8b',
+          'gemini-1.5-pro',
+          'gemini-pro',
+        ]
       }
       
       return [

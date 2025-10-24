@@ -24,13 +24,11 @@ const Me = () => {
       id: 2,
       items: [
         { id: 21, name: '收藏', Icon: FavoriteIcon, path: '' },
-        { id: 22, name: '朋友圈', Icon: MomentsIcon, path: '/moments' },
-        { id: 23, name: '卡包', Icon: WalletIcon, path: '/card-wallet' },
       ],
     },
     {
       id: 3,
-      items: [{ id: 31, name: '设置', Icon: SettingsIcon, path: '/settings' }],
+      items: [{ id: 31, name: '设置', Icon: SettingsIcon, path: '/wechat/settings' }],
     },
   ]
 
@@ -45,7 +43,12 @@ const Me = () => {
           <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
             {showStatusBar && <StatusBar />}
             <div className="px-5 py-4">
-              <h1 className="text-xl font-semibold text-gray-900">我</h1>
+              <button 
+                onClick={() => navigate('/')}
+                className="text-xl font-semibold text-gray-900 ios-button"
+              >
+                我
+              </button>
             </div>
           </div>
 
@@ -53,7 +56,7 @@ const Me = () => {
       <div className="px-3 pt-3 mb-3">
         <div className="glass-card rounded-2xl overflow-hidden">
           <div 
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate('/wechat/profile')}
             className="flex items-center px-5 py-5 ios-button cursor-pointer"
           >
             <div className="w-20 h-20 rounded-2xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-xl overflow-hidden">

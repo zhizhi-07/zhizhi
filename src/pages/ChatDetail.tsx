@@ -7,6 +7,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { useUser } from '../context/UserContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
+import { buildPromptFromTemplate } from '../utils/promptTemplate'
 import { setItem as safeSetItem } from '../utils/storage'
 import ChatMenu from '../components/ChatMenu'
 import CallScreen from '../components/CallScreen'
@@ -84,6 +85,7 @@ const ChatDetail = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { id } = useParams()
+  const { currentUser } = useUser()
   
   // 记忆系统
   const memorySystem = useMemory(id || '')
@@ -323,8 +325,7 @@ const ChatDetail = () => {
   
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
-  const { currentUser } = useUser()
-  const { getRedEnvelope, saveRedEnvelope, updateRedEnvelope, getPendingRedEnvelopes } = useRedEnvelope()
+  const { getRedEnvelope, saveRedEnvelope, updateRedEnvelope } = useRedEnvelope()
   const { moments } = useMoments()
   const { addTransaction } = useAccounting()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -640,6 +641,10 @@ ${character.description || ''}
           const response = await callAI([{ role: 'user', content: decisionPrompt }])
           
           if (response.trim() !== 'SKIP' && response.trim().length > 0) {
+            // 检查拉黑状态
+            const blacklistStatus = blacklistManager.getBlockStatus('user', id)
+            const isBlocked = blacklistStatus.blockedByMe
+            
             // AI决定发消息
             const aiMessage: Message = {
               id: Date.now(),
@@ -649,7 +654,8 @@ ${character.description || ''}
                 hour: '2-digit',
                 minute: '2-digit',
               }),
-              timestamp: Date.now()
+              timestamp: Date.now(),
+              blocked: isBlocked // 标记拉黑状态
             }
             
             setMessages(prev => [...prev, aiMessage])
@@ -1546,12 +1552,32 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       const streakData = id ? getStreakData(id) : null
       const streakDays = streakData?.currentStreak || 0
       
-      // 🔥 检索热梗（包含匹配的和随机的）
-      const { retrieveMemes } = await import('../utils/memesRetrieval')
-      const lastUserMessage = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
-      const userMessageContent = lastUserMessage?.content || ''
-      // 获取5个梗：最多2个匹配的 + 3个随机的
-      const matchedMemes = await retrieveMemes(userMessageContent, 5)
+      // 获取用户最后一条消息
+      const lastUserMsg = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
+      const userMessageContent = lastUserMsg?.content || ''
+      
+      // 🔥 基于对话上下文匹配可能用到的梗（类似世界书）
+      const { retrieveMemes, getRandomMemes } = await import('../utils/memesRetrieval')
+      
+      // 获取最近10条消息的内容作为上下文（包括AI可能想说的话的情绪）
+      const recentContext = currentMessages
+        .slice(-10)
+        .map(m => m.content)
+        .join(' ')
+      
+      // 先匹配相关的梗（最多5个）
+      let matchedMemes = await retrieveMemes(recentContext, 5)
+      
+      // 如果匹配的梗太少，补充2个随机梗，增加多样性
+      if (matchedMemes.length < 3) {
+        const randomMemes = getRandomMemes(2)
+        const matchedIds = new Set(matchedMemes.map(m => m.id))
+        randomMemes.forEach(meme => {
+          if (!matchedIds.has(meme.id)) {
+            matchedMemes.push(meme)
+          }
+        })
+      }
       
       // 转换为 RetrievedMeme 格式
       const retrievedMemes = matchedMemes.map(m => ({
@@ -1563,28 +1589,83 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
         console.log('🔥 热梗库:', matchedMemes.map(m => m['梗']).join(', '))
       }
       
-      const systemPrompt = buildRoleplayPrompt(
-        {
-          name: character?.name || 'AI',
-          signature: character?.signature,
-          description: character?.description
-        },
-        {
-          name: currentUser?.name || '用户'
-        },
-        enableNarration, // 传入旁白模式开关
-        streakDays,
-        retrievedMemes // 传入热梗
-      )
+      // 构建对话历史（根据用户设置读取消息数量，包含隐藏的通话记录）
+      // 注意：不过滤 system 消息，因为通话记录是 system 类型但 isHidden=true
+      const recentMessages = currentMessages.slice(-aiMessageLimit)
+      
+      // 🍺 检查是否使用自定义提示词模板
+      const useCustomTemplate = id ? localStorage.getItem(`prompt_template_id_${id}`) : null
+      const customTemplateContent = id ? localStorage.getItem(`prompt_custom_template_${id}`) : null
+      
+      let systemPrompt: string
+      
+      // 如果没有设置模板，默认使用"角色扮演强化"
+      const templateId = useCustomTemplate || 'roleplayEnhanced'
+      
+      if (templateId !== 'default') {
+        // 使用模板系统（包括默认的角色扮演强化）
+        console.log('🍺 使用提示词模板:', templateId)
+        
+        // 构建历史对话文本
+        const historyText = recentMessages.map(msg => {
+          const sender = msg.type === 'sent' ? currentUser?.name || '用户' : character?.name || 'AI'
+          let content = msg.content
+          
+          // 处理特殊消息类型
+          if (msg.messageType === 'transfer') {
+            content = `[转账] ¥${msg.transfer?.amount} - ${msg.transfer?.message || ''}`
+          } else if (msg.messageType === 'redenvelope') {
+            content = `[红包]`
+          } else if (msg.messageType === 'emoji') {
+            content = `[表情包: ${msg.emojiDescription}]`
+          } else if (msg.messageType === 'photo') {
+            content = `[照片: ${msg.photoDescription}]`
+          } else if (msg.messageType === 'voice') {
+            content = `[语音: ${msg.voiceText}]`
+          } else if (msg.messageType === 'location') {
+            content = `[位置: ${msg.location?.name}]`
+          }
+          
+          return `${sender}: ${content}`
+        }).join('\n')
+        
+        // 扩展角色数据，包含模板ID和自定义模板
+        const characterWithTemplate = {
+          ...character,
+          templateId: templateId,
+          customTemplate: customTemplateContent || undefined
+        }
+        
+        systemPrompt = buildPromptFromTemplate(
+          characterWithTemplate as any,
+          currentUser?.name || '用户',
+          historyText,
+          userMessageContent
+        )
+        
+        console.log('✅ 使用模板系统构建提示词')
+      } else {
+        // 使用原有的提示词系统
+        console.log('📝 使用默认提示词系统')
+        systemPrompt = buildRoleplayPrompt(
+          {
+            name: character?.name || 'AI',
+            signature: character?.signature,
+            description: character?.description
+          },
+          {
+            name: currentUser?.name || '用户'
+          },
+          enableNarration, // 传入旁白模式开关
+          streakDays,
+          retrievedMemes // 传入热梗
+        )
+      }
       
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
       console.log('📋 完整系统提示词:')
       console.log(systemPrompt)
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-
-      // 构建对话历史（根据用户设置读取消息数量，包含隐藏的通话记录）
-      // 注意：不过滤 system 消息，因为通话记录是 system 类型但 isHidden=true
-      const recentMessages = currentMessages.slice(-aiMessageLimit)
       
       console.log('📋 构建对话历史:')
       recentMessages.forEach((msg, idx) => {
@@ -1680,10 +1761,10 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       // ⏰ 计算时间间隔：用户隔了多久才回复
       let timeIntervalContext = ''
       const lastAiMessage = currentMessages.filter(m => m.type === 'received').slice(-1)[0]
-      const currentUserMessage = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
+      const lastUserMessage = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
       
-      if (lastAiMessage && currentUserMessage && lastAiMessage.timestamp && currentUserMessage.timestamp) {
-        const timeDiff = currentUserMessage.timestamp - lastAiMessage.timestamp
+      if (lastAiMessage && lastUserMessage && lastAiMessage.timestamp && lastUserMessage.timestamp) {
+        const timeDiff = lastUserMessage.timestamp - lastAiMessage.timestamp
         const minutes = Math.floor(timeDiff / 1000 / 60)
         const hours = Math.floor(minutes / 60)
         const days = Math.floor(hours / 24)
@@ -2016,69 +2097,12 @@ ${emojiInstructions}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **什么是撤回？**
-撤回就是对方发了消息后又删掉了，但你已经看到了原内容。这通常意味着：
-• 对方发错了/打错字了
-• 对方说了不好意思的话
-• 对方后悔说出来了
-• 对方想收回刚才的话
-
-**如何识别撤回？**
 当你看到 [撤回了消息: "xxx"] 这样的格式时，说明用户撤回了一条消息。
 括号里的内容就是对方撤回的原话，你能看到但对方以为你看不到。
 
-**如何自然回应？**
-根据撤回的内容和你们的关系选择合适的反应：
+撤回就是对方发了消息后又删掉了。用户界面会显示"XX撤回了一条消息"。
 
-1. **调侃逗趣**（关系亲密时）
-   • "哈哈怎么撤回了，我都看到了"
-   • "来不及了，我已经看到你说xxx了"
-   • "撤回也没用啦，我截图了哈哈"
-   • "发错了？还是不好意思说出来？"
-
-2. **温柔体贴**（对方可能尴尬时）
-   • "没事的，我看到了，不用撤回"
-   • "撤回干嘛，我又不会笑你"
-   • "诶，我还没看清你撤回了"（装作没看到）
-
-3. **好奇追问**（想知道原因时）
-   • "诶？撤回干嘛呀"
-   • "说了啥不好意思的吗"
-   • "怎么突然撤回了"
-
-4. **直接点破**（关系很好时）
-   • "你刚才是想说xxx对吧"
-   • "我看到了，你说xxx"
-   • "撤回也晚了，我都看到你说xxx了"
-
-5. **理解包容**（内容敏感时）
-   • "嗯，我懂的"（不提具体内容）
-   • "没事，我理解"
-   • 直接忽略撤回，继续之前的话题
-
-⚠️ **重要原则：**
-• ❌ 不要机械地说"你撤回了一条消息"
-• ✅ 要像真人一样自然反应
-• ✅ 根据撤回内容决定是否提及
-• ✅ 符合你的性格和当前关系
-• ✅ 如果内容很私密/敏感，可以体贴地不提
-
-**示例对比：**
-用户撤回了 "我想你了"
-❌ "你撤回了一条消息"（太机械）
-✅ "诶？撤回干嘛，我都看到了~"
-✅ "哈哈来不及了，我看到你说想我了"
-✅ "我也想你呀，撤回干嘛"
-
-用户撤回了 "你个傻逼"
-❌ "你撤回了一条消息"
-✅ "诶？刚才想骂我？"（调侃）
-✅ "哈哈我看到了，生气了？"
-✅ "怎么了，惹你生气了吗"（关心）
-
-用户撤回了 "你个傻逼"
-✅ "？？？你刚才骂我？"
-✅ "我看到了...你是不是发错人了"
-❌ "你撤回了一条消息"
+你可以根据自己的性格和你们的关系，自然地回应这个撤回行为。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -2543,7 +2567,16 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 检查AI是否要撤回消息
       let shouldRecallLastMessage = false
-      if (aiResponse.includes('[撤回消息]')) {
+      let recallMessageId: number | null = null
+      
+      // 检查是否撤回指定消息ID：[撤回:123]
+      const recallWithIdMatch = aiResponse.match(/\[撤回:(\d+)\]/)
+      if (recallWithIdMatch) {
+        recallMessageId = parseInt(recallWithIdMatch[1])
+        cleanedResponse = cleanedResponse.replace(/\[撤回:\d+\]/g, '').trim()
+        console.log('🔄 AI要撤回消息ID:', recallMessageId)
+      } else if (aiResponse.includes('[撤回消息]')) {
+        // 撤回上一条消息
         shouldRecallLastMessage = true
         cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
         console.log('🔄 AI要撤回上一条消息')
@@ -3088,17 +3121,30 @@ ${recentMessages.slice(-10).map((msg) => {
         console.error('❌ 记忆提取失败:', error)
       }
       
-      // 如果AI要撤回上一条消息
-      if (shouldRecallLastMessage) {
+      // 如果AI要撤回消息
+      if (shouldRecallLastMessage || recallMessageId) {
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        // 找到AI最后发送的消息（不包括系统消息）
-        const lastAiMessageIndex = newMessages.map((msg, idx) => ({ msg, idx }))
-          .reverse()
-          .find(({ msg }) => msg.type === 'received' && msg.messageType !== 'system')
+        let targetMessage: { msg: Message; idx: number } | undefined
         
-        if (lastAiMessageIndex) {
-          const { msg, idx } = lastAiMessageIndex
+        if (recallMessageId) {
+          // 撤回指定ID的消息
+          const messageIndex = newMessages.findIndex(msg => msg.id === recallMessageId && msg.type === 'received')
+          if (messageIndex !== -1) {
+            targetMessage = { msg: newMessages[messageIndex], idx: messageIndex }
+            console.log('🎯 找到要撤回的消息ID:', recallMessageId)
+          } else {
+            console.log('⚠️ 未找到消息ID:', recallMessageId)
+          }
+        } else {
+          // 撤回上一条消息
+          targetMessage = newMessages.map((msg, idx) => ({ msg, idx }))
+            .reverse()
+            .find(({ msg }) => msg.type === 'received' && msg.messageType !== 'system')
+        }
+        
+        if (targetMessage) {
+          const { msg, idx } = targetMessage
           
           // 检查是否是特殊消息（红包、转账、亲密付不能撤回）
           const canRecall = !msg.redEnvelopeId && !msg.transfer && !msg.intimatePay
@@ -3399,14 +3445,14 @@ ${recentMessages.slice(-10).map((msg) => {
                    )}
                  
                  {/* 消息气泡 */}
-                 <div 
-                   className="max-w-[70%]"
-                   onTouchStart={(e) => handleLongPressStart(message, e)}
+                <div className="flex items-center gap-1">
+                <div 
+                  onTouchStart={(e) => handleLongPressStart(message, e)}
                    onTouchEnd={handleLongPressEnd}
                    onMouseDown={(e) => handleLongPressStart(message, e)}
                    onMouseUp={handleLongPressEnd}
                    onMouseLeave={handleLongPressEnd}
-                 >
+                >
                    {message.messageType === 'redenvelope' && message.redEnvelopeId ? (
                      (() => {
                        const redEnvelope = getRedEnvelope(id!, message.redEnvelopeId)
@@ -3425,7 +3471,7 @@ ${recentMessages.slice(-10).map((msg) => {
                        messageId={message.id}
                      />
                    ) : message.messageType === 'voice' && message.voiceText ? (
-                     <div className="flex flex-col gap-2 max-w-[240px]">
+                     <div className="flex flex-col gap-2">
                        <div 
                          className="message-bubble"
                          style={{
@@ -3446,7 +3492,7 @@ ${recentMessages.slice(-10).map((msg) => {
                              }`}
                              onClick={(e) => {
                                e.stopPropagation()
-                               const duration = Math.min(Math.max(Math.ceil(message.voiceText.length / 5), 1), 60)
+                               const duration = Math.min(Math.max(Math.ceil((message.voiceText || '').length / 5), 1), 60)
                                handlePlayVoice(message.id, duration)
                              }}
                            >
@@ -3491,7 +3537,7 @@ ${recentMessages.slice(-10).map((msg) => {
                            <div className={`text-xs font-medium ${
                              message.type === 'sent' ? 'text-white' : 'text-gray-600'
                            }`}>
-                             {Math.min(Math.max(Math.ceil(message.voiceText.length / 5), 1), 60)}"
+                             {Math.min(Math.max(Math.ceil((message.voiceText || '').length / 5), 1), 60)}"
                            </div>
                          </div>
                        </div>
@@ -3696,23 +3742,24 @@ ${recentMessages.slice(-10).map((msg) => {
                        </div>
                      </div>
                    ) : (
-                     <div>
+                    <div style={{ maxWidth: '70vw', display: 'inline-block' }}>
                        {/* 文字内容 */}
                        {message.content && (
-                         <div
-                           className="message-bubble px-3 py-2"
-                           style={{
-                             // 默认基础样式（会被 CSS 的 !important 覆盖）
-                             backgroundColor: message.type === 'sent' ? userBubbleColor : (message.content.startsWith('[错误]') ? '#fee2e2' : aiBubbleColor),
-                             borderRadius: '12px',
-                             boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-                             overflow: 'visible',
-                             wordBreak: 'break-word',
-                             color: message.content.startsWith('[错误]') ? '#991b1b' : '#111827',
-                             position: 'relative',
-                             fontSize: '14px'
-                           }}
-                         >
+                        <div
+                          className="message-bubble px-3 py-2"
+                          style={{
+                            // 默认基础样式（会被 CSS 的 !important 覆盖）
+                            backgroundColor: message.type === 'sent' ? userBubbleColor : (message.content.startsWith('[错误]') ? '#fee2e2' : aiBubbleColor),
+                            borderRadius: '12px',
+                            boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+                            wordBreak: 'break-word',
+                            whiteSpace: 'pre-wrap',
+                            color: message.content.startsWith('[错误]') ? '#991b1b' : '#111827',
+                            fontSize: '14px',
+                            display: 'inline-block',
+                            minWidth: 'fit-content'
+                          }}
+                        >
                            <div style={{ position: 'relative', zIndex: 2 }}>
                              {/* 引用的消息 */}
                              {message.quotedMessage && (
@@ -3745,6 +3792,14 @@ ${recentMessages.slice(-10).map((msg) => {
                        )}
                      </div>
                    )}
+                 </div>
+                 
+                 {/* 拉黑警告图标 - 与气泡垂直居中 */}
+                {message.type === 'received' && message.blocked && (
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                )}
                  </div>
                  
                    {/* 自己消息：气泡在左，头像在右 */}

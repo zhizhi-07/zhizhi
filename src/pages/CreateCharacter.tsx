@@ -1,27 +1,40 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
-import { BackIcon, ImageIcon } from '../components/Icons'
+import { ImageIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { toPinyin } from '../utils/pinyin'
+import { extractCharacterCardFromPNG, convertCharacterCardToInternal } from '../utils/characterCardParser'
 
 const CreateCharacter = () => {
   const navigate = useNavigate()
   const { addCharacter } = useCharacter()
   const { showStatusBar } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const characterCardInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     name: '',
     username: '',
     avatar: '',
     signature: '',
-    description: ''
+    description: '',
+    // Character Card 扩展字段
+    personality: '',
+    scenario: '',
+    firstMessage: '',
+    exampleMessages: '',
+    systemPrompt: '',
+    alternateGreetings: [] as string[],
+    characterBook: undefined as any,
+    tags: [] as string[],
+    creator: ''
   })
 
   const [avatarPreview, setAvatarPreview] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
 
   // 处理头像上传
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,12 +44,6 @@ const CreateCharacter = () => {
     // 检查文件类型
     if (!file.type.startsWith('image/')) {
       alert('请选择图片文件')
-      return
-    }
-
-    // 检查文件大小（限制1MB防止存储溢出）
-    if (file.size > 1 * 1024 * 1024) {
-      alert('图片大小不能超过1MB，请压缩后上传')
       return
     }
 
@@ -55,6 +62,78 @@ const CreateCharacter = () => {
       setIsUploading(false)
     }
     reader.readAsDataURL(file)
+  }
+
+  // 处理 Character Card PNG 导入
+  const handleCharacterCardImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // 检查是否为 PNG 文件
+    if (!file.type.includes('png')) {
+      alert('请选择 PNG 格式的 Character Card 文件')
+      return
+    }
+
+    setIsImporting(true)
+
+    try {
+      // 提取 Character Card 数据
+      const characterCard = await extractCharacterCardFromPNG(file)
+      
+      if (!characterCard) {
+        throw new Error('无法解析 Character Card 数据')
+      }
+      
+      // 同时读取图片作为头像
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const imageDataUrl = reader.result as string
+        
+        // 转换为内部格式
+        const converted = convertCharacterCardToInternal(characterCard, imageDataUrl)
+        
+        // 填充表单
+        setFormData({
+          name: converted.name,
+          username: converted.username,
+          avatar: converted.avatar,
+          signature: converted.signature,
+          description: converted.description,
+          personality: converted.personality || '',
+          scenario: converted.scenario || '',
+          firstMessage: converted.firstMessage || '',
+          exampleMessages: converted.exampleMessages || '',
+          systemPrompt: converted.systemPrompt || '',
+          alternateGreetings: converted.alternateGreetings || [],
+          characterBook: converted.characterBook,
+          tags: converted.tags || [],
+          creator: converted.creator || ''
+        })
+        
+        setAvatarPreview(imageDataUrl)
+        setIsImporting(false)
+        
+        // 显示成功提示
+        const cardVersion = (characterCard as any).spec === 'chara_card_v2' ? 'V2' : 'V1'
+        alert(`✅ 成功导入 Character Card ${cardVersion}!\n\n角色名: ${converted.name}\n创建者: ${converted.creator || '未知'}`)
+      }
+      
+      reader.onerror = () => {
+        alert('图片读取失败')
+        setIsImporting(false)
+      }
+      
+      reader.readAsDataURL(file)
+      
+    } catch (error: any) {
+      console.error('导入 Character Card 失败:', error)
+      alert(`导入失败: ${error.message || '未知错误'}`)
+      setIsImporting(false)
+    }
+    
+    // 清空输入，允许重复导入同一文件
+    e.target.value = ''
   }
 
   // 处理名字变化，自动生成微信号
@@ -88,11 +167,21 @@ const CreateCharacter = () => {
 
     try {
       addCharacter({
-        ...formData,
-        avatar,
+        name: formData.name,
         username,
+        avatar,
         signature: formData.signature || '这个人很懒，什么都没留下',
-        description: formData.description
+        description: formData.description,
+        // Character Card 扩展字段（只保存非空值）
+        personality: formData.personality || undefined,
+        scenario: formData.scenario || undefined,
+        firstMessage: formData.firstMessage || undefined,
+        exampleMessages: formData.exampleMessages || undefined,
+        systemPrompt: formData.systemPrompt || undefined,
+        alternateGreetings: formData.alternateGreetings.length > 0 ? formData.alternateGreetings : undefined,
+        characterBook: formData.characterBook,
+        tags: formData.tags.length > 0 ? formData.tags : undefined,
+        creator: formData.creator || undefined
       })
       navigate('/contacts')
     } catch (error) {
@@ -102,7 +191,7 @@ const CreateCharacter = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gray-50">
       {/* 顶部：StatusBar + 导航栏一体化 */}
       <div className="glass-effect sticky top-0 z-50">
         {showStatusBar && <StatusBar />}
@@ -127,11 +216,46 @@ const CreateCharacter = () => {
 
       {/* 创建表单 */}
       <div className="flex-1 overflow-y-auto hide-scrollbar px-3 pt-3">
+        {/* 导入 Character Card - 简洁版 */}
+        <div className="mb-3 px-1">
+          <input
+            ref={characterCardInputRef}
+            type="file"
+            accept=".png"
+            onChange={handleCharacterCardImport}
+            className="hidden"
+          />
+          <button
+            onClick={() => characterCardInputRef.current?.click()}
+            disabled={isImporting}
+            className="glass-card rounded-xl px-4 py-3 flex items-center gap-3 ios-button w-full hover:bg-white/50 transition-all"
+          >
+            {isImporting ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-400 border-t-transparent"></div>
+                <div className="text-left">
+                  <div className="text-sm font-medium text-gray-900">正在导入...</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <div className="text-left flex-1">
+                  <div className="text-sm font-medium text-gray-900">导入 Character Card</div>
+                  <div className="text-xs text-gray-500">PNG 格式 (V1/V2)</div>
+                </div>
+              </>
+            )}
+          </button>
+        </div>
+
         {/* 上传头像 */}
         <div className="mb-3">
           <div className="px-4 py-2">
             <span className="text-sm text-gray-600 font-medium">角色头像</span>
-            <p className="text-xs text-gray-400 mt-1">可选，不上传将使用默认头像。支持 JPG、PNG、GIF 格式，大小不超过 1MB</p>
+            <p className="text-xs text-gray-400 mt-1">可选，不上传将使用默认头像。支持 JPG、PNG、GIF 等格式</p>
           </div>
           <div className="glass-card rounded-2xl p-6 flex justify-center">
             <input

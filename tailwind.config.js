@@ -22,6 +22,7 @@ export default {
       animation: {
         'slide-in-right': 'slideInRight 0.3s ease-out',
         'slide-in-left': 'slideInLeft 0.3s ease-out',
+        'spin-slow': 'spin 8s linear infinite',
       },
       keyframes: {
         slideInRight: {

@@ -2,11 +2,14 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon, MoreIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
 import { useState } from 'react'
+import StatusBar from '../components/StatusBar'
+import { useSettings } from '../context/SettingsContext'
 
 const CharacterDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { getCharacter, deleteCharacter } = useCharacter()
+  const { showStatusBar } = useSettings()
   const [showMenu, setShowMenu] = useState(false)
 
   const character = id ? getCharacter(id) : undefined
@@ -30,15 +33,17 @@ const CharacterDetail = () => {
 
   return (
     <div className="h-full flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate('/contacts')}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
         >
           <BackIcon size={24} />
         </button>
-        <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+        <h1 className="text-base font-semibold text-gray-900">
           角色详情
         </h1>
         <div className="relative z-50">
@@ -73,6 +78,7 @@ const CharacterDetail = () => {
               </div>
             </>
           )}
+        </div>
         </div>
       </div>
 

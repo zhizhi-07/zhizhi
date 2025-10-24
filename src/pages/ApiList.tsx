@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { BackIcon, AddIcon } from '../components/Icons'
 import { useApi } from '../context/ApiContext'
 import { setItem, STORAGE_KEYS } from '../utils/storage'
+import StatusBar from '../components/StatusBar'
 
 const ApiList = () => {
   const navigate = useNavigate()
@@ -43,24 +44,27 @@ const ApiList = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 顶部标题栏 */}
-      <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
-        <button
-          onClick={() => navigate(-1)}
-          className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
-        >
-          <BackIcon size={24} />
-        </button>
-        <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
-          API管理
-        </h1>
-        <button
-          onClick={() => navigate('/add-api')}
-          className="ios-button text-gray-700 hover:text-gray-900"
-        >
-          <AddIcon size={24} />
-        </button>
+    <div className="h-full flex flex-col bg-[#f5f7fa]">
+      {/* 状态栏 + 导航栏一体 */}
+      <div className="glass-effect border-b border-gray-200/50">
+        <StatusBar />
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="ios-button text-blue-500 -ml-2"
+          >
+            <BackIcon size={24} />
+          </button>
+          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+            API管理
+          </h1>
+          <button
+            onClick={() => navigate('/wechat/add-api')}
+            className="ios-button text-blue-500"
+          >
+            <AddIcon size={24} />
+          </button>
+        </div>
       </div>
 
       {/* API列表 */}
