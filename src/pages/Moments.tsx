@@ -143,7 +143,7 @@ const Moments = () => {
           <button 
             onClick={(e) => {
               e.stopPropagation()
-              navigate('/discover', { replace: true })
+              navigate('/wechat/discover', { replace: true })
             }}
             className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
           >

@@ -104,6 +104,9 @@ const ShakeShake = lazy(() => import('./pages/ShakeShake'))
 const Live = lazy(() => import('./pages/Live'))
 const LiveRoom = lazy(() => import('./pages/LiveRoom'))
 const CoupleSpace = lazy(() => import('./pages/CoupleSpace'))
+const CoupleAlbum = lazy(() => import('./pages/CoupleAlbum'))
+const CoupleAnniversary = lazy(() => import('./pages/CoupleAnniversary'))
+const CoupleMessageBoard = lazy(() => import('./pages/CoupleMessageBoard'))
 
 // 表情包和自定义
 const MemesLibrary = lazy(() => import('./pages/MemesLibrary'))
@@ -290,7 +293,11 @@ function App() {
                                   <Route path="/shake-shake" element={<PageWrapper><ShakeShake /></PageWrapper>} />
                                   <Route path="/live" element={<PageWrapper><Live /></PageWrapper>} />
                                   <Route path="/live-room/:id" element={<PageWrapper><LiveRoom /></PageWrapper>} />
+                                  <Route path="/couple-space" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
                                   <Route path="/couple-space/:characterId" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
+                                  <Route path="/couple-album" element={<PageWrapper><CoupleAlbum /></PageWrapper>} />
+                                  <Route path="/couple-anniversary" element={<PageWrapper><CoupleAnniversary /></PageWrapper>} />
+                                  <Route path="/couple-message-board" element={<PageWrapper><CoupleMessageBoard /></PageWrapper>} />
                                   <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
                                   <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
                                   <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />

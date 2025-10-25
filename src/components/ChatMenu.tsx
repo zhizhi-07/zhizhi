@@ -1,4 +1,4 @@
-import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon } from './Icons'
+import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, CoupleSpaceIcon } from './Icons'
 
 interface ChatMenuProps {
   onClose: () => void
@@ -7,6 +7,7 @@ interface ChatMenuProps {
   onSelectRedPacket: () => void
   onSelectTransfer: () => void
   onSelectIntimatePay: () => void
+  onSelectCoupleSpaceInvite: () => void
   onSelectLocation: () => void
   onSelectVoiceMessage: () => void
   onSelectVoiceCall: () => void
@@ -20,6 +21,7 @@ const ChatMenu = ({
   onSelectRedPacket,
   onSelectTransfer,
   onSelectIntimatePay,
+  onSelectCoupleSpaceInvite,
   onSelectLocation,
   onSelectVoiceMessage,
   onSelectVoiceCall,
@@ -31,6 +33,7 @@ const ChatMenu = ({
     { id: 'redpacket', label: '红包', Icon: RedPacketIcon, onClick: onSelectRedPacket },
     { id: 'transfer', label: '转账', Icon: TransferIcon, onClick: onSelectTransfer },
     { id: 'intimate-pay', label: '亲密付', Icon: IntimatePayIcon, onClick: onSelectIntimatePay },
+    { id: 'couple-space', label: '情侣空间', Icon: CoupleSpaceIcon, onClick: onSelectCoupleSpaceInvite },
     { id: 'voice-msg', label: '语音', Icon: MicIcon, onClick: onSelectVoiceMessage },
     { id: 'voice', label: '语音通话', Icon: PhoneIcon, onClick: onSelectVoiceCall },
     { id: 'video', label: '视频通话', Icon: VideoIcon, onClick: onSelectVideoCall },

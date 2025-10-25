@@ -56,7 +56,7 @@ const Me = () => {
       <div className="px-3 pt-3 mb-3">
         <div className="glass-card rounded-2xl overflow-hidden">
           <div 
-            onClick={() => navigate('/wechat/profile')}
+            onClick={() => navigate(`/profile/${currentUser?.id || 'default'}`)}
             className="flex items-center px-5 py-5 ios-button cursor-pointer"
           >
             <div className="w-20 h-20 rounded-2xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-xl overflow-hidden">
@@ -83,7 +83,17 @@ const Me = () => {
                 return (
                   <div key={item.id}>
                     <div 
-                      onClick={() => item.path && navigate(item.path)}
+                      onClick={() => {
+                        if (item.path) {
+                          // 对于外层路由（settings, services等），使用window.location确保正确跳转
+                          const externalRoutes = ['/settings', '/services']
+                          if (externalRoutes.includes(item.path)) {
+                            window.location.href = item.path
+                          } else {
+                            navigate(item.path)
+                          }
+                        }
+                      }}
                       className="flex items-center px-4 py-4 ios-button cursor-pointer"
                     >
                       <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center flex-shrink-0 shadow-lg border border-gray-200/50">

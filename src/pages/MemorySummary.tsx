@@ -8,7 +8,8 @@ import { useMemory } from '../hooks/useMemory'
 import memorySummaryIcon from '../assets/memory-summary-icon.webp'
 
 const MemorySummary = () => {
-  const { id } = useParams()
+  const { characterId } = useParams()
+  const id = characterId // 保持兼容性
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()

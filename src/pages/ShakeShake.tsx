@@ -392,7 +392,7 @@ const ShakeShake = () => {
               }`}
             >
               <img 
-                src="/shake-icon.png" 
+                src="/shake-icon.webp" 
                 alt="摇一摇" 
                 className="w-48 h-48 object-contain"
               />

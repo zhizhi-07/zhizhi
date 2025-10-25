@@ -11,8 +11,8 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 
 // 拉黑图标 - 使用绝对路径
-const blockedIcon = '/拉黑.png'
-const notBlockedIcon = '/没有拉黑.png'
+const blockedIcon = '/拉黑.webp'
+const notBlockedIcon = '/没有拉黑.webp'
 
 const ChatSettings = () => {
   const navigate = useNavigate()

@@ -804,9 +804,12 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* 退出登录 */}
+        {/* 退出登录 - 返回桌面 */}
         <div className="mb-6">
-          <button className="w-full glass-card rounded-2xl px-4 py-4 text-red-500 font-medium ios-button">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full glass-card rounded-2xl px-4 py-4 text-red-500 font-medium ios-button"
+          >
             退出登录
           </button>
         </div>

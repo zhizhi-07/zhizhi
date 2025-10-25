@@ -78,7 +78,7 @@ const MusicPlayer = () => {
   }, [])
 
   // 统一的音乐封面 - 使用音乐图标
-  const musicCover = new URL('../assets/music-icon.png', import.meta.url).href
+  const musicCover = new URL('../assets/music-icon.webp', import.meta.url).href
 
   // 默认示例歌曲列表（带歌词文件路径）
   const defaultSongs: Song[] = [

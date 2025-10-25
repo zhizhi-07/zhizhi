@@ -8,7 +8,8 @@ import { memoryManager, Memory } from '../utils/memorySystem'
 import memoryIcon from '../assets/memory-icon.webp'
 
 const MemoryViewer = () => {
-  const { id } = useParams()
+  const { characterId } = useParams()
+  const id = characterId // 保持兼容性
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()

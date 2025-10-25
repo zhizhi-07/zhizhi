@@ -44,7 +44,7 @@ const Discover = () => {
       id: 2,
       items: [
         { id: 21, name: '直播', Icon: LiveIcon, path: '/live' },
-        { id: 22, name: '摇一摇', Icon: ShakeIcon, path: '/shake' },
+        { id: 22, name: '摇一摇', Icon: ShakeIcon, path: '/shake-shake' },
       ],
     },
     {
@@ -64,7 +64,7 @@ const Discover = () => {
     {
       id: 5,
       items: [
-        { id: 51, name: '小游戏', Icon: GameIcon, path: '/games' },
+        { id: 51, name: '小游戏', Icon: GameIcon, path: '/game-list' },
       ],
     },
   ]

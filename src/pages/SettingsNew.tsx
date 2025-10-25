@@ -127,7 +127,7 @@ const SettingsNew = () => {
         <div className="px-4 py-4">
           <div 
             className="glass-card rounded-2xl p-4 shadow-lg border border-white/30 active:scale-95 transition-transform cursor-pointer"
-            onClick={() => navigate('/wechat/profile')}
+            onClick={() => navigate(`/profile/${currentUser?.id || 'default'}`)}
           >
             <div className="flex items-center gap-3">
               {/* 头像 - 可点击上传 */}
