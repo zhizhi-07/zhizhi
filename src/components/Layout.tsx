@@ -48,7 +48,20 @@ const Layout = () => {
         role="navigation"
         aria-label="主导航"
       >
-        <div className="h-16 flex items-center justify-around px-2">
+        <div className="h-16 flex items-center px-2">
+          {/* 返回桌面按钮 */}
+          <button
+            onClick={() => navigate('/')}
+            className="flex flex-col items-center justify-center px-3 py-2 ios-button"
+            aria-label="返回桌面"
+            title="返回桌面"
+          >
+            <div className="w-5 h-5 rounded bg-gray-400 mb-1"></div>
+            <span className="text-[10px] text-gray-600">桌面</span>
+          </button>
+          
+          {/* 主导航按钮 */}
+          <div className="flex-1 flex items-center justify-around">
           {tabs.map((tab, index) => {
             const Icon = tab.Icon
             const isActive = activeTab === index
@@ -78,6 +91,7 @@ const Layout = () => {
               </button>
             )
           })}
+          </div>
         </div>
         {/* iOS Home Indicator */}
         <div className="flex justify-center pb-2" aria-hidden="true">

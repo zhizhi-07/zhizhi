@@ -308,7 +308,7 @@ function App() {
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                   <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
                                   <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
-                                  <Route path="/" element={<Layout />} />
+                                  <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
                                 </Routes>
                               </Router>
                             </MusicPlayerProvider>
