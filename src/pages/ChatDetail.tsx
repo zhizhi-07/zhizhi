@@ -7,7 +7,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { useUser } from '../context/UserContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
-import { buildPromptFromTemplate } from '../utils/promptTemplate'
+// import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
 import ChatMenu from '../components/ChatMenu'
 import CallScreen from '../components/CallScreen'
@@ -1631,22 +1631,22 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           return `${sender}: ${content}`
         }).join('\n')
         
-        // 扩展角色数据，包含模板ID和自定义模板
-        const characterWithTemplate = {
-          ...character,
-          templateId: templateId,
-          customTemplate: customTemplateContent || undefined
-        }
-        
-        systemPrompt = buildPromptFromTemplate(
-          characterWithTemplate as any,
-          currentUser?.name || '用户',
-          historyText,
-          userMessageContent,
+        // 使用角色扮演提示词系统（原模板系统功能已移除）
+        systemPrompt = buildRoleplayPrompt(
+          {
+            name: character?.name || 'AI',
+            signature: character?.signature,
+            description: character?.description
+          },
+          {
+            name: currentUser?.name || '用户'
+          },
+          enableNarration, // 传入旁白模式开关
+          streakDays,
           retrievedMemes // 传入热梗
         )
         
-        console.log('✅ 使用模板系统构建提示词')
+        console.log('✅ 使用角色扮演提示词系统')
       } else {
         // 使用原有的提示词系统
         console.log('📝 使用默认提示词系统')

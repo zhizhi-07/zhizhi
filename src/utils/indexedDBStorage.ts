@@ -4,7 +4,7 @@
  */
 
 const DB_NAME = 'WeChatAppDB'
-const DB_VERSION = 1
+const DB_VERSION = 2  // 升级版本以修复object store问题
 const STORES = {
   MOMENTS: 'moments',
   CHAT_MESSAGES: 'chat_messages',
@@ -13,6 +13,17 @@ const STORES = {
 }
 
 let dbInstance: IDBDatabase | null = null
+
+/**
+ * 重置数据库连接（用于升级后刷新）
+ */
+export function resetDBConnection(): void {
+  if (dbInstance) {
+    dbInstance.close()
+    dbInstance = null
+    console.log('🔄 数据库连接已重置')
+  }
+}
 
 /**
  * 初始化数据库
@@ -36,32 +47,39 @@ export async function initDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result
+      const oldVersion = event.oldVersion
+      
+      console.log(`🔄 数据库升级: ${oldVersion} → ${DB_VERSION}`)
 
       // 创建朋友圈存储
       if (!db.objectStoreNames.contains(STORES.MOMENTS)) {
         const momentsStore = db.createObjectStore(STORES.MOMENTS, { keyPath: 'id' })
         momentsStore.createIndex('createdAt', 'createdAt', { unique: false })
         momentsStore.createIndex('userId', 'userId', { unique: false })
+        console.log(`✅ 创建 ${STORES.MOMENTS} store`)
       }
 
       // 创建聊天消息存储
       if (!db.objectStoreNames.contains(STORES.CHAT_MESSAGES)) {
         const messagesStore = db.createObjectStore(STORES.CHAT_MESSAGES, { keyPath: 'key' })
         messagesStore.createIndex('characterId', 'characterId', { unique: false })
+        console.log(`✅ 创建 ${STORES.CHAT_MESSAGES} store`)
       }
 
       // 创建表情包存储
       if (!db.objectStoreNames.contains(STORES.EMOJIS)) {
         const emojisStore = db.createObjectStore(STORES.EMOJIS, { keyPath: 'id' })
         emojisStore.createIndex('addTime', 'addTime', { unique: false })
+        console.log(`✅ 创建 ${STORES.EMOJIS} store`)
       }
 
       // 创建设置存储
       if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
         db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' })
+        console.log(`✅ 创建 ${STORES.SETTINGS} store`)
       }
 
-      console.log('✅ IndexedDB 数据库结构创建完成')
+      console.log('✅ IndexedDB 数据库结构升级完成')
     }
   })
 }

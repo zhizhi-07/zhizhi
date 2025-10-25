@@ -52,7 +52,7 @@ const CardWallet = () => {
       {/* 顶部导航栏 */}
       <div className="bg-white flex items-center border-b border-gray-200">
         <button 
-          onClick={() => navigate('/me')}
+          onClick={() => navigate('/wechat/me')}
           className="px-4 py-4 active:opacity-50 cursor-pointer flex items-center justify-center"
         >
           <BackIcon size={24} className="text-gray-900" />

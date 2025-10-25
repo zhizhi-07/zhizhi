@@ -82,7 +82,7 @@ const CreateUser = () => {
       ...formData,
       username
     })
-    navigate('/me')
+    navigate('/wechat/me')
   }
 
   return (

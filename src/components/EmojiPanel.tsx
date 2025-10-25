@@ -19,18 +19,11 @@ const EmojiPanel = ({ show, onClose, onSelect }: EmojiPanelProps) => {
   }, [show])
 
   const loadEmojis = async () => {
-    // 如果有缓存，直接使用（性能优化）
-    if (emojisCacheRef.current) {
-      console.log('🚀 使用缓存的表情包，秒开！')
-      setEmojis(emojisCacheRef.current)
-      return
-    }
-    
     console.log('🔍 EmojiPanel: 开始加载表情包...')
     const loaded = await getEmojis()
     console.log(`🔍 EmojiPanel: 加载了 ${loaded.length} 个表情包`, loaded)
     
-    // 保存到缓存
+    // 更新缓存
     emojisCacheRef.current = loaded
     setEmojis(loaded)
   }

@@ -28,11 +28,11 @@ interface ApiContextType {
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined)
 
-// 内置API配置 - Gemini 反代（你的专属 - Netlify）
+// 内置API配置 - Gemini 反代（你的专属 - Cloudflare Worker）
 const geminiProxyConfig: ApiConfig = {
   id: 'default-gemini-proxy',
   name: 'Gemini 反代（免费）',
-  baseUrl: window.location.origin + '/.netlify/functions/gemini-proxy',
+  baseUrl: 'https://zhizhi.2373922440jhj.workers.dev',
   apiKey: 'not-needed', // Gemini 反代不需要 API Key
   model: 'gemini-2.5-flash-preview-05-20',
   provider: 'google',

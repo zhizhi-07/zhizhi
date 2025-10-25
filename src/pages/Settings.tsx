@@ -778,25 +778,6 @@ const Settings = () => {
               <span className="text-gray-400 text-xl">›</span>
             </div>
 
-            {/* 提示词 - 替换 Wi-Fi 位置 */}
-            <div 
-              onClick={() => navigate('/prompt-templates')}
-              className="flex items-center justify-between px-4 py-4 ios-button cursor-pointer border-b border-gray-100"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                </div>
-                <span className="text-gray-900 font-medium">提示词</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">未连接</span>
-                <span className="text-gray-400 text-xl">›</span>
-              </div>
-            </div>
-
             {/* 通用 */}
             <div className="flex items-center justify-between px-4 py-4 ios-button cursor-pointer border-b border-gray-100">
               <span className="text-gray-900 font-medium">通用</span>

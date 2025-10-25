@@ -43,25 +43,34 @@ const Layout = () => {
       </div>
 
       {/* 底部导航栏 - 玻璃效果 */}
-      <div className={`border-t border-gray-200/50 ${globalBackground ? 'glass-dark' : 'glass-effect'}`}>
+      <nav 
+        className={`border-t border-gray-200/50 ${globalBackground ? 'glass-dark' : 'glass-effect'}`}
+        role="navigation"
+        aria-label="主导航"
+      >
         <div className="h-16 flex items-center justify-around px-2">
           {tabs.map((tab, index) => {
             const Icon = tab.Icon
+            const isActive = activeTab === index
             return (
               <button
                 key={index}
                 onClick={() => handleTabClick(index, tab.path)}
                 className="flex flex-col items-center justify-center flex-1 py-2 ios-button"
+                aria-label={`${tab.name}${isActive ? '，当前页面' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
+                tabIndex={0}
               >
                 <Icon
                   size={26}
                   className={`mb-1 smooth-transition ${
-                    activeTab === index ? 'text-wechat-primary scale-110' : 'text-gray-600'
+                    isActive ? 'text-wechat-primary scale-110' : 'text-gray-600'
                   }`}
+                  aria-hidden="true"
                 />
                 <span
                   className={`text-xs smooth-transition ${
-                    activeTab === index ? 'text-wechat-primary font-medium' : 'text-gray-600'
+                    isActive ? 'text-wechat-primary font-medium' : 'text-gray-600'
                   }`}
                 >
                   {tab.name}
@@ -71,10 +80,10 @@ const Layout = () => {
           })}
         </div>
         {/* iOS Home Indicator */}
-        <div className="flex justify-center pb-2">
+        <div className="flex justify-center pb-2" aria-hidden="true">
           <div className="w-32 h-1 bg-gray-900 rounded-full opacity-40"></div>
         </div>
-      </div>
+      </nav>
     </div>
   )
 }

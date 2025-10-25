@@ -200,14 +200,18 @@ export async function importEmojis(jsonData: string, replaceMode: boolean = fals
     console.log(`📥 准备导入 ${importData.emojis.length} 个表情包到 IndexedDB`)
     
     const currentEmojis = await getEmojis()
+    const originalCount = currentEmojis.length
     let finalEmojis: Emoji[]
+    let actualImported = 0
     
     if (replaceMode) {
       // 替换模式：清空现有数据
+      console.log(`🔄 替换模式：清空现有 ${originalCount} 个表情包`)
       if (USE_INDEXEDDB) {
         await clearIndexedDBStore(STORES.EMOJIS)
       }
       finalEmojis = importData.emojis
+      actualImported = finalEmojis.length
     } else {
       // 追加模式：合并并去重
       const mergedEmojis = [...currentEmojis, ...importData.emojis]
@@ -224,17 +228,18 @@ export async function importEmojis(jsonData: string, replaceMode: boolean = fals
       })
       
       finalEmojis = uniqueEmojis
+      actualImported = finalEmojis.length - originalCount
     }
     
     // IndexedDB 支持大容量，不需要检查大小
     const jsonSize = new Blob([JSON.stringify(finalEmojis)]).size
     const sizeMB = jsonSize / 1024 / 1024
     console.log(`📊 导入后数据大小: ${(jsonSize / 1024).toFixed(2)} KB (${sizeMB.toFixed(2)} MB)`)
+    console.log(`📊 原有: ${originalCount} 个，导入: ${importData.emojis.length} 个，最终: ${finalEmojis.length} 个`)
     
     const saved = await saveEmojis(finalEmojis)
     
     if (saved) {
-      const actualImported = finalEmojis.length - currentEmojis.length
       return { 
         success: true, 
         count: actualImported, 

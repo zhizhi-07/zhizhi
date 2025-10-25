@@ -148,8 +148,11 @@ export const getIntimatePayRelations = (): IntimatePayRelation[] => {
   
   // 检查并重置每月额度
   const currentMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-  return relations.map(relation => {
+  let hasReset = false
+  
+  const updatedRelations = relations.map(relation => {
     if (relation.lastResetMonth !== currentMonth) {
+      hasReset = true
       return {
         ...relation,
         usedAmount: 0,
@@ -158,6 +161,13 @@ export const getIntimatePayRelations = (): IntimatePayRelation[] => {
     }
     return relation
   })
+  
+  // 如果有重置，保存到 localStorage
+  if (hasReset) {
+    saveIntimatePayRelations(updatedRelations)
+  }
+  
+  return updatedRelations
 }
 
 // 保存亲密付关系
@@ -329,7 +339,8 @@ export const deleteIntimatePayRelation = (characterId: string): boolean => {
 export const useCharacterIntimatePay = (
   characterId: string,
   amount: number,
-  description: string
+  description: string,
+  receiverName?: string  // 接收者名字（给谁发的红包/转账）
 ): boolean => {
   const relations = getIntimatePayRelations()
   const relationIndex = relations.findIndex(
@@ -363,15 +374,19 @@ export const useCharacterIntimatePay = (
   saveIntimatePayRelations(relations)
   
   // 添加交易记录
+  const transactionDesc = receiverName 
+    ? `使用${relation.characterName}的亲密付 - ${description} - 给${receiverName}`
+    : `使用${relation.characterName}的亲密付 - ${description}`
+  
   addTransaction({
     type: 'intimate_pay',
     amount: amount.toFixed(2),
-    description: `使用亲密付 - ${description}`,
+    description: transactionDesc,
     characterName: relation.characterName
   })
   
   // 记录消费通知，供AI感知
-  addIntimatePayNotification(characterId, amount, description)
+  addIntimatePayNotification(characterId, amount, description, receiverName)
   
   return true
 }
@@ -382,6 +397,7 @@ export interface IntimatePayNotification {
   characterId: string
   amount: number
   description: string
+  receiverName?: string  // 接收者名字（给谁发的）
   timestamp: number
   read: boolean // AI是否已读
 }
@@ -390,13 +406,15 @@ export interface IntimatePayNotification {
 const addIntimatePayNotification = (
   characterId: string,
   amount: number,
-  description: string
+  description: string,
+  receiverName?: string
 ): void => {
   const notification: IntimatePayNotification = {
     id: Date.now().toString(),
     characterId,
     amount,
     description,
+    receiverName,
     timestamp: Date.now(),
     read: false
   }

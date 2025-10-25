@@ -9,7 +9,7 @@ const UserList = () => {
 
   const handleSwitchUser = (userId: string) => {
     switchUser(userId)
-    navigate('/me')
+    navigate('/wechat/me')
   }
 
   const handleDeleteUser = (userId: string, e: React.MouseEvent) => {

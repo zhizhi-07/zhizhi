@@ -63,7 +63,7 @@ const Accounting = () => {
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
         <button
-          onClick={() => navigate('/discover', { replace: true })}
+          onClick={() => navigate('/wechat/discover', { replace: true })}
           className="flex items-center gap-2 text-gray-700 ios-button"
         >
           <BackIcon size={20} />

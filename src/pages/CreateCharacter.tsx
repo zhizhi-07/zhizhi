@@ -21,6 +21,7 @@ const CreateCharacter = () => {
     avatar: '',
     signature: '',
     description: '',
+    userInfo: '',  // 关于对话者的信息
     // Character Card 扩展字段
     personality: '',
     scenario: '',
@@ -109,6 +110,7 @@ const CreateCharacter = () => {
           avatar: converted.avatar,
           signature: converted.signature,
           description: converted.description,
+          userInfo: converted.userInfo || '',
           personality: converted.personality || '',
           scenario: converted.scenario || '',
           firstMessage: converted.firstMessage || '',
@@ -418,8 +420,8 @@ const CreateCharacter = () => {
               </div>
             </div>
 
-            <div className="px-4 py-3">
-              <label className="block text-xs text-gray-500 mb-1">AI角色描述</label>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-500 mb-1">AI角色描述（关于TA自己）</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -429,6 +431,20 @@ const CreateCharacter = () => {
               />
               <div className="text-right text-xs text-gray-400 mt-1">
                 {formData.description.length}/5000
+              </div>
+            </div>
+
+            <div className="px-4 py-3">
+              <label className="block text-xs text-gray-500 mb-1">关于对话者（关于你）</label>
+              <textarea
+                value={formData.userInfo}
+                onChange={(e) => setFormData({ ...formData, userInfo: e.target.value })}
+                placeholder="描述对话者的信息：身份、职业、你们的关系等。AI会记住这些，不会重复询问。例如：你是我的男/女朋友，我们相恋2年了，我是程序员..."
+                maxLength={2000}
+                className="w-full h-32 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 resize-none"
+              />
+              <div className="text-right text-xs text-gray-400 mt-1">
+                {formData.userInfo.length}/2000
               </div>
             </div>
           </div>
@@ -441,6 +457,7 @@ const CreateCharacter = () => {
             <p>• <strong>角色ID：</strong>可选，不填写系统会自动根据名字拼音生成</p>
             <p>• <strong>个性签名：</strong>可选，显示在用户资料页</p>
             <p>• <strong>AI角色描述：</strong>可选，描述AI的背景、性格、说话方式等</p>
+            <p>• <strong>关于对话者：</strong>可选但强烈推荐！让AI知道你是谁，避免重复询问</p>
             <p>• <strong>头像：</strong>可选，不上传将使用默认机器人表情</p>
           </div>
         </div>

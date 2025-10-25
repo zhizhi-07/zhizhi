@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { MomentsIcon, VideoChannelIcon, LiveIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon, ShakeIcon } from '../components/Icons'
+import { MomentsIcon, CoupleSpaceIcon, LiveIcon, SearchIcon as SearchDiscoverIcon, MiniProgramIcon, AccountBookIcon, ShakeIcon } from '../components/Icons'
 import EmojiManagement from '../components/EmojiManagement'
 
 // 表情包图标组件
@@ -37,7 +37,7 @@ const Discover = () => {
       id: 1,
       items: [
         { id: 11, name: '朋友圈', Icon: MomentsIcon, path: '/moments' },
-        { id: 12, name: '视频号', Icon: VideoChannelIcon, path: '' },
+        { id: 12, name: '情侣空间', Icon: CoupleSpaceIcon, path: '/couple-space' },
       ],
     },
     {

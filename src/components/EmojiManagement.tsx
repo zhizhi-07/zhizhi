@@ -191,13 +191,19 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
     reader.onload = async (event) => {
       try {
         const result = await importEmojis(event.target?.result as string, replaceMode)
-        alert(result.message)
+        
         if (result.success) {
+          // 刷新表情包列表
           await loadEmojis()
+          // 显示成功消息
+          alert(result.message)
+          console.log('✅ 导入成功，已刷新表情包列表')
+        } else {
+          alert(result.message)
         }
       } catch (error) {
         console.error('导入失败:', error)
-        alert('导入失败，请检查文件格式')
+        alert('导入失败，请检查文件格式: ' + (error instanceof Error ? error.message : ''))
       }
     }
     reader.onerror = () => {

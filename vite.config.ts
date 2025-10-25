@@ -10,17 +10,41 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'utils': [
-            './src/utils/api.ts',
-            './src/utils/storage.ts',
-            './src/utils/prompts.ts'
-          ]
+        manualChunks: (id) => {
+          // React生态系统
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor'
+            }
+            // 其他第三方库
+            return 'vendor'
+          }
+          // 工具类
+          if (id.includes('src/utils')) {
+            return 'utils'
+          }
+          // 上下文providers
+          if (id.includes('src/context')) {
+            return 'context'
+          }
+          // 页面组件按需加载
+          if (id.includes('src/pages')) {
+            return 'pages'
+          }
         }
       }
     },
-    chunkSizeWarningLimit: 1000
+    chunkSizeWarningLimit: 1000,
+    // 启用CSS代码分割
+    cssCodeSplit: true,
+    // 压缩优化
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // 生产环境移除console
+        drop_debugger: true
+      }
+    }
   }
 })
 

@@ -11,6 +11,9 @@ export interface Character {
   description: string  // AI角色描述：背景、性格等，用于AI角色扮演
   createdAt: string
   
+  // 对话者信息
+  userInfo?: string  // 关于对话者的信息：身份、关系、背景等
+  
   // Character Card V2 扩展字段（酒馆兼容）
   personality?: string              // 性格描述
   scenario?: string                 // 场景设定

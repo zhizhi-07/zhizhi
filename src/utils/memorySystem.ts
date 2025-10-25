@@ -158,9 +158,10 @@ AI: ${aiResponse}
 # 现在请分析【对话内容】并输出JSON：
 `
 
+      // 记忆提取需要更长时间，使用自定义maxTokens和重试
       const response = await callAI([
         { role: 'user', content: prompt }
-      ])
+      ], 2, 4000) // 2次重试，最多4000 tokens
 
       // 解析 AI 返回的 JSON
       const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/)
@@ -476,9 +477,10 @@ ${characterDescription}
 []
 \`\`\``
 
+      // 初始记忆提取也需要更多时间
       const response = await callAI([
         { role: 'user', content: prompt }
-      ])
+      ], 2, 3000) // 2次重试，最多3000 tokens
 
       // 解析 AI 返回的 JSON
       const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/)

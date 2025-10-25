@@ -1,58 +1,55 @@
 import { useState, useEffect } from 'react'
-import { getIntimatePayRelation, getBalance } from '../utils/walletUtils'
+import { getIntimatePayRelations, getBalance } from '../utils/walletUtils'
 
 interface RedEnvelopeSenderProps {
   show: boolean
   onClose: () => void
-  onSend: (amount: number, blessing: string, useIntimatePay?: boolean) => void
+  onSend: (amount: number, blessing: string, useIntimatePay?: boolean, intimatePayCharacterId?: string) => void
   characterId?: string
   characterName?: string
 }
 
-const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName }: RedEnvelopeSenderProps) => {
+const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName: _characterName }: RedEnvelopeSenderProps) => {
   const [amount, setAmount] = useState('')
   const [blessing, setBlessing] = useState('恭喜发财，大吉大利')
   const [useIntimatePay, setUseIntimatePay] = useState(false)
-  const [intimatePayAvailable, setIntimatePayAvailable] = useState(false)
-  const [intimatePayRemaining, setIntimatePayRemaining] = useState(0)
+  const [availableIntimatePayList, setAvailableIntimatePayList] = useState<Array<{id: string, name: string, remaining: number}>>([])
+  const [selectedIntimatePayId, setSelectedIntimatePayId] = useState<string>('')
   const MAX_AMOUNT = 200
   
-  // 检查是否有可用的亲密付
+  // 检查所有可用的亲密付（AI给用户开通的）
   useEffect(() => {
-    if (show && characterId) {
-      console.log('🔍 [红包] 检查亲密付，characterId:', characterId)
-      const relation = getIntimatePayRelation(characterId)
-      console.log('📋 [红包] 亲密付关系:', relation)
+    if (show) {
+      console.log('🔍 [红包] 检查所有可用的亲密付')
+      const allRelations = getIntimatePayRelations()
       
-      if (!relation) {
-        console.log('❌ [红包] 未找到亲密付关系')
-        setIntimatePayAvailable(false)
-        setUseIntimatePay(false)
-        return
-      }
+      // 过滤出AI给用户开通的亲密付，且额度大于0
+      const available = allRelations
+        .filter(r => r.type === 'character_to_user')
+        .map(r => ({
+          id: r.characterId,
+          name: r.characterName,
+          remaining: r.monthlyLimit - r.usedAmount
+        }))
+        .filter(r => r.remaining > 0)
       
-      if (relation.type !== 'character_to_user') {
-        console.log('❌ [红包] 亲密付类型不对，type:', relation.type, '(需要character_to_user)')
-        setIntimatePayAvailable(false)
-        setUseIntimatePay(false)
-        return
-      }
+      console.log('💰 [红包] 可用的亲密付列表:', available)
+      setAvailableIntimatePayList(available)
       
-      const remaining = relation.monthlyLimit - relation.usedAmount
-      console.log('💰 [红包] 剩余额度:', remaining, '(月额度:', relation.monthlyLimit, ', 已用:', relation.usedAmount, ')')
-      
-      if (remaining > 0) {
-        console.log('✅ [红包] 亲密付可用！')
-        setIntimatePayAvailable(true)
-        setIntimatePayRemaining(remaining)
+      // 如果有可用的亲密付，优先选择当前AI的，否则选择第一个
+      if (available.length > 0) {
+        // 优先选择当前聊天窗口AI的亲密付
+        const currentAiRelation = characterId ? available.find(r => r.id === characterId) : null
+        const defaultSelected = currentAiRelation || available[0]
+        
+        setSelectedIntimatePayId(defaultSelected.id)
         setUseIntimatePay(true)
       } else {
-        console.log('❌ [红包] 亲密付额度已用完')
-        setIntimatePayAvailable(false)
         setUseIntimatePay(false)
+        setSelectedIntimatePayId('')
       }
     }
-  }, [show, characterId])
+  }, [show])
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^\d.]/g, '')
@@ -81,8 +78,13 @@ const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName }
     
     // 检查余额或亲密付额度
     if (useIntimatePay) {
-      if (amountNum > intimatePayRemaining) {
-        alert(`亲密付剩余额度不足，剩余￥${intimatePayRemaining.toFixed(2)}`)
+      const selectedRelation = availableIntimatePayList.find(r => r.id === selectedIntimatePayId)
+      if (!selectedRelation) {
+        alert('请选择要使用的亲密付')
+        return
+      }
+      if (amountNum > selectedRelation.remaining) {
+        alert(`${selectedRelation.name}的亲密付剩余额度不足\n剩余：￥${selectedRelation.remaining.toFixed(2)}\n需要：￥${amountNum.toFixed(2)}\n\n您可以取消勾选"使用亲密付"，使用零钱余额支付`)
         return
       }
     } else {
@@ -94,7 +96,7 @@ const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName }
     }
     
     const finalBlessing = blessing.trim() || '恭喜发财，大吉大利'
-    onSend(amountNum, finalBlessing, useIntimatePay)
+    onSend(amountNum, finalBlessing, useIntimatePay, useIntimatePay ? selectedIntimatePayId : undefined)
     
     // 重置表单
     setAmount('')
@@ -105,6 +107,8 @@ const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName }
   const handleClose = () => {
     setAmount('')
     setBlessing('恭喜发财，大吉大利')
+    setUseIntimatePay(false)
+    setSelectedIntimatePayId('')
     onClose()
   }
 
@@ -149,19 +153,34 @@ const RedEnvelopeSender = ({ show, onClose, onSend, characterId, characterName }
           </div>
           
           {/* 亲密付支付选项 */}
-          {intimatePayAvailable && (
+          {availableIntimatePayList.length > 0 && (
             <div className="red-packet-field">
-              <label className="flex items-center cursor-pointer">
+              <label className="flex items-center cursor-pointer mb-2">
                 <input
                   type="checkbox"
                   checked={useIntimatePay}
                   onChange={(e) => setUseIntimatePay(e.target.checked)}
                   className="mr-2"
                 />
-                <span className="text-sm text-gray-700">
-                  使用{characterName || '对方'}的亲密付（剩余￥{intimatePayRemaining.toFixed(2)}）
+                <span className="text-sm text-gray-700 font-medium">
+                  使用亲密付
                 </span>
               </label>
+              
+              {/* 选择使用哪个AI的亲密付 */}
+              {useIntimatePay && (
+                <select
+                  value={selectedIntimatePayId}
+                  onChange={(e) => setSelectedIntimatePayId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-red-500"
+                >
+                  {availableIntimatePayList.map(relation => (
+                    <option key={relation.id} value={relation.id}>
+                      {relation.name}的亲密付（剩余￥{relation.remaining.toFixed(2)}）
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
           

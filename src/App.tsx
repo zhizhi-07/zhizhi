@@ -25,6 +25,7 @@ import Discover from './pages/Discover'
 import Me from './pages/Me'
 import ChatDetail from './pages/ChatDetail'
 import Settings from './pages/Settings'
+import SettingsNew from './pages/SettingsNew'
 import Profile from './pages/Profile'
 import EditProfile from './pages/EditProfile'
 import UserList from './pages/UserList'
@@ -63,6 +64,7 @@ import GroupSettings from './pages/GroupSettings'
 import ShakeShake from './pages/ShakeShake'
 import Live from './pages/Live'
 import LiveRoom from './pages/LiveRoom'
+import CoupleSpace from './pages/CoupleSpace'
 import SparkMoments from './pages/SparkMoments'
 import MemesLibrary from './pages/MemesLibrary'
 import MiniPrograms from './pages/MiniPrograms'
@@ -76,9 +78,10 @@ import GameList from './pages/GameList'
 import UndercoverGame from './pages/UndercoverGame'
 import Desktop from './pages/Desktop'
 import StoryMode from './pages/StoryMode'
-import PromptTemplates from './pages/PromptTemplates'
 import WorldBook from './pages/WorldBook'
 import EditWorldBook from './pages/EditWorldBook'
+import MemoryCleanup from './pages/MemoryCleanup'
+import StorageMigration from './pages/StorageMigration'
 
 // DynamicIsland包装组件
 const DynamicIslandWrapper = () => {
@@ -109,7 +112,7 @@ function App() {
     }
   }, [])
 
-  // 加载自定义字体
+  // 加载自定义字体 - 优化版，防止重复加载
   useEffect(() => {
     const loadCustomFonts = async () => {
       try {
@@ -119,15 +122,22 @@ function App() {
         const fonts = JSON.parse(savedFonts)
         console.log(`🔄 开始加载 ${fonts.length} 个自定义字体...`)
 
-        // 并行加载所有字体
+        // 使用Set记录已加载的字体，避免重复加载
+        const loadedFonts = new Set<string>()
+        
+        // 检查已存在的字体
+        document.fonts.forEach((font: any) => {
+          if (font.family) {
+            loadedFonts.add(font.family)
+          }
+        })
+
+        // 只加载未加载的字体
         const loadPromises = fonts.map(async (font: any) => {
           try {
-            // 检查字体是否已存在
-            const existingFont = Array.from(document.fonts).find(
-              (f: any) => f.family === font.fontFamily
-            )
-            if (existingFont) {
-              console.log(`⚡ 字体已存在: ${font.name}`)
+            // 如果字体已加载，跳过
+            if (loadedFonts.has(font.fontFamily)) {
+              console.log(`⚡ 字体已存在，跳过: ${font.name}`)
               return true
             }
 
@@ -136,6 +146,7 @@ function App() {
             })
             await fontFace.load()
             document.fonts.add(fontFace)
+            loadedFonts.add(font.fontFamily) // 标记为已加载
             console.log(`✅ 字体加载成功: ${font.name}`)
             return true
           } catch (error) {
@@ -214,7 +225,7 @@ function App() {
             <Route path="/create-character" element={<CreateCharacter />} />
             <Route path="/character/:id" element={<CharacterDetail />} />
             <Route path="/edit-character/:id" element={<EditCharacter />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<SettingsNew />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/api-config" element={<ApiConfig />} />
@@ -250,6 +261,7 @@ function App() {
               <Route path="/shake" element={<ShakeShake />} />
               <Route path="/live" element={<Live />} />
               <Route path="/live/:id" element={<LiveRoom />} />
+              <Route path="/couple-space" element={<CoupleSpace />} />
               <Route path="/spark-moments" element={<SparkMoments />} />
               <Route path="/memes-library" element={<MemesLibrary />} />
               <Route path="/mini-programs" element={<MiniPrograms />} />
@@ -261,10 +273,11 @@ function App() {
               <Route path="/game-select" element={<GameCharacterSelect />} />
               <Route path="/games" element={<GameList />} />
               <Route path="/undercover" element={<UndercoverGame />} />
-              <Route path="/prompt-templates" element={<PromptTemplates />} />
               <Route path="/worldbook" element={<WorldBook />} />
               <Route path="/worldbook/create" element={<EditWorldBook />} />
               <Route path="/worldbook/edit/:id" element={<EditWorldBook />} />
+              <Route path="/memory-cleanup" element={<MemoryCleanup />} />
+              <Route path="/storage-migration" element={<StorageMigration />} />
                   </Routes>
                 </Router>
                       </MusicPlayerProvider>

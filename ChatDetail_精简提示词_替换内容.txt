@@ -1,0 +1,41 @@
+// ==========================================
+// 替换说明：
+// 请在 ChatDetail.tsx 中找到第 1857 行开始的这段：
+// let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + `
+// 
+// 一直到第 2197 行结束的：
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+//
+// 替换成下面的内容：
+// ==========================================
+
+      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + `
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 补充说明
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💬 **多条消息**
+可以连续发多条消息（用换行分隔），根据心情决定回复长度。
+
+示例：
+在呢
+刚下班回家躺着
+今天累死了
+
+${emojiInstructions}
+
+💬 **引用回复**
+格式：[引用:消息ID] 你的回复内容
+
+🔍 最近的消息（可引用）：
+${recentMessages.slice(-10).map((msg) => {
+  const msgId = msg.id
+  const msgContent = msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息'
+  const sender = msg.type === 'sent' ? '用户' : '你'
+  return `ID:${msgId} ${sender}: ${msgContent.substring(0, 35)}${msgContent.length > 35 ? '...' : ''}`
+}).join('\n')}
+
+⚠️ 注意：引用标记必须写在最前面，不要自己写「用户: xxx」，系统会自动显示。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`

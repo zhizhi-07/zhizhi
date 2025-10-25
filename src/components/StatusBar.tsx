@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import statusIcons from '../assets/status-icons.png'
+import { storageObserver } from '../utils/storageObserver'
 
 const StatusBar = () => {
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -24,22 +25,19 @@ const StatusBar = () => {
     return () => clearInterval(timer)
   }, [])
   
-  // 监听专注模式和时间设置变化
+  // 监听专注模式和时间设置变化 - 优化版
   useEffect(() => {
-    const handleStorageChange = () => {
-      const savedFocus = localStorage.getItem('focus_mode')
-      setFocusMode(savedFocus ? JSON.parse(savedFocus) : null)
-      
-      const savedTime = localStorage.getItem('time_settings')
-      setTimeSettings(savedTime ? JSON.parse(savedTime) : { showBg: true, color: '#22c55e' })
-    }
+    const unsubFocus = storageObserver.observe('focus_mode', (value) => {
+      setFocusMode(value ? JSON.parse(value) : null)
+    })
     
-    window.addEventListener('storage', handleStorageChange)
-    const interval = setInterval(handleStorageChange, 500)
+    const unsubTime = storageObserver.observe('time_settings', (value) => {
+      setTimeSettings(value ? JSON.parse(value) : { showBg: true, color: '#22c55e' })
+    })
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
+      unsubFocus()
+      unsubTime()
     }
   }, [])
 

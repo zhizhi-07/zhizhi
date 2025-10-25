@@ -302,6 +302,7 @@ export function convertCharacterCardToInternal(
   avatar: string
   signature: string
   description: string
+  userInfo?: string
   personality?: string
   scenario?: string
   firstMessage?: string
@@ -374,6 +375,7 @@ export function convertCharacterCardToInternal(
     avatar: imageDataUrl, // 使用 PNG 本身作为头像
     signature: data.personality?.slice(0, 100) || '来自 Character Card',
     description: fullDescription || '这个角色还没有描述',
+    userInfo: '', // Character Card 不包含对话者信息，需要用户手动填写
     personality: data.personality,
     scenario: data.scenario,
     firstMessage: data.first_mes,

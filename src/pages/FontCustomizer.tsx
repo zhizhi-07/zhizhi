@@ -45,7 +45,7 @@ const FontCustomizer = () => {
     setCustomFonts(fonts)
   }
 
-  // 加载字体（带缓存）
+  // 加载字体（带缓存和超时）
   const loadFont = async (font: CustomFont) => {
     // 检查是否已加载
     if (loadedFontsCache.current.has(font.id)) {
@@ -68,7 +68,14 @@ const FontCustomizer = () => {
       const fontFace = new FontFace(font.fontFamily, `url(${font.url})`, {
         display: 'swap'
       })
-      await fontFace.load()
+      
+      // 添加超时机制（10秒）
+      const loadPromise = fontFace.load()
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('字体加载超时')), 10000)
+      })
+      
+      await Promise.race([loadPromise, timeoutPromise])
       document.fonts.add(fontFace)
       loadedFontsCache.current.add(font.id)
       console.log(`✅ 字体加载成功: ${font.name}`)
@@ -88,33 +95,38 @@ const FontCustomizer = () => {
 
     setIsLoading(true)
 
-    const newFont: CustomFont = {
-      id: `custom_${Date.now()}`,
-      name: fontName.trim(),
-      url: fontUrl.trim(),
-      fontFamily: fontFamily.trim(),
-      createdAt: Date.now()
-    }
+    try {
+      const newFont: CustomFont = {
+        id: `custom_${Date.now()}`,
+        name: fontName.trim(),
+        url: fontUrl.trim(),
+        fontFamily: fontFamily.trim(),
+        createdAt: Date.now()
+      }
 
-    // 尝试加载字体
-    const success = await loadFont(newFont)
-    
-    if (success) {
-      const updatedFonts = [...customFonts, newFont]
-      saveCustomFonts(updatedFonts)
+      // 尝试加载字体
+      const success = await loadFont(newFont)
       
-      // 清空表单
-      setFontName('')
-      setFontUrl('')
-      setFontFamily('')
-      setShowAddForm(false)
-      
-      alert('字体添加成功！')
-    } else {
-      alert('字体加载失败，请检查链接是否正确')
+      if (success) {
+        const updatedFonts = [...customFonts, newFont]
+        saveCustomFonts(updatedFonts)
+        
+        // 清空表单
+        setFontName('')
+        setFontUrl('')
+        setFontFamily('')
+        setShowAddForm(false)
+        
+        alert('字体添加成功！')
+      } else {
+        alert('字体加载失败，请检查：\n\n1. 字体链接是否正确\n2. 链接是否支持跨域（CORS）\n3. 网络连接是否正常')
+      }
+    } catch (error) {
+      console.error('添加字体失败:', error)
+      alert('添加字体失败：' + (error instanceof Error ? error.message : '未知错误'))
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   // 删除自定义字体

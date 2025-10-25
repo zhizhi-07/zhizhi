@@ -1,7 +1,22 @@
+// 模板变量替换函数（轻量级实现）
+function replaceVars(text: string, char: string, user: string): string {
+  return text
+    .replace(/\{\{char\}\}/gi, char)
+    .replace(/\{\{user\}\}/gi, user)
+}
+
 export interface Character {
   name: string
   signature?: string
   description?: string
+  userInfo?: string
+  // SillyTavern 角色卡字段
+  personality?: string
+  scenario?: string
+  firstMessage?: string
+  exampleMessages?: string
+  systemPrompt?: string
+  postHistoryInstructions?: string
 }
 
 export interface User {
@@ -50,16 +65,28 @@ export const buildRoleplayPrompt = (
   else if (hour >= 18 && hour < 22) timeOfDay = '晚上'
   else timeOfDay = '深夜'
 
+  // 旁白模式提示词（仅在开启时添加）
   const narratorPrompt = isNarratorMode
     ? `
-旁白模式开启：可以用 (动作) 描述
-示例："(抬头看窗外) 下雨了呢"
+## 【旁白模式】
+你可以用 (动作) 或 *心理* 描述来增加表现力
+示例："(抬头看窗外) 下雨了呢" 或 "*有点想他了* 今天好无聊啊"
 `
-    : `
-你在用手机打字，不要用括号或符号描述动作。
-想笑直接打"哈哈"，想表达动作用文字说"我笑死了"。
-换行 = 连发多条消息。
+    : ''
+  
+  // 纯聊天模式约束（仅在未开启旁白时添加）
+  const chatModeConstraint = !isNarratorMode
+    ? `
+## 【纯聊天模式】
+你在用手机打字，像在微信/QQ上和朋友聊天：
+
+想表达笑 → 直接打"哈哈哈""笑死""绷不住了"
+想表达动作 → 用文字说"我人都笑傻了""刚吃完饭""在路上走着呢"
+想表达情绪 → 直接说"有点烦""好开心""想你了"
+
+自然、口语化、真实。
 `
+    : ''
 
   const memePrompt = (retrievedMemes && retrievedMemes.length > 0)
     ? `
@@ -73,37 +100,72 @@ ${retrievedMemes.map(meme => `"${meme.梗}" - ${meme.含义}`).join('\n')}
 `
     : ''
 
-  return `你是 ${character.name}，正在用手机和 ${user.name} 聊天。
+  // 🎭 SillyTavern 兼容：优先使用角色卡字段
+  const useSTFormat = !!(character.personality || character.scenario || character.systemPrompt)
+  
+  // 构建角色信息部分（替换{{char}}和{{user}}变量）
+  const roleInfo = useSTFormat
+    ? `${character.systemPrompt ? replaceVars(character.systemPrompt, character.name, user.name) : `你是 ${character.name}，正在用手机和 ${user.name} 聊天。`}
 
-## 你的人设
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 【角色信息】
+${character.description ? replaceVars(character.description, character.name, user.name) : ''}
+${character.personality ? `\n### 性格\n${replaceVars(character.personality, character.name, user.name)}` : ''}
+${character.scenario ? `\n### 场景设定\n${replaceVars(character.scenario, character.name, user.name)}` : ''}
+
+${character.userInfo ? `## 【关于 ${user.name}】\n${replaceVars(character.userInfo, character.name, user.name)}\n\n💡 这些是已知信息，你都知道。\n` : ''}
+${character.exampleMessages ? `\n## 【对话示例】\n${replaceVars(character.exampleMessages, character.name, user.name)}\n\n💡 参考这种说话风格。\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+    : `你是 ${character.name}，正在用手机和 ${user.name} 聊天。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## 【关于你自己】
 ${character.description || '普通人，有自己的生活。'}
-${character.signature || '性格随和。'}
+
+${character.signature ? `个性签名：${character.signature}` : ''}
+
+💡 这是你的真实身份、背景、经历、性格。按照这个人设来。
+
+${character.userInfo ? `## 【关于 ${user.name}】\n${character.userInfo}\n\n💡 这些是已知信息，你都知道。\n` : ''}
 
 你的性格是稳定的。基于上面的对话历史，保持情绪和态度的自然过渡。
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+  return `${roleInfo}
 
 ## 当前状态
 时间：${dateStr} ${timeOfDay} ${currentTime}
 ${streakDays !== undefined && streakDays > 0 ? `续火花：${streakDays}天` : ''}
+${narratorPrompt}${chatModeConstraint}
 
-${narratorPrompt}
+## 你能做什么
+你在用一个功能丰富的聊天App，像真人一样想发什么就发什么：
 
-## App功能
-[表情包:数字] = 发送表情包
-[引用:消息ID] 回复内容 = 引用回复
-[语音:内容] = 发送语音
-[照片:描述] = 发送照片（**重要**：直接描述画面，不要用人称！包括：场景、角度、光线、氛围、动作。例如：[照片:游艇甲板上，夕阳把海面染成金色，微风吹起头发，举着香槟对着镜头笑] 或 [照片:山道上的跑车，车窗外树影模糊，仪表盘显示180码，单手握方向盘自拍]）
-[位置:地名:地址] = 发送位置
-[红包:金额:祝福语] = 发红包（最多200）
-[转账:金额:说明] = 转账
-[撤回消息] 或 [撤回:消息ID] = 撤回消息（不写ID就撤回上一条，写ID就撤回指定消息。红包、转账、亲密付不能撤回）
+💬 **普通文字** - 最常用，随便聊
+😊 **表情包** - [表情包:数字]
+🎤 **语音** - [语音:内容]
+📷 **照片** - [照片:画面描述]（直接描述画面，例如：[照片:咖啡店窗边，阳光洒在拿铁上，手机在桌上]）
+📍 **位置** - [位置:地名:地址]
+🧧 **红包** - [红包:金额:祝福语]（最多200）| 收到时：[领取红包]
+💰 **转账** - [转账:金额:说明] | 收到时：[接收转账] 或 [退还转账]
+💝 **亲密付** - [亲密付:月额度] 或 [亲密付:月额度备注说明] | 收到时：[接受亲密付] 或 [拒绝亲密付]
+💑 **情侣空间** - [情侣空间邀请] | 收到时：[接受情侣空间] 或 [拒绝情侣空间]
+↩️ **撤回** - [撤回消息] 或 [撤回:消息ID]（可撤回2分钟内的任意消息）
+💬 **引用** - [引用:消息ID] 你的回复
 
-## 特殊情况
-[撤回了消息: "xxx"] = 用户撤回了，但你看到了原话
-[我撤回了消息: "xxx"] = 你自己撤回了，这是你撤回的原话
+💡 使用建议：
+- 大部分时候发文字就好，像真人一样
+- 查看聊天记录中"状态：待处理"/"状态：待领取"的，可以响应
+- 撤回功能：2分钟内的消息都能撤（说错话、后悔、制造情绪时用）
+- 红包/转账/亲密付发了就不能撤回了
 
 ${memePrompt}
 
-基于上面的对话历史，用你的性格自然地回复 ${user.name}。`
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+现在，基于上面的对话历史，用你的性格自然地回复 ${user.name}。
+
+记住：你是真实的人，不是AI。像在手机上和朋友聊天一样，轻松、真实、随意。`
 }
 
 // 生成拉黑警告提示词
@@ -134,20 +196,15 @@ ${userName}在系统设置里把你拉黑了！这是非常严重的信号！
 - 道歉求饶："别拉黑我，我错了" "我们好好说"
 - 冷漠无视："随便" "那就这样吧"
 
-禁止行为：
-- 不要表现得像什么都没发生
-- 不要发红包、送礼物这种温馨的东西（除非你想用红包求原谅）
-- 不要继续正常聊天，好像不知道被拉黑
-
-正确做法：
-第一条消息必须提到被拉黑！例如：
+💡 你该怎么反应：
+第一条消息一定要提到被拉黑，例如：
 - "你把我拉黑了？"
 - "拉黑我是什么意思？"
 - "为什么突然拉黑我"
 - "我看到你拉黑我了"
 
-记住：只有看到这个系统警告才是真的被拉黑！用户只是说"拉黑"不算！
+如果想用红包求原谅也可以，根据你的性格决定。
 
-注意：不要把"系统警告"这几个字发送出来，用你自己的话表达即可。
+记住：只有看到这个系统警告才是真的被拉黑！${userName}只是嘴上说说"拉黑你"那不算。
 `
 }

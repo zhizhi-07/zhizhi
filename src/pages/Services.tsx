@@ -34,7 +34,7 @@ const Services = () => {
   // 处理返回
   const handleBack = () => {
     console.log('点击返回按钮')
-    navigate('/me')
+    navigate('/wechat/me')
   }
 
   // 服务列表

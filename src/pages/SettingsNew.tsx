@@ -67,7 +67,6 @@ const SettingsNew = () => {
       id: 'group1',
       items: [
         { id: 'api', title: 'API 设置', icon: KeyIcon, iconColor: 'bg-orange-500', route: '/wechat/api-list' },
-        { id: 'prompt', title: '提示词', icon: SettingsIcon, iconColor: 'bg-blue-500', value: '未连接', route: '/prompt-templates' },
         { id: 'bluetooth', title: '蓝牙', icon: BluetoothIcon, iconColor: 'bg-blue-500', value: '开', route: '/settings/bluetooth' },
         { id: 'cellular', title: '蜂窝网络', icon: SignalIcon, iconColor: 'bg-green-500', route: '/settings/cellular' },
         { id: 'hotspot', title: '个人热点', icon: SignalIcon, iconColor: 'bg-green-500', value: '关', route: '/settings/hotspot' },
