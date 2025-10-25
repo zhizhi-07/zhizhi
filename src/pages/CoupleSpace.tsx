@@ -8,6 +8,8 @@ import {
   getCoupleSpaceRelation, 
   createCoupleSpaceInvite, 
   endCoupleSpaceRelation,
+  getCoupleSpacePrivacy,
+  setCoupleSpacePrivacy,
   type CoupleSpaceRelation 
 } from '../utils/coupleSpaceUtils'
 
@@ -18,14 +20,46 @@ const CoupleSpace = () => {
   const { characters } = useCharacter()
   const [relation, setRelation] = useState<CoupleSpaceRelation | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
+  const [privacyMode, setPrivacyMode] = useState<'public' | 'private'>('public')
 
   useEffect(() => {
     loadRelation()
+    
+    // 监听页面可见性变化，当页面重新可见时刷新状态
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadRelation()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // 监听focus事件，当窗口重新获得焦点时刷新
+    const handleFocus = () => {
+      loadRelation()
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+    }
   }, [])
 
   const loadRelation = () => {
     const relation = getCoupleSpaceRelation()
     setRelation(relation)
+    
+    // 加载隐私设置
+    const privacy = getCoupleSpacePrivacy()
+    setPrivacyMode(privacy)
+  }
+  
+  const handlePrivacyToggle = () => {
+    const newMode = privacyMode === 'public' ? 'private' : 'public'
+    setCoupleSpacePrivacy(newMode)
+    setPrivacyMode(newMode)
   }
 
   const handleInvite = (characterId: string) => {
@@ -283,17 +317,28 @@ const CoupleSpace = () => {
                 </button>
               </div>
 
-              {/* 每日情话 - 简化版 */}
-              <div className="glass-card rounded-2xl p-5 border border-white/20 shadow-lg">
-                <div className="flex items-center space-x-2 mb-3">
-                  <svg className="w-5 h-5 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                  </svg>
-                  <span className="text-xs text-gray-500">今日情话</span>
+              {/* 隐私设置 */}
+              <div className="glass-card rounded-2xl p-4 border border-white/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-900 mb-1">隐私设置</div>
+                    <div className="text-xs text-gray-600">
+                      {privacyMode === 'public' 
+                        ? '公开：其他人可以看到你有情侣空间' 
+                        : '私密：对其他人隐藏情侣空间状态'}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handlePrivacyToggle}
+                    className={`px-4 py-2 rounded-full text-sm font-medium ios-button transition-all ${
+                      privacyMode === 'public' 
+                        ? 'glass-card border border-white/20 text-gray-900' 
+                        : 'bg-blue-500 text-white'
+                    }`}
+                  >
+                    {privacyMode === 'public' ? '公开' : '私密'}
+                  </button>
                 </div>
-                <p className="text-sm text-gray-900 leading-relaxed italic">
-                  "遇见你之后，我的世界才真正有了颜色"
-                </p>
               </div>
 
               {/* 结束关系按钮 */}

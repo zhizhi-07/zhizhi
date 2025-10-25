@@ -20,12 +20,25 @@ const EmojiPanel = ({ show, onClose, onSelect }: EmojiPanelProps) => {
 
   const loadEmojis = async () => {
     console.log('🔍 EmojiPanel: 开始加载表情包...')
-    const loaded = await getEmojis()
-    console.log(`🔍 EmojiPanel: 加载了 ${loaded.length} 个表情包`, loaded)
-    
-    // 更新缓存
-    emojisCacheRef.current = loaded
-    setEmojis(loaded)
+    try {
+      // 添加3秒超时保护（兼容无痕模式）
+      const loaded = await Promise.race([
+        getEmojis(),
+        new Promise<Emoji[]>((_, reject) => 
+          setTimeout(() => reject(new Error('表情包加载超时')), 3000)
+        )
+      ])
+      console.log(`🔍 EmojiPanel: 加载了 ${loaded.length} 个表情包`, loaded)
+      
+      // 更新缓存
+      emojisCacheRef.current = loaded
+      setEmojis(loaded)
+    } catch (error) {
+      console.warn('⚠️ EmojiPanel: 表情包加载失败（可能是无痕模式）:', error)
+      // 加载失败时显示空列表
+      setEmojis([])
+      emojisCacheRef.current = []
+    }
   }
 
   const handleSelectEmoji = (emoji: Emoji) => {

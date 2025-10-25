@@ -85,13 +85,7 @@ const Me = () => {
                     <div 
                       onClick={() => {
                         if (item.path) {
-                          // 对于外层路由（settings, services等），使用window.location确保正确跳转
-                          const externalRoutes = ['/settings', '/services']
-                          if (externalRoutes.includes(item.path)) {
-                            window.location.href = item.path
-                          } else {
-                            navigate(item.path)
-                          }
+                          navigate(item.path)
                         }
                       }}
                       className="flex items-center px-4 py-4 ios-button cursor-pointer"

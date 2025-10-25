@@ -3,21 +3,76 @@ import { useNavigate } from 'react-router-dom'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { getCoupleAnniversaries, getDaysUntil, formatAnniversaryDate, type CoupleAnniversary as Anniversary } from '../utils/coupleSpaceContentUtils'
+import { getCoupleAnniversaries, addCoupleAnniversary, getDaysUntil, getAnniversaryBackground, type CoupleAnniversary as Anniversary } from '../utils/coupleSpaceContentUtils'
+import { getCoupleSpaceRelation } from '../utils/coupleSpaceUtils'
 
 const CoupleAnniversary = () => {
   const navigate = useNavigate()
   const { background, getBackgroundStyle } = useBackground()
   const { showStatusBar } = useSettings()
   const [anniversaries, setAnniversaries] = useState<Anniversary[]>([])
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [anniversaryDate, setAnniversaryDate] = useState('')
+  const [anniversaryTitle, setAnniversaryTitle] = useState('')
+  const [anniversaryDescription, setAnniversaryDescription] = useState('')
+  const [selectedAnniversary, setSelectedAnniversary] = useState<Anniversary | null>(null)
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [bgImage, setBgImage] = useState<string | null>(null)
 
   useEffect(() => {
     loadAnniversaries()
+    loadBackground()
+    
+    // 监听页面可见性变化，刷新背景
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadBackground()
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
+  
+  const loadBackground = () => {
+    const bg = getAnniversaryBackground()
+    setBgImage(bg)
+  }
 
   const loadAnniversaries = () => {
     const allAnniversaries = getCoupleAnniversaries()
     setAnniversaries(allAnniversaries)
+  }
+
+  const handleAddAnniversary = () => {
+    if (!anniversaryDate || !anniversaryTitle.trim()) {
+      alert('请填写日期和标题')
+      return
+    }
+
+    const relation = getCoupleSpaceRelation()
+    if (!relation || relation.status !== 'active') {
+      alert('请先开通情侣空间')
+      return
+    }
+
+    addCoupleAnniversary(
+      relation.characterId,
+      '我',
+      anniversaryDate,
+      anniversaryTitle.trim(),
+      anniversaryDescription.trim()
+    )
+
+    setAnniversaryDate('')
+    setAnniversaryTitle('')
+    setAnniversaryDescription('')
+    setShowAddModal(false)
+    loadAnniversaries()
+    alert('纪念日已添加！')
   }
 
   return (
@@ -35,7 +90,10 @@ const CoupleAnniversary = () => {
               返回
             </button>
             <h1 className="text-lg font-semibold text-gray-900">纪念日</h1>
-            <button className="text-blue-500 ios-button">
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="text-blue-500 ios-button"
+            >
               添加
             </button>
           </div>
@@ -66,39 +124,86 @@ const CoupleAnniversary = () => {
               </div>
             </div>
           ) : (
-            /* 纪念日列表 */
-            <div className="space-y-4 pb-6">
+            /* 纪念日列表 - 网格布局 */
+            <div className="grid grid-cols-2 gap-4 pb-6">
               {anniversaries.map(anniversary => {
                 const daysUntil = getDaysUntil(anniversary.date)
                 const isPast = daysUntil < 0
                 const isToday = daysUntil === 0
+                const daysCount = Math.abs(daysUntil)
+                
+                // 获取星期几
+                const dateObj = new Date(anniversary.date)
+                const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+                const weekday = weekdays[dateObj.getDay()]
                 
                 return (
-                  <div key={anniversary.id} className="glass-card rounded-2xl p-5 border border-white/20 shadow-lg">
-                    <div className="flex items-start space-x-4">
-                      {/* 日期显示 */}
-                      <div className="w-16 h-16 rounded-2xl glass-card flex flex-col items-center justify-center flex-shrink-0 border border-white/30">
-                        <span className="text-xs text-gray-600">{formatAnniversaryDate(anniversary.date)}</span>
-                        {isToday ? (
-                          <span className="text-xs text-pink-500 font-bold mt-1">今天</span>
-                        ) : isPast ? (
-                          <span className="text-xs text-gray-400 mt-1">{Math.abs(daysUntil)}天前</span>
-                        ) : (
-                          <span className="text-xs text-pink-500 mt-1">{daysUntil}天后</span>
-                        )}
+                  <div 
+                    key={anniversary.id} 
+                    className="relative rounded-2xl overflow-hidden shadow-lg border border-white/20 cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => {
+                      setSelectedAnniversary(anniversary)
+                      setShowDetailModal(true)
+                    }}
+                  >
+                    {/* 背景图片 */}
+                    {bgImage && (
+                      <div 
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{ backgroundImage: `url(${bgImage})` }}
+                      />
+                    )}
+                    {/* 半透明遮罩层 */}
+                    <div className="absolute inset-0 bg-white/60" />
+                    
+                    {/* 内容层 */}
+                    <div className="relative z-10">
+                      {/* 顶部标题条 */}
+                      <div className="px-4 py-3 text-center border-b border-white/20">
+                        <h3 className="text-gray-900 text-base font-bold truncate">
+                          {anniversary.title}
+                        </h3>
                       </div>
                       
-                      {/* 内容 */}
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-1">
-                          {isToday && <span className="text-xs bg-pink-100 text-pink-600 px-2 py-0.5 rounded-full">今天</span>}
-                          <h3 className="font-bold text-gray-900">{anniversary.title}</h3>
-                        </div>
-                        
-                        <p className="text-xs text-gray-500 mb-2">{anniversary.characterName} 添加</p>
-                        
+                      {/* 中间天数显示 */}
+                      <div className="px-4 py-8">
+                      <div className="text-center">
+                        {isPast ? (
+                          <div className="space-y-1">
+                            <p className="text-gray-500 text-xs">已经过去</p>
+                            <p className="text-5xl font-bold text-gray-800 tracking-tight leading-none">
+                              {daysCount}
+                            </p>
+                            <p className="text-gray-500 text-sm">天</p>
+                          </div>
+                        ) : isToday ? (
+                          <div className="space-y-1">
+                            <p className="text-pink-500 text-sm font-bold">就是今天</p>
+                            <p className="text-5xl font-bold text-pink-500 tracking-tight leading-none">
+                              0
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-gray-500 text-xs">还有</p>
+                            <p className="text-5xl font-bold text-gray-800 tracking-tight leading-none">
+                              {daysCount}
+                            </p>
+                            <p className="text-gray-500 text-sm">天</p>
+                          </div>
+                        )}
+                      </div>
+                      </div>
+                      
+                      {/* 底部日期信息 */}
+                      <div className="px-4 py-3 text-center border-t border-white/20">
+                        <p className="text-gray-600 text-xs truncate">
+                          {anniversary.date} {weekday}
+                        </p>
                         {anniversary.description && (
-                          <p className="text-sm text-gray-700 leading-relaxed">{anniversary.description}</p>
+                          <p className="text-gray-500 text-xs mt-1 truncate">
+                            {anniversary.description}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -108,6 +213,148 @@ const CoupleAnniversary = () => {
             </div>
           )}
         </div>
+
+        {/* 添加纪念日弹窗 */}
+        {showAddModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowAddModal(false)}
+            />
+            <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 shadow-2xl border border-white/20">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">添加纪念日</h3>
+              
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">日期</label>
+                  <input
+                    type="date"
+                    value={anniversaryDate}
+                    onChange={(e) => setAnniversaryDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">标题</label>
+                  <input
+                    type="text"
+                    value={anniversaryTitle}
+                    onChange={(e) => setAnniversaryTitle(e.target.value)}
+                    placeholder="例如：第一次见面"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">描述（可选）</label>
+                  <textarea
+                    value={anniversaryDescription}
+                    onChange={(e) => setAnniversaryDescription(e.target.value)}
+                    placeholder="记录这个特殊的日子..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none text-sm"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleAddAnniversary}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  添加
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 纪念日详情弹窗 */}
+        {showDetailModal && selectedAnniversary && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowDetailModal(false)}
+            />
+            <div className="relative w-full max-w-md glass-card rounded-3xl p-6 shadow-2xl border border-white/20">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">{selectedAnniversary.title}</h3>
+              
+              <div className="space-y-3">
+                <div className="glass-card rounded-xl p-4 border border-white/20">
+                  <div className="text-sm text-gray-600 mb-1">目标日期</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {selectedAnniversary.date}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {(() => {
+                      const dateObj = new Date(selectedAnniversary.date)
+                      const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+                      return weekdays[dateObj.getDay()]
+                    })()}
+                  </div>
+                </div>
+                
+                <div className="glass-card rounded-xl p-4 border border-white/20">
+                  <div className="text-sm text-gray-600 mb-1">倒计时</div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {(() => {
+                      const daysUntil = getDaysUntil(selectedAnniversary.date)
+                      const isPast = daysUntil < 0
+                      const isToday = daysUntil === 0
+                      const daysCount = Math.abs(daysUntil)
+                      
+                      if (isToday) return '就是今天！'
+                      if (isPast) return `已过 ${daysCount} 天`
+                      return `还有 ${daysCount} 天`
+                    })()}
+                  </div>
+                </div>
+                
+                {selectedAnniversary.description && (
+                  <div className="glass-card rounded-xl p-4 border border-white/20">
+                    <div className="text-sm text-gray-600 mb-1">描述</div>
+                    <div className="text-sm text-gray-900 leading-relaxed">
+                      {selectedAnniversary.description}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="glass-card rounded-xl p-4 border border-white/20">
+                  <div className="text-sm text-gray-600 mb-1">创建者</div>
+                  <div className="text-sm text-gray-900">{selectedAnniversary.characterName}</div>
+                </div>
+                
+                <div className="glass-card rounded-xl p-4 border border-white/20">
+                  <div className="text-sm text-gray-600 mb-1">创建时间</div>
+                  <div className="text-sm text-gray-900">
+                    {new Date(selectedAnniversary.createdAt).toLocaleString('zh-CN', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit'
+                    })}
+                  </div>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="w-full px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button mt-4"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

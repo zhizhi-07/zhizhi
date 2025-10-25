@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { getCoupleMessages, type CoupleMessage } from '../utils/coupleSpaceContentUtils'
+import { getCoupleMessages, addCoupleMessage, type CoupleMessage } from '../utils/coupleSpaceContentUtils'
+import { getCoupleSpaceRelation } from '../utils/coupleSpaceUtils'
 
 const CoupleMessageBoard = () => {
   const navigate = useNavigate()
   const { background, getBackgroundStyle } = useBackground()
   const { showStatusBar } = useSettings()
   const [messages, setMessages] = useState<CoupleMessage[]>([])
+  const [showWriteModal, setShowWriteModal] = useState(false)
+  const [messageContent, setMessageContent] = useState('')
 
   useEffect(() => {
     loadMessages()
@@ -37,6 +40,30 @@ const CoupleMessageBoard = () => {
     }
   }
 
+  const handleWriteMessage = () => {
+    if (!messageContent.trim()) {
+      alert('请输入留言内容')
+      return
+    }
+
+    const relation = getCoupleSpaceRelation()
+    if (!relation || relation.status !== 'active') {
+      alert('请先开通情侣空间')
+      return
+    }
+
+    addCoupleMessage(
+      relation.characterId,
+      '我',
+      messageContent.trim()
+    )
+
+    setMessageContent('')
+    setShowWriteModal(false)
+    loadMessages()
+    alert('留言已发布！')
+  }
+
   return (
     <div className="h-full flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 z-0" style={getBackgroundStyle()} />
@@ -52,7 +79,10 @@ const CoupleMessageBoard = () => {
               返回
             </button>
             <h1 className="text-lg font-semibold text-gray-900">留言板</h1>
-            <button className="text-blue-500 ios-button">
+            <button 
+              onClick={() => setShowWriteModal(true)}
+              className="text-blue-500 ios-button"
+            >
               写留言
             </button>
           </div>
@@ -111,6 +141,43 @@ const CoupleMessageBoard = () => {
             </div>
           )}
         </div>
+
+        {/* 写留言弹窗 */}
+        {showWriteModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowWriteModal(false)}
+            />
+            <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 shadow-2xl border border-white/20">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">发布留言</h3>
+              
+              <textarea
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                placeholder="写下你想说的话..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none mb-4 text-sm"
+                rows={5}
+                autoFocus
+              />
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowWriteModal(false)}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleWriteMessage}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  发布
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

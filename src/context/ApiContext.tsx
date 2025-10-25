@@ -32,9 +32,9 @@ const ApiContext = createContext<ApiContextType | undefined>(undefined)
 const geminiProxyConfig: ApiConfig = {
   id: 'default-gemini-proxy',
   name: 'Gemini 反代（免费）',
-  baseUrl: window.location.origin + '/.netlify/functions/gemini-proxy',
+  baseUrl: 'https://zhizhi-ai.netlify.app/.netlify/functions/gemini-proxy',
   apiKey: 'not-needed', // Gemini 反代不需要 API Key
-  model: 'gemini-2.5-pro-preview-03-25',
+  model: 'gemini-2.5-pro',
   provider: 'google',
   temperature: 0.7,
   maxTokens: 2000,

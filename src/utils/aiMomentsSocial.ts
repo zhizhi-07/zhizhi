@@ -153,23 +153,12 @@ export const batchAIInteractWithMoment = async (
 ): Promise<Array<{
   characterId: string
   characterName: string
-  action: 'like' | 'comment' | 'skip'
+  actions: Array<'like' | 'comment' | 'message' | 'skip'>
   comment?: string
+  message?: string
   reason?: string
 }>> => {
   try {
-    const now = new Date()
-    const currentTime = now.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-    
-    const currentDate = now.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    })
 
     // 构建角色信息（平衡版）
     const charactersInfo = characters.map((char, idx) => {
@@ -226,21 +215,31 @@ ${charactersInfo}
 4. 如果没人@我，我要不要主动说点什么？
 5. 我之前说过什么吗？不要重复
 
-互动方式：
-• skip = 跳过（不感兴趣）
-• like = 点赞（最常用，看到了但没话说）
-• comment = 评论（被@了，或者真的有话说）
+互动方式（可以同时做多个）：
+• skip = 跳过（完全不感兴趣）
+• like = 点赞（看到了，表示支持）
+• comment = 公开评论（想说点什么，让所有人看到）
+• message = 私信（想单独跟发布者聊聊，不想让别人看到）
+
+✨ 重要：可以同时做多个动作！
+• 点赞+评论：很常见的组合
+• 点赞+私信：公开点赞，私下再聊
+• 评论+私信：公开回应，私下补充
+• 点赞+评论+私信：都可以！
 
 硬性规则：
-• 被@了应该回复
+• 被@了应该回复（comment或message）
 • 不要重复说同样的话
+• comment是公开的，所有人能看到
+• message是私密的，只有发布者能看到
 
 请按以下JSON格式回复（只输出JSON数组，不要有其他内容）：
 [
   {
     "characterName": "角色名字",
-    "action": "like" 或 "comment" 或 "skip",
-    "comment": "如果action是comment，这里写评论内容（5-30字），否则为空字符串",
+    "actions": ["like", "comment"],
+    "comment": "如果有comment动作，这里写评论内容（5-30字）",
+    "message": "如果有message动作，这里写私信内容（10-50字）",
     "reason": "简短说明决策理由（可选）"
   },
   ...
@@ -250,14 +249,23 @@ ${charactersInfo}
 [
   {
     "characterName": "小雪",
-    "action": "like",
-    "comment": "",
-    "reason": "内容不错，点个赞"
+    "actions": ["like", "comment"],
+    "comment": "哈哈好可爱",
+    "message": "",
+    "reason": "很有趣，点赞加评论"
   },
   {
     "characterName": "小明",
-    "action": "skip",
+    "actions": ["like", "message"],
     "comment": "",
+    "message": "看到你发的朋友圈了，有空一起出来玩吧",
+    "reason": "想私下聊聊"
+  },
+  {
+    "characterName": "小李",
+    "actions": ["skip"],
+    "comment": "",
+    "message": "",
     "reason": "和我无关"
   }
 ]
@@ -284,8 +292,9 @@ ${charactersInfo}
       return {
         characterId: character?.id || '',
         characterName: result.characterName,
-        action: result.action,
-        comment: result.action === 'comment' ? result.comment : undefined,
+        actions: Array.isArray(result.actions) ? result.actions : [result.action || 'skip'],
+        comment: result.comment || undefined,
+        message: result.message || undefined,
         reason: result.reason
       }
     })
@@ -397,15 +406,15 @@ export const triggerAIReactToComment = async (
     // 批量调用AI（只调用一次API）
     const results = await batchAIInteractWithMoment(charactersData, moment)
 
-    // 处理结果
+    // 处理结果（支持多动作）
     results.forEach(result => {
       const character = enabledCharacters.find(c => c.id === result.characterId)
       if (!character) return
 
-      console.log(`💭 ${result.characterName} 的决定: ${result.action} ${result.reason || ''}`)
+      console.log(`💭 ${result.characterName} 的决定: ${result.actions.join('+')} ${result.reason || ''}`)
 
-      if (result.action === 'like') {
-        // 检查是否已经点赞
+      // 处理点赞
+      if (result.actions.includes('like')) {
         const hasLiked = moment.likes.some(like => like.userId === result.characterId)
         if (!hasLiked) {
           console.log(`👍 ${result.characterName} 决定点赞，正在执行...`)
@@ -414,8 +423,10 @@ export const triggerAIReactToComment = async (
         } else {
           console.log(`⏭️ ${result.characterName} 已经点赞过了`)
         }
-      } else if (result.action === 'comment' && result.comment) {
-        // 只检查评论内容是否重复，不限制AI评论次数
+      }
+      
+      // 处理评论
+      if (result.actions.includes('comment') && result.comment) {
         const cleanComment = result.comment.replace(/@\S+\s*/g, '').toLowerCase().trim()
         const isDuplicate = existingComments.some(existing => {
           const cleanExisting = existing.replace(/@\S+\s*/g, '').toLowerCase().trim()
@@ -429,7 +440,32 @@ export const triggerAIReactToComment = async (
           console.log(`💬 ${result.characterName} 回复了: ${result.comment}`)
           existingComments.push(result.comment.toLowerCase().trim())
         }
-      } else {
+      }
+      
+      // 处理私信
+      if (result.actions.includes('message') && result.message) {
+        // 发送私信到聊天记录
+        const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        const messageContent = {
+          id: Date.now() + Math.random(),
+          type: 'received',
+          content: result.message,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'text',
+          blocked: false
+        }
+        messages.push(messageContent)
+        localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
+        console.log(`💬 ${result.characterName} 发送私信: ${result.message}`)
+      }
+      
+      // 跳过
+      if (result.actions.includes('skip') || result.actions.length === 0) {
         console.log(`😶 ${result.characterName} 选择跳过`)
       }
     })

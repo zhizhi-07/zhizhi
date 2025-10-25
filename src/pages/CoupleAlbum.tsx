@@ -3,13 +3,18 @@ import { useNavigate } from 'react-router-dom'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { getCouplePhotos, type CoupleAlbumPhoto } from '../utils/coupleSpaceContentUtils'
+import { getCouplePhotos, addCouplePhoto, type CoupleAlbumPhoto } from '../utils/coupleSpaceContentUtils'
+import { getCoupleSpaceRelation } from '../utils/coupleSpaceUtils'
+import FlipPhotoCard from '../components/FlipPhotoCard'
 
 const CoupleAlbum = () => {
   const navigate = useNavigate()
   const { background, getBackgroundStyle } = useBackground()
   const { showStatusBar } = useSettings()
   const [photos, setPhotos] = useState<CoupleAlbumPhoto[]>([])
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [photoDescription, setPhotoDescription] = useState('')
+  const [photoFile, setPhotoFile] = useState<string | null>(null)
 
   useEffect(() => {
     loadPhotos()
@@ -20,21 +25,30 @@ const CoupleAlbum = () => {
     setPhotos(allPhotos)
   }
 
-  const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
-    if (days === 0) {
-      return '今天'
-    } else if (days === 1) {
-      return '昨天'
-    } else if (days < 7) {
-      return `${days}天前`
-    } else {
-      return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+  const handleUpload = () => {
+    if (!photoDescription.trim() && !photoFile) {
+      alert('请至少上传照片或输入文案')
+      return
     }
+
+    const relation = getCoupleSpaceRelation()
+    if (!relation || relation.status !== 'active') {
+      alert('请先开通情侣空间')
+      return
+    }
+
+    addCouplePhoto(
+      relation.characterId,
+      '我',
+      photoDescription.trim() || '（无文案）',
+      photoFile || undefined
+    )
+
+    setPhotoDescription('')
+    setPhotoFile(null)
+    setShowUploadModal(false)
+    loadPhotos()
+    alert('照片已上传！')
   }
 
   return (
@@ -52,7 +66,10 @@ const CoupleAlbum = () => {
               返回
             </button>
             <h1 className="text-lg font-semibold text-gray-900">相册</h1>
-            <button className="text-blue-500 ios-button">
+            <button 
+              onClick={() => setShowUploadModal(true)}
+              className="text-blue-500 ios-button"
+            >
               上传
             </button>
           </div>
@@ -83,39 +100,108 @@ const CoupleAlbum = () => {
               </div>
             </div>
           ) : (
-            /* 照片列表 */
-            <div className="space-y-4 pb-6">
-              {photos.map(photo => (
-                <div key={photo.id} className="glass-card rounded-2xl p-4 border border-white/20 shadow-lg">
-                  <div className="flex items-start space-x-3">
-                    {/* 头像 */}
-                    <div className="w-10 h-10 rounded-full glass-card flex items-center justify-center flex-shrink-0 border border-white/30">
-                      <span className="text-sm font-bold text-gray-700">{photo.characterName[0]}</span>
+            /* 照片列表 - 网格布局 */
+            <div className="grid grid-cols-2 gap-4 pb-6">
+              {photos.map(photo => {
+                const uploadTime = new Date(photo.timestamp)
+                const timeString = uploadTime.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                
+                const hasCaption = photo.description && photo.description !== '（无文案）'
+                
+                return (
+                  <div key={photo.id} className="space-y-2">
+                    {/* 翻转照片卡片 */}
+                    <div className="flex justify-center">
+                      <FlipPhotoCard 
+                        description="暂无图片描述（后续识图功能将自动生成）"
+                        messageId={photo.timestamp}
+                      />
                     </div>
                     
-                    {/* 内容 */}
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-900">{photo.characterName}</span>
-                        <span className="text-xs text-gray-500">{formatTime(photo.timestamp)}</span>
-                      </div>
-                      
-                      {/* 照片描述 */}
-                      <div className="glass-card rounded-xl p-3 border border-white/20 bg-white/50">
-                        <div className="flex items-start space-x-2">
-                          <svg className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          <p className="text-sm text-gray-700 leading-relaxed">{photo.description}</p>
-                        </div>
-                      </div>
+                    {/* 发布者和时间 */}
+                    <div className="flex items-center justify-between px-2">
+                      <span className="text-xs font-semibold text-gray-700">
+                        {photo.uploaderName || photo.characterName}
+                      </span>
+                      <span className="text-xs text-gray-500">{timeString}</span>
                     </div>
+                    
+                    {/* 文案（如果有） */}
+                    {hasCaption && (
+                      <div className="glass-card rounded-xl p-3 border border-white/20">
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {photo.description}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
+
+        {/* 上传照片弹窗 */}
+        {showUploadModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowUploadModal(false)}
+            />
+            <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 shadow-2xl border border-white/20">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">上传照片</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-2">选择照片（可选）</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onload = (evt) => {
+                        setPhotoFile(evt.target?.result as string)
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm"
+                />
+                {photoFile && (
+                  <img src={photoFile} alt="预览" className="mt-2 w-full h-40 object-cover rounded-xl" />
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm text-gray-700 mb-2">文案</label>
+                <textarea
+                  value={photoDescription}
+                  onChange={(e) => setPhotoDescription(e.target.value)}
+                  placeholder="写下你想说的话..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none text-sm"
+                  rows={3}
+                />
+                <p className="text-xs text-gray-500 mt-1">图片描述将在后续识图功能中自动生成</p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleUpload}
+                  className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button"
+                >
+                  上传
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

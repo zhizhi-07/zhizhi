@@ -6,15 +6,19 @@ import { useMoments } from '../context/MomentsContext'
 import { ImageViewer } from '../components/ImageViewer'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { useCharacter } from '../context/CharacterContext'
+import { triggerAIReactToComment } from '../utils/aiMomentsSocial'
 
 const Moments = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
   const { moments, likeMoment, unlikeMoment, addComment } = useMoments()
   const { showStatusBar } = useSettings()
+  const { getCharacter, characters } = useCharacter()
   const [showCommentInput, setShowCommentInput] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
   const [replyToUser, setReplyToUser] = useState<string>('')
+  const [replyToUserId, setReplyToUserId] = useState<string>('')
   const [coverImage, setCoverImage] = useState<string>(() => {
     // 从localStorage读取封面图片
     return localStorage.getItem('moments_cover_image') || ''
@@ -88,15 +92,68 @@ const Moments = () => {
     const finalComment = replyToUser ? `@${replyToUser} ${commentText.trim()}` : commentText.trim()
     
     addComment(momentId, currentUser.id, currentUser.name, currentUser.avatar, finalComment)
+    
+    // 如果是回复AI角色的评论，同步到聊天记录并触发AI反应
+    if (replyToUserId && replyToUserId !== currentUser.id) {
+      const character = getCharacter(replyToUserId)
+      if (character) {
+        const chatMessages = localStorage.getItem(`chat_messages_${replyToUserId}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        // 添加用户的回复到聊天记录
+        const replyMessage = {
+          id: Date.now() + Math.random(),
+          type: 'sent',
+          content: `💬 你回复了TA的朋友圈评论：${commentText.trim()}`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'text'
+        }
+        
+        messages.push(replyMessage)
+        localStorage.setItem(`chat_messages_${replyToUserId}`, JSON.stringify(messages))
+        console.log(`💾 你的回复已同步到与 ${character.name} 的聊天记录`)
+        
+        // 触发AI的反应（让AI决定回复评论还是私信）
+        const moment = moments.find(m => m.id === momentId)
+        if (moment) {
+          console.log(`🔔 用户回复了 ${character.name} 的评论，触发AI反应...`)
+          
+          setTimeout(() => {
+            triggerAIReactToComment(
+              momentId,
+              moment,
+              currentUser.name,
+              characters,
+              (characterId: string) => {
+                const msgs = localStorage.getItem(`chat_messages_${characterId}`)
+                return msgs ? JSON.parse(msgs).slice(-10).map((msg: any) => ({
+                  role: msg.type === 'sent' ? 'user' as const : 'assistant' as const,
+                  content: msg.content
+                })) : []
+              },
+              likeMoment,
+              addComment
+            )
+          }, 2000) // 延迟2秒，让用户看到自己的评论
+        }
+      }
+    }
+    
     setCommentText('')
     setReplyToUser('')
+    setReplyToUserId('')
     setShowCommentInput(null)
   }
 
   // 处理点击评论（回复评论）
-  const handleReplyComment = (momentId: string, userName: string) => {
+  const handleReplyComment = (momentId: string, userName: string, userId: string) => {
     setShowCommentInput(momentId)
     setReplyToUser(userName)
+    setReplyToUserId(userId)
     setCommentText('')
   }
 
@@ -305,7 +362,7 @@ const Moments = () => {
                           <div 
                             key={comment.id} 
                             className="text-sm leading-relaxed cursor-pointer hover:bg-gray-50 -mx-2 px-2 py-1 rounded transition-colors"
-                            onClick={() => handleReplyComment(moment.id, comment.userName)}
+                            onClick={() => handleReplyComment(moment.id, comment.userName, comment.userId)}
                           >
                             <span className="text-blue-600 font-medium">{comment.userName}：</span>
                             <span className="text-gray-700">{comment.content}</span>

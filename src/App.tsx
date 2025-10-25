@@ -32,8 +32,17 @@ import Layout from './components/Layout'
 import MomentsSocialManager from './components/MomentsSocialManager'
 import ErrorBoundary from './components/ErrorBoundary'
 import OfflineIndicator from './components/OfflineIndicator'
-import { ChatListSkeleton } from './components/Skeleton'
 import { initPerformanceMonitor } from './utils/performance'
+
+// 通用加载组件
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+      <p className="text-gray-600">加载中...</p>
+    </div>
+  </div>
+)
 
 // 核心页面 - 直接导入（首屏需要）
 import ChatList from './pages/ChatList'
@@ -41,15 +50,29 @@ import Contacts from './pages/Contacts'
 import Discover from './pages/Discover'
 import Me from './pages/Me'
 
-// 高频页面 - 懒加载但优先级高
-const ChatDetail = lazy(() => import('./pages/ChatDetail'))
-const Moments = lazy(() => import('./pages/Moments'))
-const Settings = lazy(() => import('./pages/Settings'))
+// 懒加载重试函数
+const lazyWithRetry = (componentImport: () => Promise<any>) => {
+  return lazy(() => 
+    componentImport().catch((error) => {
+      console.error('懒加载失败，尝试重新加载:', error)
+      // 重试一次
+      return componentImport().catch((retryError) => {
+        console.error('重试失败:', retryError)
+        throw retryError
+      })
+    })
+  )
+}
 
-// 中频页面 - 懒加载
+// 高频页面 - 懒加载但优先级高
+const ChatDetail = lazyWithRetry(() => import('./pages/ChatDetail'))
+const Moments = lazyWithRetry(() => import('./pages/Moments'))
+const Settings = lazyWithRetry(() => import('./pages/Settings'))
+
+// 中频页面 - 懒加载（关键页面使用重试）
 const Profile = lazy(() => import('./pages/Profile'))
 const ChatSettings = lazy(() => import('./pages/ChatSettings'))
-const CreateCharacter = lazy(() => import('./pages/CreateCharacter'))
+const CreateCharacter = lazyWithRetry(() => import('./pages/CreateCharacter'))
 const EditCharacter = lazy(() => import('./pages/EditCharacter'))
 const CharacterDetail = lazy(() => import('./pages/CharacterDetail'))
 
@@ -107,6 +130,7 @@ const CoupleSpace = lazy(() => import('./pages/CoupleSpace'))
 const CoupleAlbum = lazy(() => import('./pages/CoupleAlbum'))
 const CoupleAnniversary = lazy(() => import('./pages/CoupleAnniversary'))
 const CoupleMessageBoard = lazy(() => import('./pages/CoupleMessageBoard'))
+const CalendarView = lazy(() => import('./pages/CalendarView'))
 
 // 表情包和自定义
 const MemesLibrary = lazy(() => import('./pages/MemesLibrary'))
@@ -154,9 +178,11 @@ const DynamicIslandWrapper = () => {
 
 // 加载包装器组件
 const PageWrapper = ({ children }: { children: React.ReactNode }) => (
-  <Suspense fallback={<ChatListSkeleton />}>
-    {children}
-  </Suspense>
+  <ErrorBoundary>
+    <Suspense fallback={<LoadingFallback />}>
+      {children}
+    </Suspense>
+  </ErrorBoundary>
 )
 
 function App() {
@@ -241,8 +267,8 @@ function App() {
                             <MusicPlayerProvider>
                               <Router>
                                 <OfflineIndicator />
-                                <MomentsSocialManager />
                                 <DynamicIslandWrapper />
+                                <MomentsSocialManager>
                                 <Routes>
                                   <Route path="/wechat" element={<Layout />}>
                                     <Route index element={<ChatList />} />
@@ -298,6 +324,7 @@ function App() {
                                   <Route path="/couple-album" element={<PageWrapper><CoupleAlbum /></PageWrapper>} />
                                   <Route path="/couple-anniversary" element={<PageWrapper><CoupleAnniversary /></PageWrapper>} />
                                   <Route path="/couple-message-board" element={<PageWrapper><CoupleMessageBoard /></PageWrapper>} />
+                                  <Route path="/calendar" element={<PageWrapper><CalendarView /></PageWrapper>} />
                                   <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
                                   <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
                                   <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />
@@ -317,6 +344,7 @@ function App() {
                                   <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
                                   <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
                                 </Routes>
+                                </MomentsSocialManager>
                               </Router>
                             </MusicPlayerProvider>
                           </GroupRedEnvelopeProvider>

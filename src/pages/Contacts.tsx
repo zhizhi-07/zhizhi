@@ -13,7 +13,7 @@ const Contacts = () => {
   const { showStatusBar } = useSettings()
 
   const specialContacts = [
-    { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/wechat/create-character' },
+    { id: 1, name: '创建角色', Icon: NewFriendIcon, path: '/create-character' },
     { id: 2, name: '群聊', Icon: GroupIcon, path: '/group-list' },
     { id: 3, name: '标签', Icon: TagIcon, path: '' },
   ]
@@ -40,7 +40,7 @@ const Contacts = () => {
             <SearchIcon size={22} />
           </button>
           <button 
-            onClick={() => navigate('/wechat/create-character')}
+            onClick={() => navigate('/create-character')}
             className="ios-button text-gray-700 hover:text-gray-900 cursor-pointer"
           >
             <AddIcon size={22} />

@@ -1,0 +1,47 @@
+=== 需要在ChatDetail.tsx中修复和添加的代码 ===
+
+1. 在第4460行附近，找到 ChatMenu 组件调用，修改为：
+
+<ChatMenu
+  onClose={() => setShowMenu(false)}
+  onSelectImage={handleSelectImage}
+  onSelectCamera={handleSelectCamera}
+  onSelectRedPacket={() => {
+    setShowMenu(false)
+    setShowRedEnvelopeSender(true)
+  }}
+  onSelectTransfer={() => {
+    setShowMenu(false)
+    setShowTransferSender(true)
+  }}
+  onSelectIntimatePay={() => {
+    setShowMenu(false)
+    setShowIntimatePaySender(true)
+  }}
+  onSelectCoupleSpaceInvite={() => {
+    setShowMenu(false)
+    setShowCoupleSpaceInviteSender(true)
+  }}
+  onSelectCoupleSpaceContent={handleOpenCoupleSpaceContent}  // 新增
+  onSelectLocation={handleSelectLocation}
+  onSelectVoiceMessage={handleSelectVoice}
+  onSelectVoiceCall={() => {
+    setShowMenu(false)
+    setIsVideoCall(false)
+    setCallStartTime(Date.now())
+    setShowCallScreen(true)
+  }}
+  onSelectVideoCall={() => {
+    setShowMenu(false)
+    setIsVideoCall(true)
+    setCallStartTime(Date.now())
+    setShowCallScreen(true)
+  }}
+  hasCoupleSpace={hasCoupleSpaceActive}  // 新增
+/>
+
+2. 在文件末尾return语句之前（大约第5100行），添加情侣空间内容创建弹窗UI（完整代码见文档）
+
+3. 确保所有状态变量和处理函数已添加（handleOpenCoupleSpaceContent, handleSendCouplePhoto, handleSendCoupleMessage, handleSendAnniversary）
+
+这些函数已经在第1295-1381行添加好了。

@@ -15,6 +15,7 @@ import { useGroupRedEnvelope } from '../context/GroupRedEnvelopeContext'
 import { parseAIEmojiResponse } from '../utils/emojiParser'
 import { getEmojis, Emoji } from '../utils/emojiStorage'
 import EmojiPanel from '../components/EmojiPanel'
+import { generateGroupAIChat } from '../utils/groupAIChat'
 
 interface GroupMessage {
   id: number
@@ -76,6 +77,87 @@ const GroupChatDetail = () => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // 🤖 AI自由对话系统
+  useEffect(() => {
+    if (!id || !group || isAiTyping) return
+
+    // 检查是否开启AI自由对话
+    const aiChatEnabled = localStorage.getItem(`group_ai_chat_enabled_${id}`) === 'true'
+    if (!aiChatEnabled) return
+
+    // 获取对话间隔（秒）
+    const intervalSeconds = parseInt(localStorage.getItem(`group_ai_chat_interval_${id}`) || '30')
+    const intervalMs = intervalSeconds * 1000
+
+    console.log(`🤖 AI自由对话已启用，间隔: ${intervalSeconds}秒`)
+
+    const timer = setInterval(async () => {
+      // 再次检查是否还开启（用户可能关闭了）
+      const stillEnabled = localStorage.getItem(`group_ai_chat_enabled_${id}`) === 'true'
+      if (!stillEnabled || isAiTyping) return
+
+      try {
+        setIsAiTyping(true)
+        console.log('🤖 触发AI自由对话...')
+
+        // 准备AI成员数据
+        const characterDescriptions = new Map<string, string>()
+        group.members
+          .filter(m => m.type === 'character')
+          .forEach(m => {
+            const char = getCharacter(m.id)
+            if (char) {
+              characterDescriptions.set(m.id, char.description || '')
+            }
+          })
+
+        // 调用AI决定是否发言
+        const result = await generateGroupAIChat(
+          id,
+          group.members,
+          messages,
+          characterDescriptions
+        )
+
+        if (result && result.shouldSpeak) {
+          // 找到发言的角色
+          const speaker = group.members.find(m => m.id === result.speakerId)
+          if (speaker) {
+            // 添加AI消息
+            const aiMessage: GroupMessage = {
+              id: Date.now(),
+              groupId: id,
+              senderId: speaker.id,
+              senderType: 'character',
+              senderName: speaker.name,
+              senderAvatar: speaker.avatar,
+              content: result.content,
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now(),
+              messageType: 'text'
+            }
+
+            setMessages(prev => [...prev, aiMessage])
+            updateGroupLastMessage(result.content)
+            console.log(`💬 ${speaker.name}: ${result.content}`)
+          }
+        }
+      } catch (error) {
+        console.error('❌ AI自由对话失败:', error)
+      } finally {
+        setIsAiTyping(false)
+      }
+    }, intervalMs)
+
+    return () => {
+      clearInterval(timer)
+      console.log('🤖 AI自由对话定时器已清理')
+    }
+  }, [id, group, messages, isAiTyping, getCharacter, updateGroup])
 
   // 更新群聊最后消息
   const updateGroupLastMessage = (content: string) => {
@@ -235,9 +317,22 @@ const GroupChatDetail = () => {
   const handleSelectEmoji = async (emoji: Emoji) => {
     if (!group || !id) return
 
-    // 获取所有表情包，找到当前表情包的索引
-    const allEmojis = await getEmojis()
-    const index = allEmojis.findIndex(e => e.url === emoji.url)
+    // 获取所有表情包，找到当前表情包的索引（带超时保护）
+    let allEmojis: Emoji[] = []
+    let index = -1
+    try {
+      allEmojis = await Promise.race([
+        getEmojis(),
+        new Promise<Emoji[]>((_, reject) => 
+          setTimeout(() => reject(new Error('获取表情包超时')), 1000)
+        )
+      ])
+      index = allEmojis.findIndex(e => e.url === emoji.url)
+    } catch (error) {
+      console.error('获取表情包失败:', error)
+      // 失败时使用一个临时索引
+      index = Date.now() % 1000
+    }
 
     const emojiMessage: GroupMessage = {
       id: Date.now(),
@@ -261,9 +356,13 @@ const GroupChatDetail = () => {
     setShowEmojiPanel(false)
   }
 
-  // 发送消息（不自动触发AI回复）
+  // 发送消息（自动触发AI回复）
   const handleSend = async () => {
-    if (!inputValue.trim() || !group || !id) return
+    console.log('📤 handleSend 被调用')
+    if (!inputValue.trim() || !group || !id) {
+      console.log('❌ 条件不满足:', { inputValue: inputValue.trim(), group: !!group, id })
+      return
+    }
 
     const userMessage: GroupMessage = {
       id: Date.now(),
@@ -281,11 +380,27 @@ const GroupChatDetail = () => {
       messageType: 'text'
     }
 
+    console.log('💬 用户消息:', userMessage.content)
     setMessages(prev => [...prev, userMessage])
     updateGroupLastMessage(userMessage.content)
     setInputValue('')
 
-    // 不自动触发AI回复，需要用户点击纸飞机按钮
+    // 延迟2秒后触发AI回复（让用户看到自己的消息）
+    console.log('⏰ 设置2秒延迟触发AI回复')
+    setTimeout(async () => {
+      console.log('🎯 延迟结束，开始处理AI回复')
+      try {
+        // 先让AI抢红包
+        console.log('🧧 检查红包...')
+        await handleAiGrabRedEnvelopes()
+        console.log('💬 开始AI回复...')
+        // 然后AI回复消息
+        await handleAiReplies(userMessage)
+        console.log('✅ AI回复处理完成')
+      } catch (error) {
+        console.error('❌ AI回复出错:', error)
+      }
+    }, 2000)
   }
 
   // 发送红包
@@ -447,17 +562,23 @@ const GroupChatDetail = () => {
 
   // AI全员参与对话逻辑 - 一次API调用获取所有回复
   const handleAiReplies = async (userMessage: GroupMessage) => {
-    if (!group) return
+    console.log('🤖 handleAiReplies 被调用，用户消息:', userMessage.content)
+    if (!group) {
+      console.log('❌ 没有群聊信息')
+      return
+    }
 
     setIsAiTyping(true)
+    console.log('⌨️ 设置AI输入中状态')
 
     try {
       // 获取所有AI成员
       const aiMembers = group.members.filter(m => m.type === 'character')
+      console.log('👥 AI成员数量:', aiMembers.length, '成员:', aiMembers.map(m => m.name))
       
       // 如果没有AI成员，直接返回
       if (aiMembers.length === 0) {
-        console.log('群聊中没有AI成员')
+        console.log('❌ 群聊中没有AI成员')
         return
       }
       
@@ -502,15 +623,19 @@ const GroupChatDetail = () => {
       }
 
       // 构建群聊提示词
+      console.log('📝 开始构建群聊提示词...')
       const groupPrompt = await buildGroupChatPromptForAll(
         aiMembersInfo,
         group,
         contextMessages,
         userMessage.content
       )
+      console.log('✅ 提示词构建完成，长度:', groupPrompt.length)
 
       try {
+        console.log('🌐 调用AI API...')
         const aiResponse = await callAI(groupPrompt)
+        console.log('✅ AI响应成功，长度:', aiResponse?.length || 0)
         
         if (aiResponse) {
           // 解析AI返回的多个角色回复
@@ -550,8 +675,21 @@ const GroupChatDetail = () => {
             // 检查是否有分段消息（用 | 分隔）
             const messageParts = reply.content.split('|').map(part => part.trim()).filter(part => part)
             
-            // 获取表情包列表
-            const availableEmojis = await getEmojis()
+            // 获取表情包列表（带超时保护）
+            let availableEmojis: Emoji[] = []
+            try {
+              console.log('  📦 尝试获取表情包...')
+              availableEmojis = await Promise.race([
+                getEmojis(),
+                new Promise<Emoji[]>((_, reject) => 
+                  setTimeout(() => reject(new Error('获取表情包超时')), 1000)
+                )
+              ])
+              console.log('  ✅ 表情包获取成功')
+            } catch (error) {
+              console.log('  ⚠️ 表情包获取失败，跳过表情包功能:', error)
+              availableEmojis = []
+            }
             
             // 如果有多条消息，依次发送
             for (let j = 0; j < messageParts.length; j++) {
@@ -650,23 +788,43 @@ const GroupChatDetail = () => {
     contextMessages: string,
     userMessage: string
   ) => {
+    console.log('🔧 buildGroupChatPromptForAll 函数开始')
+    console.log('  AI成员信息:', aiMembersInfo.length, '个')
+    
     const membersDescription = aiMembersInfo.map((member, index) => 
       `【角色${index + 1}：${member.name}】
 性格特点：${member.description || member.signature || '一个AI角色'}
 说话风格：根据上述性格，用符合角色特点的语气、用词、表情来回复
 `
     ).join('\n')
+    console.log('  ✅ 成员描述构建完成')
 
     // 添加群公告信息
     const announcementInfo = group.description 
       ? `\n【群公告】\n${group.description}\n` 
       : ''
+    console.log('  ✅ 群公告信息处理完成')
 
-    // 获取表情包列表
-    const availableEmojis = await getEmojis()
-    const emojiList = availableEmojis.length > 0
-      ? `\n【可用表情包】\n${availableEmojis.map((emoji, index) => `[${index}] ${emoji.description}`).join('\n')}\n使用方式：在回复中写 [表情包:数字]，例如 [表情包:0]\n`
-      : ''
+    // 获取表情包列表 - 带超时保护（3秒超时）
+    console.log('  📦 开始获取表情包列表...')
+    let emojiList = ''
+    try {
+      const availableEmojis = await Promise.race([
+        getEmojis(),
+        new Promise<Emoji[]>((_, reject) => 
+          setTimeout(() => reject(new Error('表情包获取超时')), 3000)
+        )
+      ])
+      console.log('  ✅ 表情包获取成功:', availableEmojis.length, '个')
+      emojiList = availableEmojis.length > 0
+        ? `\n【可用表情包】\n${availableEmojis.map((emoji, index) => `[${index}] ${emoji.description}`).join('\n')}\n使用方式：在回复中写 [表情包:数字]，例如 [表情包:0]\n`
+        : ''
+      console.log('  ✅ 表情包列表构建完成')
+    } catch (error) {
+      console.error('  ⚠️ 表情包获取失败，继续构建提示词:', error)
+      emojiList = ''
+    }
+    console.log('🎯 准备返回提示词')
 
     return `# 角色
 你是一个模拟真实群聊的"AI导演"。你的唯一任务是基于群聊的上下文和每个成员的"人设"，决定【谁】应该回复、【回复什么】以及【是否分段】。

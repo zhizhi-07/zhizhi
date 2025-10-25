@@ -8,10 +8,12 @@ interface ChatMenuProps {
   onSelectTransfer: () => void
   onSelectIntimatePay: () => void
   onSelectCoupleSpaceInvite: () => void
+  onSelectCoupleSpaceContent: () => void
   onSelectLocation: () => void
   onSelectVoiceMessage: () => void
   onSelectVoiceCall: () => void
   onSelectVideoCall: () => void
+  hasCoupleSpace?: boolean
 }
 
 const ChatMenu = ({
@@ -22,18 +24,36 @@ const ChatMenu = ({
   onSelectTransfer,
   onSelectIntimatePay,
   onSelectCoupleSpaceInvite,
+  onSelectCoupleSpaceContent,
   onSelectLocation,
   onSelectVoiceMessage,
   onSelectVoiceCall,
-  onSelectVideoCall
+  onSelectVideoCall,
+  hasCoupleSpace
 }: ChatMenuProps) => {
+  console.log('📱 ChatMenu 渲染', { hasCoupleSpace })
+  
   const menuItems = [
     { id: 'image', label: '相册', Icon: ImageIcon, onClick: onSelectImage },
     { id: 'camera', label: '拍摄', Icon: CameraIcon, onClick: onSelectCamera },
     { id: 'redpacket', label: '红包', Icon: RedPacketIcon, onClick: onSelectRedPacket },
     { id: 'transfer', label: '转账', Icon: TransferIcon, onClick: onSelectTransfer },
     { id: 'intimate-pay', label: '亲密付', Icon: IntimatePayIcon, onClick: onSelectIntimatePay },
-    { id: 'couple-space', label: '情侣空间', Icon: CoupleSpaceIcon, onClick: onSelectCoupleSpaceInvite },
+    { 
+      id: 'couple-space', 
+      label: hasCoupleSpace ? '情侣空间' : '情侣空间',
+      Icon: CoupleSpaceIcon, 
+      onClick: () => {
+        console.log('🔘 情侣空间按钮点击', { hasCoupleSpace })
+        if (hasCoupleSpace) {
+          console.log('➡️ 调用 onSelectCoupleSpaceContent')
+          onSelectCoupleSpaceContent()
+        } else {
+          console.log('➡️ 调用 onSelectCoupleSpaceInvite')
+          onSelectCoupleSpaceInvite()
+        }
+      }
+    },
     { id: 'voice-msg', label: '语音', Icon: MicIcon, onClick: onSelectVoiceMessage },
     { id: 'voice', label: '语音通话', Icon: PhoneIcon, onClick: onSelectVoiceCall },
     { id: 'video', label: '视频通话', Icon: VideoIcon, onClick: onSelectVideoCall },
@@ -58,7 +78,9 @@ const ChatMenu = ({
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    console.log('🔘 菜单按钮点击:', item.id)
                     item.onClick()
                     onClose()
                   }}

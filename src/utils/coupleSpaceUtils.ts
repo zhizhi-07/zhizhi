@@ -13,6 +13,7 @@ export interface CoupleSpaceRelation {
 }
 
 const STORAGE_KEY = 'couple_space_relation'
+const PRIVACY_KEY = 'couple_space_privacy' // 'public' | 'private'
 
 // 获取当前情侣空间关系
 export const getCoupleSpaceRelation = (): CoupleSpaceRelation | null => {
@@ -136,7 +137,15 @@ export const endCoupleSpaceRelation = (): boolean => {
 // 检查是否有与指定角色的活跃情侣空间
 export const hasActiveCoupleSpace = (characterId: string): boolean => {
   const relation = getCoupleSpaceRelation()
-  return !!(relation && relation.characterId === characterId && relation.status === 'active')
+  const isActive = !!(relation && relation.characterId === characterId && relation.status === 'active')
+  console.log('🔍 hasActiveCoupleSpace检查:', { 
+    characterId, 
+    relation, 
+    isActive,
+    relationCharId: relation?.characterId,
+    relationStatus: relation?.status
+  })
+  return isActive
 }
 
 // 检查是否有待处理的邀请
@@ -149,4 +158,41 @@ export const hasPendingInvite = (characterId?: string): boolean => {
   }
   
   return true
+}
+
+// 设置情侣空间隐私模式
+export const setCoupleSpacePrivacy = (mode: 'public' | 'private'): void => {
+  localStorage.setItem(PRIVACY_KEY, mode)
+  console.log('💑 情侣空间隐私设置已更新:', mode === 'public' ? '公开' : '私密')
+}
+
+// 获取情侣空间隐私模式
+export const getCoupleSpacePrivacy = (): 'public' | 'private' => {
+  const saved = localStorage.getItem(PRIVACY_KEY)
+  return (saved === 'private' ? 'private' : 'public') as 'public' | 'private'
+}
+
+// 检查是否可以向某人发送情侣空间邀请（考虑隐私设置）
+export const canSendCoupleSpaceInvite = (): boolean => {
+  const relation = getCoupleSpaceRelation()
+  
+  // 如果没有情侣空间关系，可以发送
+  if (!relation) return true
+  
+  // 如果有pending、active或rejected状态的关系，不能发送
+  if (relation.status === 'pending' || relation.status === 'active' || relation.status === 'rejected') {
+    return false
+  }
+  
+  return true
+}
+
+// 检查对方是否公开了情侣空间状态（用于AI判断是否显示"对方已有情侣空间"）
+// 注意：这个函数只能检查当前用户的设置，AI的设置由AI自己管理
+export const isUserCoupleSpacePublic = (): boolean => {
+  const relation = getCoupleSpaceRelation()
+  if (!relation || relation.status === 'ended') return false
+  
+  const privacy = getCoupleSpacePrivacy()
+  return privacy === 'public'
 }

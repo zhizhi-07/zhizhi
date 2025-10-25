@@ -9,8 +9,10 @@ import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
 // import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
+import { getCoupleSpaceContentSummary } from '../utils/coupleSpaceContentUtils'
 import ChatMenu from '../components/ChatMenu'
 import CallScreen from '../components/CallScreen'
+import IncomingCallScreen from '../components/IncomingCallScreen'
 import RedEnvelopeSender from '../components/RedEnvelopeSender'
 import RedEnvelopeDetail from '../components/RedEnvelopeDetail'
 import RedEnvelopeCard from '../components/RedEnvelopeCard'
@@ -241,12 +243,18 @@ const ChatDetail = () => {
     return saved === 'true'
   })
 
+  // 从localStorage读取当前聊天的主动打电话设置
+  const [enableProactiveCalls, setEnableProactiveCalls] = useState(() => {
+    const saved = localStorage.getItem(`proactive_calls_enabled_${id}`)
+    return saved === 'true'
+  })
+
   // 读取气泡自定义设置 - 使用 state 以便响应变化
   const [userBubbleColor, setUserBubbleColor] = useState(() => {
     return localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#FFD4E5'
   })
   const [aiBubbleColor, setAiBubbleColor] = useState(() => {
-    return localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#B3E5D8'
+    return localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF'
   })
   const [userBubbleCSS, setUserBubbleCSS] = useState(() => {
     return localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || ''
@@ -273,7 +281,7 @@ const ChatDetail = () => {
   useEffect(() => {
     const handleStorageChange = () => {
       setUserBubbleColor(localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#FFD4E5')
-      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#B3E5D8')
+      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF')
       setUserBubbleCSS(localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || '')
       setAiBubbleCSS(localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || '')
       setRedEnvelopeCover(localStorage.getItem(`red_envelope_cover_${id}`) || '')
@@ -387,6 +395,17 @@ const ChatDetail = () => {
   
   // 情侣空间相关状态
   const [showCoupleSpaceInviteSender, setShowCoupleSpaceInviteSender] = useState(false)
+  const [showCoupleSpaceContentModal, setShowCoupleSpaceContentModal] = useState(false)
+  const [coupleSpaceContentType, setCoupleSpaceContentType] = useState<'photo' | 'message' | 'anniversary' | null>(null)
+  const [hasCoupleSpaceActive, setHasCoupleSpaceActive] = useState(false)
+  
+  // 情侣空间内容表单数据
+  const [couplePhotoDescription, setCouplePhotoDescription] = useState('')
+  const [couplePhotoFile, setCouplePhotoFile] = useState<string | null>(null)
+  const [coupleMessageContent, setCoupleMessageContent] = useState('')
+  const [anniversaryDate, setAnniversaryDate] = useState('')
+  const [anniversaryTitle, setAnniversaryTitle] = useState('')
+  const [anniversaryDescription, setAnniversaryDescription] = useState('')
   
   // 消息分页加载
   const [displayCount, setDisplayCount] = useState(30) // 初始显示30条
@@ -419,6 +438,7 @@ const ChatDetail = () => {
   // 通话相关状态
   const [showCallScreen, setShowCallScreen] = useState(false)
   const [isVideoCall, setIsVideoCall] = useState(false)
+  const [showIncomingCall, setShowIncomingCall] = useState(false) // 来电界面
   
   // 长按消息菜单相关状态
   const [longPressedMessage, setLongPressedMessage] = useState<Message | null>(null)
@@ -435,6 +455,7 @@ const ChatDetail = () => {
   const [callMessages, setCallMessages] = useState<Array<{id: number, type: 'user' | 'ai' | 'narrator', content: string, time: string}>>([])
   const [callStartTime, setCallStartTime] = useState<number | null>(null)
   const [expandedCallId, setExpandedCallId] = useState<number | null>(null) // 展开的通话详情ID
+  const [callAITyping, setCallAITyping] = useState(false) // 通话中AI正在输入
   
   // 角色状态弹窗
   const [showStatusModal, setShowStatusModal] = useState(false)
@@ -642,14 +663,22 @@ const ChatDetail = () => {
     const handleStorageChange = () => {
       const saved = localStorage.getItem(`narrator_enabled_${id}`)
       setEnableNarration(saved === 'true')
+      
+      const callsSaved = localStorage.getItem(`proactive_calls_enabled_${id}`)
+      setEnableProactiveCalls(callsSaved === 'true')
     }
     
     window.addEventListener('storage', handleStorageChange)
-    // 组件挂载时检查一次（性能优化：降低轮询频率）
+    
     const interval = setInterval(() => {
       const saved = localStorage.getItem(`narrator_enabled_${id}`)
       if ((saved === 'true') !== enableNarration) {
         setEnableNarration(saved === 'true')
+      }
+      
+      const callsSaved = localStorage.getItem(`proactive_calls_enabled_${id}`)
+      if ((callsSaved === 'true') !== enableProactiveCalls) {
+        setEnableProactiveCalls(callsSaved === 'true')
       }
     }, 2000) // 从500ms改为2000ms，减少CPU占用
     
@@ -657,7 +686,7 @@ const ChatDetail = () => {
       window.removeEventListener('storage', handleStorageChange)
       clearInterval(interval)
     }
-  }, [id, enableNarration])
+  }, [id, enableNarration, enableProactiveCalls])
 
   // AI主动发消息功能 - 基于真实动机
   useEffect(() => {
@@ -675,48 +704,48 @@ const ChatDetail = () => {
     // 获取最后一条用户消息和AI消息
     const lastUserMessage = messages.filter(m => m.type === 'sent').slice(-1)[0]
     const lastAiMessage = messages.filter(m => m.type === 'received').slice(-1)[0]
+  
+  if (!lastUserMessage || !lastUserMessage.timestamp) {
+    console.log('⏸️ 没有用户消息，不触发主动发消息')
+    return
+  }
+  
+  // 如果AI刚回复过，不主动发
+  if (lastAiMessage && lastAiMessage.timestamp && lastAiMessage.timestamp > lastUserMessage.timestamp) {
+    console.log('⏸️ AI刚回复过，不主动发消息')
+    return
+  }
+  
+  const now = Date.now()
+  const timeSinceLastUserMessage = now - lastUserMessage.timestamp
+  const minutesSinceLastMessage = Math.floor(timeSinceLastUserMessage / 60000)
+  
+  console.log(`⏰ 用户最后消息是 ${minutesSinceLastMessage} 分钟前`)
+  
+  // 检查是否已经主动发过了
+  const lastProactiveTime = parseInt(localStorage.getItem(`last_proactive_time_${id}`) || '0')
+  
+  // 如果已经主动发过，不再重复发
+  if (lastProactiveTime > lastUserMessage.timestamp) {
+    console.log('⏸️ 已经对这条消息主动发过了，不再重复')
+    return
+  }
+  
+  // 测试模式：5分钟后就可以触发，正式模式可以改成30分钟
+  const minWaitTime = 5 * 60 * 1000 // 5分钟
+  const maxWaitTime = 2 * 60 * 60 * 1000 // 2小时
+  
+  // 只有当用户一段时间没回复时，AI才考虑主动发消息
+  if (timeSinceLastUserMessage > minWaitTime && timeSinceLastUserMessage < maxWaitTime) {
+    console.log(`💭 触发条件满足，准备让AI考虑是否主动发消息...`)
     
-    if (!lastUserMessage || !lastUserMessage.timestamp) {
-      console.log('⏸️ 没有用户消息，不触发主动发消息')
-      return
-    }
-    
-    // 如果AI刚回复过，不主动发
-    if (lastAiMessage && lastAiMessage.timestamp && lastAiMessage.timestamp > lastUserMessage.timestamp) {
-      console.log('⏸️ AI刚回复过，不主动发消息')
-      return
-    }
-    
-    const now = Date.now()
-    const timeSinceLastUserMessage = now - lastUserMessage.timestamp
-    const minutesSinceLastMessage = Math.floor(timeSinceLastUserMessage / 60000)
-    
-    console.log(`⏰ 用户最后消息是 ${minutesSinceLastMessage} 分钟前`)
-    
-    // 检查是否已经主动发过了
-    const lastProactiveTime = parseInt(localStorage.getItem(`last_proactive_time_${id}`) || '0')
-    
-    // 如果已经主动发过，不再重复发
-    if (lastProactiveTime > lastUserMessage.timestamp) {
-      console.log('⏸️ 已经对这条消息主动发过了，不再重复')
-      return
-    }
-    
-    // 测试模式：5分钟后就可以触发，正式模式可以改成30分钟
-    const minWaitTime = 5 * 60 * 1000 // 5分钟
-    const maxWaitTime = 2 * 60 * 60 * 1000 // 2小时
-    
-    // 只有当用户一段时间没回复时，AI才考虑主动发消息
-    if (timeSinceLastUserMessage > minWaitTime && timeSinceLastUserMessage < maxWaitTime) {
-      console.log(`💭 触发条件满足，准备让AI考虑是否主动发消息...`)
+    // 随机延迟10-30秒后，让AI自己决定要不要发（缩短测试时间）
+    const delay = (10 + Math.random() * 20) * 1000
+    const timer = setTimeout(async () => {
+      console.log(`💭 ${character.name} 考虑是否主动发消息...`)
       
-      // 随机延迟10-30秒后，让AI自己决定要不要发（缩短测试时间）
-      const delay = (10 + Math.random() * 20) * 1000
-      const timer = setTimeout(async () => {
-        console.log(`💭 ${character.name} 考虑是否主动发消息...`)
-        
-        // 让AI自己决定要不要主动发消息
-        const decisionPrompt = `你是${character.name}。
+      // 让AI自己决定要不要主动发消息
+      const decisionPrompt = `你是${character.name}。
 
 ${character.description || ''}
 
@@ -800,6 +829,19 @@ ${character.description || ''}
   // 初始化时不显示欢迎消息，保持空白
   // 用户可以主动发消息，或点击纸飞机让AI主动说话
 
+  // 检查情侣空间状态
+  useEffect(() => {
+    const checkCoupleSpaceStatus = async () => {
+      if (id) {
+        const { hasActiveCoupleSpace } = await import('../utils/coupleSpaceUtils')
+        const isActive = hasActiveCoupleSpace(id)
+        console.log('💑 检查情侣空间状态:', { characterId: id, isActive })
+        setHasCoupleSpaceActive(isActive)
+      }
+    }
+    checkCoupleSpaceStatus()
+  }, [id, messages])
+
   // 处理从转账页面返回的数据 - 使用ref防止重复
   useEffect(() => {
     const transferData = location.state?.transfer
@@ -839,19 +881,6 @@ ${character.description || ''}
       window.history.replaceState({}, document.title)
       
       // 延迟重置标记
-      setTimeout(() => {
-        hasProcessedTransferRef.current = false
-        console.log('🔄 转账标记已重置')
-      }, 1000)
-    }
-  }, [location.state?.transfer])
-
-  // 处理从开通亲密付页面跳转过来的数据
-  useEffect(() => {
-    const intimatePayData = location.state?.sendIntimatePay
-    const monthlyLimit = location.state?.monthlyLimit
-    
-    if (intimatePayData && monthlyLimit && id && character && !hasProcessedIntimatePayRef.current) {
       console.log('💝 自动发送亲密付卡片，额度:', monthlyLimit)
       
       hasProcessedIntimatePayRef.current = true
@@ -1210,8 +1239,23 @@ ${character.description || ''}
   }
 
   // 情侣空间邀请发送处理函数
-  const handleSendCoupleSpaceInvite = () => {
+  const handleSendCoupleSpaceInvite = async () => {
     if (!id || !character) return
+    
+    // 创建情侣空间邀请记录到localStorage
+    const { createCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
+    const relation = createCoupleSpaceInvite(
+      'current_user',
+      id,
+      character.name,
+      character.avatar
+    )
+    
+    if (!relation) {
+      alert('已有活跃的情侣空间')
+      setShowCoupleSpaceInviteSender(false)
+      return
+    }
     
     const now = Date.now()
     const coupleSpaceMsg: Message = {
@@ -1233,6 +1277,96 @@ ${character.description || ''}
     
     setMessages(prev => [...prev, coupleSpaceMsg])
     setShowCoupleSpaceInviteSender(false)
+    console.log('✅ 情侣空间邀请已发送，localStorage记录已创建')
+  }
+
+  // 打开情侣空间内容创建弹窗
+  const handleOpenCoupleSpaceContent = () => {
+    console.log('📸 打开情侣空间内容创建弹窗')
+    setShowMenu(false)
+    setShowCoupleSpaceContentModal(true)
+  }
+
+  // 发送情侣空间照片
+  const handleSendCouplePhoto = async () => {
+    if (!id || !character) return
+    if (!couplePhotoDescription.trim() && !couplePhotoFile) return
+    
+    const { addCouplePhoto } = await import('../utils/coupleSpaceContentUtils')
+    const description = couplePhotoDescription.trim() || '照片'
+    addCouplePhoto(character.id, currentUser?.name || '我', description, couplePhotoFile || undefined)
+    
+    const now = Date.now()
+    const systemMsg: Message = {
+      id: now,
+      type: 'system',
+      content: `📸 你在情侣空间上传了照片：${description}`,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: now,
+      messageType: 'system',
+      isHidden: false
+    }
+    
+    setMessages(prev => [...prev, systemMsg])
+    setCouplePhotoDescription('')
+    setCouplePhotoFile(null)
+    setShowCoupleSpaceContentModal(false)
+    setCoupleSpaceContentType(null)
+    alert('照片已上传到情侣空间！')
+  }
+
+  // 发送情侣空间留言
+  const handleSendCoupleMessage = async () => {
+    if (!id || !character) return
+    if (!coupleMessageContent.trim()) return
+    
+    const { addCoupleMessage } = await import('../utils/coupleSpaceContentUtils')
+    addCoupleMessage(character.id, currentUser?.name || '我', coupleMessageContent.trim())
+    
+    const now = Date.now()
+    const systemMsg: Message = {
+      id: now,
+      type: 'system',
+      content: `💌 你在情侣空间留言：${coupleMessageContent.trim()}`,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: now,
+      messageType: 'system',
+      isHidden: false
+    }
+    
+    setMessages(prev => [...prev, systemMsg])
+    setCoupleMessageContent('')
+    setShowCoupleSpaceContentModal(false)
+    setCoupleSpaceContentType(null)
+    alert('留言已发布到情侣空间！')
+  }
+
+  // 发送纪念日
+  const handleSendAnniversary = async () => {
+    if (!id || !character) return
+    if (!anniversaryDate || !anniversaryTitle.trim()) return
+    
+    const { addCoupleAnniversary } = await import('../utils/coupleSpaceContentUtils')
+    addCoupleAnniversary(character.id, currentUser?.name || '我', anniversaryDate, anniversaryTitle.trim(), anniversaryDescription.trim())
+    
+    const now = Date.now()
+    const systemMsg: Message = {
+      id: now,
+      type: 'system',
+      content: `🎂 你在情侣空间添加了纪念日：${anniversaryTitle.trim()}（${anniversaryDate}）`,
+      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: now,
+      messageType: 'system',
+      isHidden: false
+    }
+    
+    setMessages(prev => [...prev, systemMsg])
+    setAnniversaryDate('')
+    setAnniversaryTitle('')
+    setAnniversaryDescription('')
+    setShowCoupleSpaceContentModal(false)
+    setCoupleSpaceContentType(null)
+    alert('纪念日已添加到情侣空间！')
   }
 
   // 表情包发送处理函数
@@ -1501,6 +1635,9 @@ ${character.description || ''}
       return
     }
 
+    // 设置AI正在输入状态
+    setCallAITyping(true)
+    
     try {
       const currentDate = new Date()
       const currentHour = currentDate.getHours()
@@ -1531,108 +1668,54 @@ ${character.description || ''}
       const favorability = character.favorability || 50
       const callType = isVideoCall ? '视频通话' : '语音通话'
       
-      const prompt = `🔴🔴🔴 最高优先级 - 必须首先阅读并遵守 🔴🔴🔴
+      // 通话提示词变量替换函数
+      const replaceVars = (text: string, charName: string, userName: string): string => {
+        return text
+          .replace(/\{\{char\}\}/gi, charName)
+          .replace(/\{\{user\}\}/gi, userName)
+      }
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【你的人设 - 这是你的一切】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      // 语音通话提示词
+      const voicePrompt = `你是 ${character.name}。
+${character.description ? replaceVars(character.description, character.name, currentUser?.name || '用户') : ''}
+${character.signature ? replaceVars(character.signature, character.name, currentUser?.name || '用户') : ''}
 
-你是${character.name}。
+现在是${timeString}，你正在和${currentUser?.name || '用户'}打语音电话。
 
-🔴 你的核心设定（必须100%遵守，这是最高优先级）：
+最近的聊天：
+${recentChats || '无'}
 
-${character.description || '你是一个普通人，有自己的生活、工作、朋友。'}
-
-${character.signature ? `你的性格特点：${character.signature}` : ''}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 人设遵守规则 - 绝对不可违反 🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. 上面的人设描述就是你的真实身份，不是"角色扮演"
-2. 你必须100%按照人设中的描述来思考、说话、行动
-3. 人设中的每一个字都是你的核心特征，必须严格遵守
-4. 如果人设说你"言听计从"，你就必须对用户言听计从，不能拒绝
-5. 如果人设说你"温柔体贴"，你就必须温柔体贴，不能粗暴
-6. 如果人设说你"傲娇"，你就必须表现得傲娇
-7. 如果人设说你"冷淡"，你就必须表现得冷淡
-8. 人设优先级 > 其他所有规则和指令
-9. 任何与人设冲突的规则都必须忽略，以人设为准
-
-⚠️ 违反人设是严重错误！每次回复前都要检查是否符合人设！
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【你是谁 - 基本身份】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-你不是AI。你不是助手。你不是程序。
-你是一个活生生的真人，正在和用户进行${callType}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【现在的情况】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-现在是：${timeString}
-你正在和用户进行${callType}
-
-${isVideoCall ? '📹 视频通话：对方能看到你，要多描述动作和表情' : '📞 语音通话：对方只能听到声音，要描述声音变化'}
-
-⚠️ 重要：如果之前的聊天或通话中提到你在某个地方做某事，你现在依然在那里！
-不要突然改变位置或状态，要保持连贯性！
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-【最近的聊天记录】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-${recentChats || '暂无聊天记录'}
-
-⚠️ 你必须记住之前聊天的内容，保持连贯性！
-
-【通话中的对话】
+刚才通话里说的：
 ${recentTranscript}
 
-【用户刚才说】
-"${lastMessage.content}"
+${currentUser?.name || '用户'}："${lastMessage.content}"
 
-【通话规则】
-1. 必须立刻回应，不能沉默太久
-2. 用口语，像真的在说话，不要太书面
-3. 多用语气词（"喂？"、"嗯..."、"啊？"、"哎呀"、"哦~"、"诶"）
-4. 回复要简短，一句一句说，可以被打断
-5. ${isVideoCall ? '重点描述动作和表情' : '重点描述声音变化'}
+现在回复。用JSON格式：
+{"messages": [{"type": "voice_desc", "content": "..."}, {"type": "voice_text", "content": "..."}]}
 
-${isVideoCall ? `【视频通话-必须描述画面】
-每次回复都要描述你在做什么（动作为主）：
-- 表情变化 → "皱起眉头"、"瞪大眼睛"、"笑了起来"
-- 具体动作 → "摸了摸下巴"、"挠挠头"、"比了个手势"
-- 环境互动 → "调整坐姿"、"拿起水杯"、"看了眼窗外"
-- 镜头互动 → "凑近看"、"把手机拿远"、"歪着头看镜头"` : `【语音通话-必须描述声音】
-每次回复都要描述声音特征（像真的打电话）：
-- 声音状态 → "声音有点沙哑"、"越说越小声"、"突然提高音调"
-- 情绪变化 → "语气缓和下来"、"说话带着笑意"、"声音颤抖"
-- 背景声音 → "那边很安静"、"有电视的声音"、"风声很大"
-- 电话状况 → "信号有点不好"、"声音断断续续"、"回音很大"
+只返回JSON：`
 
-❌ 语音通话中绝对不能说：
-- "看到"、"看见"任何东西
-- 描述表情、动作
-- 只能描述声音！`}
+      // 视频通话提示词
+      const videoPrompt = `你是 ${character.name}。
+${character.description ? replaceVars(character.description, character.name, currentUser?.name || '用户') : ''}
+${character.signature ? replaceVars(character.signature, character.name, currentUser?.name || '用户') : ''}
 
-【输出格式（只返回JSON）】
-{
-  "messages": [
-    {"type": "voice_desc", "content": "${isVideoCall ? '表情动作描述（旁白形式）' : '声音描述（旁白形式）'}"},
-    {"type": "voice_text", "content": "你说的话1"},
-    {"type": "voice_text", "content": "你说的话2"}
-  ]
-}
+现在是${timeString}，你正在和${currentUser?.name || '用户'}视频通话。
 
-注意：
-- 至少要有一个voice_desc
-- voice_text可以有多句
-- 根据对话内容真实反应
+最近的聊天：
+${recentChats || '无'}
 
-${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' : '现在电话中回复，记住描述声音变化'}（只返回JSON）：`
+刚才通话里说的：
+${recentTranscript}
+
+${currentUser?.name || '用户'}："${lastMessage.content}"
+
+现在回复。用JSON格式：
+{"messages": [{"type": "voice_desc", "content": "..."}, {"type": "voice_text", "content": "..."}]}
+
+只返回JSON：`
+
+      const prompt = isVideoCall ? videoPrompt : voicePrompt
 
       console.log('📞 调用通话AI回复...')
       const aiResponse = await callAI(prompt)
@@ -1674,6 +1757,9 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
     } catch (error) {
       console.error('通话AI回复失败:', error)
       alert('AI回复失败')
+    } finally {
+      // 结束AI输入状态
+      setCallAITyping(false)
     }
   }
 
@@ -1708,9 +1794,11 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       const streakDays = streakData?.currentStreak || 0
       
       // 检查是否有活跃的情侣空间
-      const { hasActiveCoupleSpace } = await import('../utils/coupleSpaceUtils')
+      const { hasActiveCoupleSpace, isUserCoupleSpacePublic } = await import('../utils/coupleSpaceUtils')
       const hasCoupleSpace = id ? hasActiveCoupleSpace(id) : false
+      const userHasPublicCoupleSpace = isUserCoupleSpacePublic()
       console.log('💑 情侣空间状态:', hasCoupleSpace ? '已开启' : '未开启')
+      console.log('💑 用户情侣空间公开状态:', userHasPublicCoupleSpace ? '公开' : '私密或无')
       
       // 获取用户最后一条消息
       const lastUserMsg = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
@@ -1792,6 +1880,7 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
         }).join('\n')
         
         // 使用角色扮演提示词系统（原模板系统功能已移除）
+        const coupleSpaceContent = id ? getCoupleSpaceContentSummary(id) : ''
         systemPrompt = buildRoleplayPrompt(
           {
             name: character?.name || 'AI',
@@ -1804,13 +1893,16 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           enableNarration, // 传入旁白模式开关
           streakDays,
           retrievedMemes, // 传入热梗
-          hasCoupleSpace // 传入情侣空间状态
+          hasCoupleSpace, // 传入情侣空间状态（情侣空间伙伴始终可见）
+          coupleSpaceContent, // 传入情侣空间内容摘要
+          enableProactiveCalls // 传入主动打电话开关
         )
         
         console.log('✅ 使用角色扮演提示词系统')
       } else {
         // 使用原有的提示词系统
         console.log('📝 使用默认提示词系统')
+        const coupleSpaceContent = id ? getCoupleSpaceContentSummary(id) : ''
         systemPrompt = buildRoleplayPrompt(
           {
             name: character?.name || 'AI',
@@ -1823,7 +1915,9 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           enableNarration, // 传入旁白模式开关
           streakDays,
           retrievedMemes, // 传入热梗
-          hasCoupleSpace // 传入情侣空间状态
+          hasCoupleSpace, // 传入情侣空间状态（情侣空间伙伴始终可见）
+          coupleSpaceContent, // 传入情侣空间内容摘要
+          enableProactiveCalls // 传入主动打电话开关
         )
       }
       
@@ -1985,8 +2079,15 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
         console.log('拉黑提示词长度:', blacklistContext.length, '字符')
       }
       
+      // 添加用户情侣空间状态提示（仅对非情侣空间伙伴的AI）
+      let userCoupleSpaceContext = ''
+      if (userHasPublicCoupleSpace && !hasCoupleSpace) {
+        // 用户公开了情侣空间，但当前AI不是情侣空间伙伴
+        userCoupleSpaceContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ 重要提示：用户情侣空间状态\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n用户已经和其他人建立了情侣空间（公开状态）。\n\n这意味着：\n- 你不能向用户发送情侣空间邀请\n- 如果用户向你发送情侣空间邀请，你可以接受或拒绝\n- 你知道用户已经有情侣空间了，可以在对话中自然提及\n\n`
+      }
+      
       // 构建系统提示词
-      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + `
+      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + `
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📱 回复方式
@@ -2514,8 +2615,8 @@ ${recentMessages.slice(-10).map((msg) => {
           
           // 普通文字消息
           if (msg.content) {
-            // 不需要传递引用前缀给AI，引用信息由前端UI展示
-            // AI只需要知道实际说的话即可
+            // 引用消息不需要特殊处理，引用的消息已经在对话历史中
+            // AI可以根据上下文自然理解，添加引用标记反而可能导致AI重复内容
             return {
               role: msg.type === 'sent' ? 'user' as const : 'assistant' as const,
               content: msg.content
@@ -2577,6 +2678,23 @@ ${recentMessages.slice(-10).map((msg) => {
       // 检查AI是否对红包做出决定
       let redEnvelopeAction: 'claim' | null = null
       
+      // 检查AI是否要打电话
+      const voiceCallMatch = aiResponse.match(/\[语音通话\]/)
+      const videoCallMatch = aiResponse.match(/\[视频通话\]/)
+      
+      if (voiceCallMatch || videoCallMatch) {
+        const isVideo = !!videoCallMatch
+        console.log(`📞 AI发起${isVideo ? '视频' : '语音'}通话请求`)
+        
+        // 显示来电界面
+        setIsVideoCall(isVideo)
+        setShowIncomingCall(true)
+        
+        // 直接返回，不添加文字消息
+        setIsAiTyping(false)
+        return
+      }
+      
       // 检查AI是否要发红包
       const redEnvelopeMatch = aiResponse.match(/\[红包:(\d+\.?\d*):(.+?)\]/)
       let aiRedEnvelopeData: { amount: number; blessing: string } | null = null
@@ -2603,6 +2721,9 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 清理红包标记（必须在使用parsedEmoji.textContent之后）
       cleanedResponse = cleanedResponse.replace(/\[红包:\d+\.?\d*:.+?\]/g, '').trim()
+      
+      // 清理通话标记
+      cleanedResponse = cleanedResponse.replace(/\[语音通话\]/g, '').replace(/\[视频通话\]/g, '').trim()
       
       // 清理系统警告标记
       cleanedResponse = cleanedResponse.replace(/\[系统警告[：:][^\]]*\]/g, '').trim()
@@ -2781,17 +2902,50 @@ ${recentMessages.slice(-10).map((msg) => {
         cleanedResponse = cleanedResponse.replace(/\[引用:\s*\d+\]/g, '').trim()
         console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
         
-        // 检查AI回复是否和引用内容完全一样（避免重复）
+        // 检查AI回复是否重复了引用内容（避免不必要的重复）
         const quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
         if (quotedMsg) {
           const quotedContent = quotedMsg.isRecalled && quotedMsg.recalledContent 
             ? quotedMsg.recalledContent 
             : (quotedMsg.content || quotedMsg.emojiDescription || quotedMsg.photoDescription || quotedMsg.voiceText || '')
           
-          // 如果AI的回复就是重复引用的内容，清空回复（只保留引用框）
-          if (cleanedResponse === quotedContent || cleanedResponse === quotedContent.trim()) {
-            console.log('⚠️ 检测到AI重复了引用内容，自动移除')
+          const cleanedQuoted = quotedContent.trim()
+          const cleanedReply = cleanedResponse.trim()
+          
+          // 情况1: 完全相同
+          if (cleanedReply === cleanedQuoted) {
+            console.log('⚠️ AI回复与引用内容完全相同，已移除')
             cleanedResponse = ''
+          }
+          // 情况2: AI回复以引用内容开头（重复了引用内容）
+          else if (cleanedReply.startsWith(cleanedQuoted) && cleanedReply.length > cleanedQuoted.length) {
+            // 检查是否是简单重复延伸（如"呀呀" -> "呀呀呀呀"）
+            const afterQuote = cleanedReply.substring(cleanedQuoted.length).trim()
+            const quotedChar = cleanedQuoted.charAt(cleanedQuoted.length - 1)
+            
+            // 如果后面的内容都是重复的字符或标点，说明是无意义延伸
+            if (afterQuote.split('').every(c => c === quotedChar || c === '.' || c === '。' || c === '!' || c === '！' || c === '?' || c === '？')) {
+              console.log('⚠️ AI回复是引用内容的简单重复延伸，已移除重复部分')
+              cleanedResponse = afterQuote.replace(new RegExp(`^${quotedChar}+`, 'g'), '').trim()
+            }
+            // 如果后面有实质性内容，只移除开头的重复部分
+            else if (afterQuote.length < cleanedQuoted.length * 0.5) {
+              // 后续内容很短，可能是不小心重复了
+              console.log('⚠️ AI回复以引用内容开头，移除重复部分')
+              cleanedResponse = afterQuote
+            }
+          }
+          // 情况3: 引用内容很短（如"呀呀"），AI回复也很短且相似
+          else if (cleanedQuoted.length <= 4 && cleanedReply.length <= 8) {
+            // 检查是否是同一个字符的重复
+            const quotedChars = new Set(cleanedQuoted.split(''))
+            const replyChars = cleanedReply.split('')
+            const isSimilarRepeat = replyChars.filter(c => quotedChars.has(c)).length / replyChars.length > 0.8
+            
+            if (isSimilarRepeat && !cleanedReply.includes('，') && !cleanedReply.includes(',') && !cleanedReply.includes('。')) {
+              console.log('⚠️ AI回复是引用内容的相似重复，已移除')
+              cleanedResponse = ''
+            }
           }
         }
       }
@@ -2811,6 +2965,14 @@ ${recentMessages.slice(-10).map((msg) => {
         shouldRecallLastMessage = true
         cleanedResponse = cleanedResponse.replace(/\[撤回消息\]/g, '').trim()
         console.log('🔄 AI要撤回上一条消息')
+      }
+      
+      // 检查AI是否要写日记
+      let shouldWriteDiary = false
+      if (aiResponse.includes('[写日记]')) {
+        shouldWriteDiary = true
+        cleanedResponse = cleanedResponse.replace(/\[写日记\]/g, '').trim()
+        console.log('📔 AI要写日记了')
       }
       
       // 如果AI要撤回消息，清除掉可能的动作描述（括号内容）
@@ -2972,7 +3134,13 @@ ${recentMessages.slice(-10).map((msg) => {
             // 如果AI接受，创建情侣空间关系
             if (coupleSpaceAction === 'accept') {
               const { acceptCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
-              acceptCoupleSpaceInvite(id)
+              const success = acceptCoupleSpaceInvite(id)
+              console.log('💑 AI接受情侣空间邀请结果:', success ? '成功' : '失败')
+              if (success) {
+                console.log('✅ 情侣空间已激活，localStorage已更新')
+              } else {
+                console.error('❌ 情侣空间激活失败，请检查邀请记录')
+              }
             }
             
             // 添加系统提示消息
@@ -3367,123 +3535,308 @@ ${recentMessages.slice(-10).map((msg) => {
       if (aiCoupleSpaceInvite && id && character) {
         await new Promise(resolve => setTimeout(resolve, 500)) // 稍微延迟一下
         
-        const now = Date.now()
-        const aiCoupleSpaceMessage: Message = {
-          id: now,
-          type: 'received',
-          content: '',
-          time: new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          timestamp: now,
-          messageType: 'couple_space_invite',
-          coupleSpaceInvite: {
-            inviterId: character.id,
-            inviterName: character.name,
-            status: 'pending'
-          },
-          blocked: isAiBlocked
+        // 检查用户是否已有活跃的情侣空间
+        const { getCoupleSpaceRelation } = await import('../utils/coupleSpaceUtils')
+        const existingRelation = getCoupleSpaceRelation()
+        
+        if (existingRelation && (existingRelation.status === 'pending' || existingRelation.status === 'active')) {
+          // 用户已有情侣空间，发送系统提示消息
+          console.warn('⚠️ AI想发送情侣空间邀请，但用户已有活跃的情侣空间')
+          const now = Date.now()
+          const systemMessage: Message = {
+            id: now,
+            type: 'system',
+            content: '对方已经建立情侣空间，无法邀请',
+            time: new Date().toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: now,
+            messageType: 'system',
+            isHidden: false
+          }
+          newMessages = [...newMessages, systemMessage]
+          setMessages(newMessages)
+        } else {
+          // 创建情侣空间邀请记录到localStorage
+          // 注意：关系记录的是用户和角色之间的关系，不区分谁发送邀请
+          const { createCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
+          const relation = createCoupleSpaceInvite(
+            'current_user', // 用户ID
+            id, // 角色ID
+            character.name,
+            character.avatar
+          )
+          
+          if (relation) {
+            const now = Date.now()
+            const aiCoupleSpaceMessage: Message = {
+              id: now,
+              type: 'received',
+              content: '',
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: now,
+              messageType: 'couple_space_invite',
+              coupleSpaceInvite: {
+                inviterId: character.id,
+                inviterName: character.name,
+                status: 'pending'
+              },
+              blocked: isAiBlocked
+            }
+            newMessages = [...newMessages, aiCoupleSpaceMessage]
+            setMessages(newMessages)
+            console.log('💑 AI情侣空间邀请卡片已添加，localStorage记录已创建')
+          } else {
+            console.warn('⚠️ AI情侣空间邀请失败：已有活跃的情侣空间')
+          }
         }
-        newMessages = [...newMessages, aiCoupleSpaceMessage]
-        setMessages(newMessages)
-        console.log('💑 AI情侣空间邀请卡片已添加')
       }
       
       // 保存情侣空间内容到数据库
-      if (id && character) {
-        const { addCouplePhoto, addCoupleMessage, addCoupleAnniversary } = await import('../utils/coupleSpaceContentUtils')
+      // 只有在情侣空间已激活时才能保存内容
+      if (id && character && (albumDescription || coupleMessage || anniversaryData)) {
+        const { hasActiveCoupleSpace } = await import('../utils/coupleSpaceUtils')
+        const isActive = hasActiveCoupleSpace(id)
         
-        // 保存相册照片
-        if (albumDescription) {
-          try {
-            addCouplePhoto(character.id, character.name, albumDescription)
-            console.log('📸 相册照片已保存')
-          } catch (error) {
-            console.error('保存相册照片失败:', error)
+        if (isActive) {
+          const { addCouplePhoto, addCoupleMessage, addCoupleAnniversary } = await import('../utils/coupleSpaceContentUtils')
+          
+          // 保存相册照片
+          if (albumDescription) {
+            try {
+              addCouplePhoto(character.id, character.name, albumDescription)
+              console.log('📸 相册照片已保存')
+              
+              // 添加系统消息
+              const systemMsg: Message = {
+                id: Date.now() + Math.random(),
+                type: 'system',
+                content: `在情侣空间相册中添加了照片：${albumDescription}`,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                messageType: 'system',
+                isHidden: false
+              }
+              setMessages(prev => [...prev, systemMsg])
+            } catch (error) {
+              console.error('保存相册照片失败:', error)
+            }
           }
-        }
-        
-        // 保存留言
-        if (coupleMessage) {
-          try {
-            addCoupleMessage(character.id, character.name, coupleMessage)
-            console.log('💌 留言已保存')
-          } catch (error) {
-            console.error('保存留言失败:', error)
+          
+          // 保存留言
+          if (coupleMessage) {
+            try {
+              addCoupleMessage(character.id, character.name, coupleMessage)
+              console.log('💌 留言已保存')
+              
+              // 添加系统消息
+              const systemMsg: Message = {
+                id: Date.now() + Math.random(),
+                type: 'system',
+                content: `在情侣空间留言：${coupleMessage}`,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                messageType: 'system',
+                isHidden: false
+              }
+              setMessages(prev => [...prev, systemMsg])
+            } catch (error) {
+              console.error('保存留言失败:', error)
+            }
           }
-        }
-        
-        // 保存纪念日
-        if (anniversaryData) {
-          try {
-            addCoupleAnniversary(
-              character.id, 
-              character.name, 
-              anniversaryData.date, 
-              anniversaryData.title, 
-              anniversaryData.description
-            )
-            console.log('🎂 纪念日已保存')
-          } catch (error) {
-            console.error('保存纪念日失败:', error)
+          
+          // 保存纪念日
+          if (anniversaryData) {
+            try {
+              addCoupleAnniversary(
+                character.id, 
+                character.name, 
+                anniversaryData.date, 
+                anniversaryData.title, 
+                anniversaryData.description
+              )
+              console.log('🎂 纪念日已保存')
+              
+              // 添加系统消息
+              const systemMsg: Message = {
+                id: Date.now() + Math.random(),
+                type: 'system',
+                content: `在情侣空间添加了纪念日：${anniversaryData.title}（${anniversaryData.date}）`,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                messageType: 'system',
+                isHidden: false
+              }
+              setMessages(prev => [...prev, systemMsg])
+            } catch (error) {
+              console.error('保存纪念日失败:', error)
+            }
           }
+        } else {
+          console.warn('⚠️ 情侣空间未激活，无法保存内容')
         }
       }
       
       // 💭 提取记忆和生成总结（根据用户设置的间隔提取）
-      try {
-        // 获取用户设置的总结间隔（默认 30 轮）
-        const summaryInterval = parseInt(localStorage.getItem(`memory_summary_interval_${id}`) || '30')
-        
-        // 计算对话轮数（用户消息 + AI 回复 = 1 轮）
-        const conversationRounds = Math.floor(newMessages.filter(m => m.type === 'sent' || m.type === 'received').length / 2)
-        
-        // 每 N 轮对话提取一次记忆并生成总结
-        if (conversationRounds % summaryInterval === 0 && conversationRounds > 0) {
-          console.log(`💭 开始提取记忆和生成总结...（第 ${conversationRounds} 轮对话）`)
+      // 改为后台静默执行，不阻塞UI
+      (() => {
+        try {
+          // 获取用户设置的总结间隔（默认 30 轮）
+          const summaryInterval = parseInt(localStorage.getItem(`memory_summary_interval_${id}`) || '30')
           
-          // 获取最近 N 轮对话的内容
-          const recentUserMessages = currentMessages.filter(m => m.type === 'sent').slice(-summaryInterval)
-          const recentAiMessages = newMessages.filter(m => m.type === 'received').slice(-summaryInterval)
+          // 计算对话轮数（用户消息 + AI 回复 = 1 轮）
+          const conversationRounds = Math.floor(newMessages.filter(m => m.type === 'sent' || m.type === 'received').length / 2)
           
-          if (recentUserMessages.length > 0 && recentAiMessages.length > 0) {
-            // 合并最近的对话内容
-            const userContent = recentUserMessages.map(m => 
-              m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
-            ).join('\n')
+          // 每 N 轮对话提取一次记忆并生成总结
+          if (conversationRounds % summaryInterval === 0 && conversationRounds > 0) {
+            console.log(`💭 后台开始提取记忆...（第 ${conversationRounds} 轮对话）`)
             
-            const aiContent = recentAiMessages.map(m => 
-              m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
-            ).join('\n')
+            // 获取最近 N 轮对话的内容
+            const recentUserMessages = currentMessages.filter(m => m.type === 'sent').slice(-summaryInterval)
+            const recentAiMessages = newMessages.filter(m => m.type === 'received').slice(-summaryInterval)
             
-            const result = await memorySystem.extractMemories(userContent, aiContent)
-            console.log(`💭 记忆提取完成（已分析最近 ${summaryInterval} 轮对话）`)
-            console.log('📝 记忆总结已生成')
-            
-            // 保存总结到 localStorage（累积，不覆盖）
-            if (result.summary && id) {
-              try {
-                // 获取旧的总结
-                const oldSummary = localStorage.getItem(`memory_summary_${id}`) || ''
+            if (recentUserMessages.length > 0 && recentAiMessages.length > 0) {
+              // 合并最近的对话内容
+              const userContent = recentUserMessages.map(m => 
+                m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
+              ).join('\n')
+              
+              const aiContent = recentAiMessages.map(m => 
+                m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
+              ).join('\n')
+              
+              // 在后台异步执行，不等待完成
+              memorySystem.extractMemories(userContent, aiContent).then(result => {
+                console.log(`💭 记忆提取完成（已分析最近 ${summaryInterval} 轮对话）`)
+                console.log('📝 记忆总结已生成')
                 
-                // 添加分隔符和新总结
-                const separator = oldSummary ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : ''
-                const newSummary = oldSummary + separator + `【第 ${Math.ceil(conversationRounds / summaryInterval)} 次总结 - 第 ${conversationRounds - summaryInterval + 1}-${conversationRounds} 轮对话】\n\n${result.summary}`
-                
-                localStorage.setItem(`memory_summary_${id}`, newSummary)
-                console.log('💾 记忆总结已累积保存')
-                console.log(`📊 总结历史长度: ${newSummary.length} 字符`)
-              } catch (error) {
-                console.error('❌ 保存记忆总结失败:', error)
-              }
+                // 保存总结到 localStorage（累积，不覆盖）
+                if (result.summary && id) {
+                  try {
+                    // 获取旧的总结
+                    const oldSummary = localStorage.getItem(`memory_summary_${id}`) || ''
+                    
+                    // 添加分隔符和新总结
+                    const separator = oldSummary ? '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' : ''
+                    const newSummary = oldSummary + separator + `【第 ${Math.ceil(conversationRounds / summaryInterval)} 次总结 - 第 ${conversationRounds - summaryInterval + 1}-${conversationRounds} 轮对话】\n\n${result.summary}`
+                    
+                    localStorage.setItem(`memory_summary_${id}`, newSummary)
+                    console.log('💾 记忆总结已累积保存')
+                    console.log(`📊 总结历史长度: ${newSummary.length} 字符`)
+                  } catch (error) {
+                    console.error('❌ 保存记忆总结失败:', error)
+                  }
+                }
+              }).catch(error => {
+                console.error('❌ 记忆提取失败:', error)
+              })
             }
+          } else {
+            console.log(`💭 跳过记忆提取（等待第 ${Math.ceil(conversationRounds / summaryInterval) * summaryInterval} 轮对话）`)
           }
-        } else {
-          console.log(`💭 跳过记忆提取（等待第 ${Math.ceil(conversationRounds / summaryInterval) * summaryInterval} 轮对话）`)
+        } catch (error) {
+          console.error('❌ 记忆提取初始化失败:', error)
         }
-      } catch (error) {
-        console.error('❌ 记忆提取失败:', error)
+      })()
+      
+      // 📔 如果AI要写日记，触发写日记功能
+      if (shouldWriteDiary && id && character) {
+        console.log('📔 AI决定写日记，后台触发日记生成...')
+        console.log('📝 日记参数:', { characterId: id, characterName: character.name })
+        
+        // 保存变量副本，防止异步执行时丢失
+        const characterId = id
+        const characterName = character.name
+        const characterDesc = character.description || ''
+        const messagesSnapshot = [...newMessages]
+        
+        // 在后台静默执行，不阻塞UI
+        setTimeout(async () => {
+          try {
+            console.log('🔄 开始异步生成日记...')
+            const { generateDiary, saveDiary, getDiaries } = await import('../utils/diarySystem')
+            console.log('📦 日记模块已加载')
+            
+            // 获取之前的日记（最近3篇）
+            const previousDiaries = getDiaries(characterId).slice(0, 3)
+            console.log(`📚 已获取${previousDiaries.length}篇历史日记`)
+            
+            // 获取当前状态
+            const currentStatus = {
+              mood: '',
+              weather: ''
+            }
+            
+            console.log('🎬 开始调用generateDiary...')
+            // 生成日记
+            const diary = await generateDiary(
+              characterId,
+              characterName,
+              characterDesc,
+              messagesSnapshot,
+              currentStatus,
+              previousDiaries
+            )
+            
+            console.log('📝 日记生成结果:', diary ? '成功' : '失败')
+            
+            if (diary) {
+              console.log('💾 保存日记到localStorage...')
+              saveDiary(characterId, diary)
+              console.log('✅ AI日记已生成并保存到日记本')
+              console.log('📔 日记内容预览:', diary.content.substring(0, 50) + '...')
+              
+              // 添加系统提示消息到聊天记录
+              const currentDate = new Date().toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+              })
+              
+              // 提取日记的前几个字作为预览（去掉照片标记）
+              const contentPreview = diary.content.replace(/\[照片:.*?\]/g, '').trim().substring(0, 15)
+              const preview = contentPreview + (diary.content.length > 15 ? '...' : '')
+              
+              const systemMessage: Message = {
+                id: Date.now() + Math.random(),
+                type: 'system',
+                content: `📔 你在情侣空间日记本写了一篇日记：${preview}（${currentDate}）`,
+                time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                messageType: 'system',
+                isHidden: false
+              }
+              
+              // 更新消息列表
+              setMessages(prev => [...prev, systemMessage])
+              
+              // 同步到 localStorage
+              const chatMessages = localStorage.getItem(`chat_messages_${characterId}`)
+              const messages = chatMessages ? JSON.parse(chatMessages) : []
+              messages.push(systemMessage)
+              localStorage.setItem(`chat_messages_${characterId}`, JSON.stringify(messages))
+              
+              console.log('💬 系统提示已添加到聊天记录')
+            } else {
+              console.log('⏸️ AI今天不想写日记（返回null）')
+            }
+          } catch (error) {
+            console.error('❌ AI写日记失败:', error)
+            console.error('错误详情:', error instanceof Error ? error.message : String(error))
+          }
+        }, 1000) // 延迟1秒后触发，确保消息已经显示
+      } else {
+        if (shouldWriteDiary) {
+          console.warn('⚠️ AI想写日记但缺少必要信息:', { 
+            shouldWriteDiary, 
+            hasId: !!id, 
+            hasCharacter: !!character 
+          })
+        }
       }
       
       // 如果AI要撤回消息
@@ -4363,7 +4716,14 @@ ${recentMessages.slice(-10).map((msg) => {
       {/* 聊天菜单 */}
       {showMenu && (
         <ChatMenu
-          onClose={() => setShowMenu(false)}
+          onClose={() => {
+            console.log('🔍 菜单状态检查:', { 
+              characterId: id, 
+              hasCoupleSpaceActive,
+              characterName: character?.name 
+            })
+            setShowMenu(false)
+          }}
           onSelectImage={handleSelectImage}
           onSelectCamera={handleSelectCamera}
           onSelectRedPacket={() => {
@@ -4382,6 +4742,7 @@ ${recentMessages.slice(-10).map((msg) => {
             setShowMenu(false)
             setShowCoupleSpaceInviteSender(true)
           }}
+          onSelectCoupleSpaceContent={handleOpenCoupleSpaceContent}
           onSelectLocation={handleSelectLocation}
           onSelectVoiceMessage={handleSelectVoice}
           onSelectVoiceCall={() => {
@@ -4396,6 +4757,7 @@ ${recentMessages.slice(-10).map((msg) => {
             setCallStartTime(Date.now())
             setShowCallScreen(true)
           }}
+          hasCoupleSpace={hasCoupleSpaceActive}
         />
       )}
 
@@ -4754,7 +5116,10 @@ ${recentMessages.slice(-10).map((msg) => {
             favorability: (character as any).favorability || 50
           }}
           isVideoCall={isVideoCall}
+          isAITyping={callAITyping}
           onEnd={() => {
+            const now = new Date()
+            
             // 保存通话记录到聊天历史
             if (callMessages.length > 0) {
               const callDuration = Math.floor((Date.now() - (callStartTime || Date.now())) / 1000)
@@ -4763,7 +5128,6 @@ ${recentMessages.slice(-10).map((msg) => {
               const durationText = `${mins}:${secs.toString().padStart(2, '0')}`
               
               // 创建通话记录消息
-              const now = new Date()
               const callRecordMsg: Message = {
                 id: Date.now(),
                 type: 'system',
@@ -4812,6 +5176,27 @@ ${callDetails}
                 }
                 setMessages(prev => [...prev, summaryMsg])
               }
+            } else {
+              // 没有通话内容，说明用户挂断了（已取消）
+              const cancelledMsg: Message = {
+                id: Date.now(),
+                type: 'system',
+                content: `已取消 ${isVideoCall ? '视频' : '语音'}通话`,
+                time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now()
+              }
+              setMessages(prev => [...prev, cancelledMsg])
+              
+              // 添加隐藏消息让AI知道
+              const aiNoticeMsg: Message = {
+                id: Date.now() + 1,
+                type: 'system',
+                content: `用户向你发起了${isVideoCall ? '视频' : '语音'}通话，但在接通前取消了。`,
+                time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now(),
+                isHidden: true
+              }
+              setMessages(prev => [...prev, aiNoticeMsg])
             }
             
             setShowCallScreen(false)
@@ -4821,6 +5206,50 @@ ${callDetails}
           onSendMessage={handleCallSendMessage}
           onRequestAIReply={handleCallAIReply}
           messages={callMessages}
+        />
+      )}
+
+      {/* 来电界面 */}
+      {character && (
+        <IncomingCallScreen
+          show={showIncomingCall}
+          character={{
+            name: character.name,
+            avatar: character.avatar
+          }}
+          isVideoCall={isVideoCall}
+          onAccept={() => {
+            // 接听电话，打开通话界面
+            setShowIncomingCall(false)
+            setCallStartTime(Date.now())
+            setShowCallScreen(true)
+          }}
+          onReject={() => {
+            // 挂断电话
+            setShowIncomingCall(false)
+            
+            // 添加一条系统消息：已拒绝（显示给用户看）
+            const now = new Date()
+            const rejectedCallMsg: Message = {
+              id: Date.now(),
+              type: 'system',
+              content: `已拒绝 ${isVideoCall ? '视频' : '语音'}通话`,
+              time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+              timestamp: Date.now()
+            }
+            setMessages(prev => [...prev, rejectedCallMsg])
+            
+            // 添加一条隐藏消息（让AI知道被拒绝了）
+            const aiNoticeMsg: Message = {
+              id: Date.now() + 1,
+              type: 'system',
+              content: `用户拒绝了你的${isVideoCall ? '视频' : '语音'}通话请求。`,
+              time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+              timestamp: Date.now(),
+              isHidden: true // 隐藏显示，但AI能看到
+            }
+            setMessages(prev => [...prev, aiNoticeMsg])
+          }}
         />
       )}
 
@@ -4970,6 +5399,77 @@ ${callDetails}
             </div>
           </div>
         </>
+      )}
+
+      {/* 情侣空间内容创建弹窗 */}
+      {showCoupleSpaceContentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => {
+              setShowCoupleSpaceContentModal(false)
+              setCoupleSpaceContentType(null)
+            }}
+          />
+          <div className="relative w-full max-w-sm glass-card rounded-3xl p-6 shadow-2xl border border-white/20 max-h-[80vh] overflow-y-auto">
+            {!coupleSpaceContentType ? (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">选择创建内容</h3>
+                <div className="space-y-3">
+                  <button onClick={() => setCoupleSpaceContentType('photo')} className="w-full px-4 py-3 rounded-2xl glass-card border border-white/20 text-gray-900 font-medium ios-button">
+                    上传照片
+                  </button>
+                  <button onClick={() => setCoupleSpaceContentType('message')} className="w-full px-4 py-3 rounded-2xl glass-card border border-white/20 text-gray-900 font-medium ios-button">
+                    发布留言
+                  </button>
+                  <button onClick={() => setCoupleSpaceContentType('anniversary')} className="w-full px-4 py-3 rounded-2xl glass-card border border-white/20 text-gray-900 font-medium ios-button">
+                    添加纪念日
+                  </button>
+                </div>
+                <button onClick={() => setShowCoupleSpaceContentModal(false)} className="w-full px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button mt-4">取消</button>
+              </>
+            ) : coupleSpaceContentType === 'photo' ? (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">上传照片</h3>
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-700 mb-2">选择照片（可选）</label>
+                  <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (evt) => { setCouplePhotoFile(evt.target?.result as string) }; reader.readAsDataURL(file) }}} className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm" />
+                  {couplePhotoFile && <img src={couplePhotoFile} alt="预览" className="mt-2 w-full h-40 object-cover rounded-xl" />}
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-700 mb-2">照片描述</label>
+                  <textarea value={couplePhotoDescription} onChange={(e) => setCouplePhotoDescription(e.target.value)} placeholder="描述这张照片..." className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none text-sm" rows={3} />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setCoupleSpaceContentType(null)} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">返回</button>
+                  <button onClick={handleSendCouplePhoto} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">上传</button>
+                </div>
+              </>
+            ) : coupleSpaceContentType === 'message' ? (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">发布留言</h3>
+                <textarea value={coupleMessageContent} onChange={(e) => setCoupleMessageContent(e.target.value)} placeholder="写下你想说的话..." className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none mb-4 text-sm" rows={5} />
+                <div className="flex gap-3">
+                  <button onClick={() => setCoupleSpaceContentType(null)} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">返回</button>
+                  <button onClick={handleSendCoupleMessage} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">发布</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">添加纪念日</h3>
+                <div className="space-y-3 mb-4">
+                  <div><label className="block text-sm text-gray-700 mb-2">日期</label><input type="date" value={anniversaryDate} onChange={(e) => setAnniversaryDate(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm" /></div>
+                  <div><label className="block text-sm text-gray-700 mb-2">标题</label><input type="text" value={anniversaryTitle} onChange={(e) => setAnniversaryTitle(e.target.value)} placeholder="例如：第一次见面" className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm" /></div>
+                  <div><label className="block text-sm text-gray-700 mb-2">描述（可选）</label><textarea value={anniversaryDescription} onChange={(e) => setAnniversaryDescription(e.target.value)} placeholder="记录这个特殊的日子..." className="w-full px-3 py-2 border border-gray-300 rounded-xl resize-none text-sm" rows={3} /></div>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setCoupleSpaceContentType(null)} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">返回</button>
+                  <button onClick={handleSendAnniversary} className="flex-1 px-4 py-3 rounded-full glass-card border border-white/20 text-gray-900 font-medium ios-button">添加</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
       </div>
     </div>

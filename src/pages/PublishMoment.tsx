@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
@@ -71,20 +71,42 @@ const PublishMoment = () => {
         }
       )
 
-      // 处理结果
+      // 处理结果（支持多动作）
       const existingComments: string[] = []
       
       results.forEach(result => {
         const character = enabledCharacters.find(c => c.id === result.characterId)
         if (!character) return
 
-        console.log(`💭 ${result.characterName} 的决定: ${result.action} ${result.reason || ''}`)
+        console.log(`💭 ${result.characterName} 的决定: ${result.actions.join('+')} ${result.reason || ''}`)
 
-        if (result.action === 'like') {
+        // 处理点赞
+        if (result.actions.includes('like')) {
           console.log(`👍 ${result.characterName} 决定点赞，正在执行...`)
           likeMoment(momentId, result.characterId, result.characterName, character.avatar)
           console.log(`✅ ${result.characterName} 点赞成功！`)
-        } else if (result.action === 'comment' && result.comment) {
+          
+          // 同步点赞到聊天记录
+          const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
+          const messages = chatMessages ? JSON.parse(chatMessages) : []
+          const likeMessage = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            content: `👍 ${result.characterName} 给你的朋友圈点赞了`,
+            time: new Date().toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: Date.now(),
+            messageType: 'system',
+            isHidden: false
+          }
+          messages.push(likeMessage)
+          localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
+        }
+        
+        // 处理评论
+        if (result.actions.includes('comment') && result.comment) {
           // 检查是否与已有评论重复
           const cleanComment = result.comment.replace(/@\S+\s*/g, '').toLowerCase().trim()
           const isDuplicate = existingComments.some(existing => {
@@ -98,8 +120,51 @@ const PublishMoment = () => {
             addComment(momentId, result.characterId, result.characterName, character.avatar, result.comment)
             console.log(`💬 ${result.characterName} 评论了: ${result.comment}`)
             existingComments.push(result.comment.toLowerCase().trim())
+            
+            // 同步评论到聊天记录
+            const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
+            const messages = chatMessages ? JSON.parse(chatMessages) : []
+            const commentMessage = {
+              id: Date.now() + Math.random(),
+              type: 'received',
+              content: `💬 ${result.characterName} 评论了你的朋友圈：${result.comment}`,
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now(),
+              messageType: 'text',
+              blocked: false
+            }
+            messages.push(commentMessage)
+            localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
+            console.log(`💾 ${result.characterName} 的评论已同步到聊天记录`)
           }
-        } else {
+        }
+        
+        // 处理私信
+        if (result.actions.includes('message') && result.message) {
+          const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
+          const messages = chatMessages ? JSON.parse(chatMessages) : []
+          const privateMessage = {
+            id: Date.now() + Math.random(),
+            type: 'received',
+            content: result.message,
+            time: new Date().toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: Date.now(),
+            messageType: 'text',
+            blocked: false
+          }
+          messages.push(privateMessage)
+          localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
+          console.log(`💬 ${result.characterName} 发送私信: ${result.message}`)
+        }
+        
+        // 跳过
+        if (result.actions.includes('skip') || result.actions.length === 0) {
           console.log(`😶 ${result.characterName} 选择跳过`)
         }
       })
@@ -166,6 +231,42 @@ const PublishMoment = () => {
     
     // 添加朋友圈
     addMoment(momentData)
+
+    // 为每个启用AI朋友圈的角色添加聊天记录
+    characters.forEach(character => {
+      const enabled = localStorage.getItem(`ai_moments_enabled_${character.id}`)
+      if (enabled === 'true') {
+        const chatMessages = localStorage.getItem(`chat_messages_${character.id}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        // 构建朋友圈消息内容
+        let momentContent = `📸 你发布了朋友圈：${content.trim()}`
+        if (images.length > 0) {
+          momentContent += ` [${images.length}张图片]`
+        }
+        if (location.trim()) {
+          momentContent += ` 📍${location.trim()}`
+        }
+        
+        // 添加系统消息到聊天记录
+        const systemMessage = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: momentContent,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: false
+        }
+        
+        messages.push(systemMessage)
+        localStorage.setItem(`chat_messages_${character.id}`, JSON.stringify(messages))
+        console.log(`💾 朋友圈已同步到与 ${character.name} 的聊天记录`)
+      }
+    })
 
     // 延迟触发AI互动，确保朋友圈已经添加到列表中，并且localStorage已更新
     setTimeout(() => {

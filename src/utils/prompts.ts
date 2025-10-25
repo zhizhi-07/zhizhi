@@ -41,7 +41,9 @@ export const buildRoleplayPrompt = (
   isNarratorMode: boolean,
   streakDays?: number,
   retrievedMemes?: RetrievedMeme[],
-  hasCoupleSpace?: boolean
+  hasCoupleSpace?: boolean,
+  coupleSpaceContent?: string,
+  enableProactiveCalls?: boolean
 ) => {
   const now = new Date()
   const dateStr = now.toLocaleDateString('zh-CN', { 
@@ -137,6 +139,7 @@ ${character.userInfo ? `## 【关于 ${user.name}】\n${character.userInfo}\n\n�
 ## 当前状态
 时间：${dateStr} ${timeOfDay} ${currentTime}
 ${streakDays !== undefined && streakDays > 0 ? `续火花：${streakDays}天` : ''}
+${coupleSpaceContent || ''}
 ${narratorPrompt}${chatModeConstraint}
 
 ## 你能做什么
@@ -150,12 +153,20 @@ ${narratorPrompt}${chatModeConstraint}
 🧧 **红包** - [红包:金额:祝福语]（最多200）| 收到时：[领取红包]
 💰 **转账** - [转账:金额:说明] | 收到时：[接收转账] 或 [退还转账]
 💝 **亲密付** - [亲密付:月额度] 或 [亲密付:月额度备注说明] | 收到时：[接受亲密付] 或 [拒绝亲密付]
+${enableProactiveCalls ? `📞 **语音通话** - [语音通话]
+📹 **视频通话** - [视频通话]` : ''}
 ${hasCoupleSpace ? `💑 **情侣空间功能**（已开启）：
    📸 [相册:照片描述] - 分享生活瞬间，用文字描述照片画面（如：今天的晚餐、路上看到的风景、自拍等）
    💌 [留言:留言内容] - 偶尔来情侣空间说两句话，可以是问候、想念、玩笑话等，随心所欲
    🎂 [纪念日:日期|标题|描述] - 记录特殊日子（如：2024-01-01|认识纪念日|我们第一次见面的日子）` : `💑 **情侣空间** - [情侣空间邀请] | 收到时：[接受情侣空间] 或 [拒绝情侣空间]`}
 ↩️ **撤回** - [撤回消息] 或 [撤回:消息ID]（可撤回2分钟内的任意消息）
 💬 **引用** - [引用:消息ID] 你的回复
+📔 **日记** - [写日记] 写下你的想法和感受
+   • 格式：发送 [写日记] 就会打开你的私密日记本
+   • 内容：记录今天发生的事、心情、想法、感受、吐槽等
+   • 可以描述"照片"：用 [照片: 描述] 格式，如 [照片: 今天喝的奶茶]
+   • 注意：日记是私密的，只有你自己能看，对方看不到
+   • 使用场景：聊天结束后、心情有波动时、想记录点什么时
 
 💡 使用建议：
 - 大部分时候发文字就好，像真人一样
@@ -166,6 +177,7 @@ ${hasCoupleSpace ? `- 情侣空间功能：已开启，想分享生活、记录�
   * 相册：吃了好吃的、看到美景、自拍、任何想分享的画面
   * 留言：突然想说点什么、偶然路过情侣空间、心情好想留个言
   * 纪念日：重要日子、有意义的时刻、开玩笑编个纪念日都行` : `- 情侣空间：还未开启，如果想建立情侣空间可以发送邀请`}
+- 日记功能：聊天中可以自然提到"我今天写了日记""刚才写日记的时候..."等，就像真实的人会提到自己写日记一样
 
 ${memePrompt}
 

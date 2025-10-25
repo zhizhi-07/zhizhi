@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import React, { useState, useRef, useEffect } from 'react'
 import StatusBar from '../components/StatusBar'
 import { useMusicPlayer } from '../context/MusicPlayerContext'
+import CalendarWidget from '../components/CalendarWidget'
 import { 
   MusicIcon, HeartIcon, PauseIcon, SkipForwardIcon, PlayIcon,
   ChatIcon, SettingsIcon, FileIcon, ImageIcon,
@@ -42,7 +43,7 @@ const Desktop = () => {
     { id: 'preset', name: '预设', icon: SettingsIcon, color: 'glass-card', route: '/preset' },
     { id: 'worldbook', name: '世界书', icon: FileIcon, color: 'glass-card', route: '/worldbook' },
     { id: 'music-app', name: '音乐', icon: MusicIcon, color: 'glass-card', route: '/music-player' },
-    { id: 'settings', name: '应用设置', icon: SettingsIcon, color: 'glass-card', route: '/wechat/settings' },
+    { id: 'settings', name: '应用设置', icon: SettingsIcon, color: 'glass-card', route: '/settings' },
   ]
 
   // 第二页应用
@@ -285,8 +286,15 @@ const Desktop = () => {
                 </div>
               </div>
 
-              {/* 第二页应用 */}
-              <div className="grid grid-cols-4 gap-4">
+              {/* 第二页应用和小组件 */}
+              <div className="grid grid-cols-4 gap-4" style={{ gridAutoRows: '90px' }}>
+                {/* 日历小组件 - 2x2 */}
+                <div 
+                  className="col-span-2 row-span-2 cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => navigate('/calendar')}
+                >
+                  <CalendarWidget />
+                </div>
                 {page2Apps.map((app) => {
                   const isImageIcon = typeof app.icon === 'string'
                   return (

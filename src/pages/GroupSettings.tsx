@@ -19,6 +19,27 @@ const GroupSettings = () => {
   const [groupName, setGroupName] = useState(group?.name || '')
   const [announcement, setAnnouncement] = useState(group?.description || '')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  // AI自由对话设置
+  const [aiChatEnabled, setAiChatEnabled] = useState(() => {
+    if (!id) return false
+    const saved = localStorage.getItem(`group_ai_chat_enabled_${id}`)
+    return saved === 'true'
+  })
+  
+  const [aiChatInterval, setAiChatInterval] = useState(() => {
+    if (!id) return 30
+    const saved = localStorage.getItem(`group_ai_chat_interval_${id}`)
+    return saved ? parseInt(saved) : 30
+  })
+  
+  // 保存AI对话设置
+  const handleSaveAiChatSettings = () => {
+    if (!id) return
+    localStorage.setItem(`group_ai_chat_enabled_${id}`, String(aiChatEnabled))
+    localStorage.setItem(`group_ai_chat_interval_${id}`, String(aiChatInterval))
+    alert(aiChatEnabled ? 'AI自由对话已启用' : 'AI自由对话已关闭')
+  }
 
   if (!group) {
     return (
@@ -129,6 +150,70 @@ const GroupSettings = () => {
             >
               保存
             </button>
+          </div>
+        </div>
+
+        {/* AI自由对话设置 */}
+        <div className="glass-card rounded-2xl p-5 mb-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-4">🤖 AI自由对话</h3>
+          
+          {/* 开关 */}
+          <div className="flex items-center justify-between mb-4 p-3 bg-white rounded-xl">
+            <div className="flex-1">
+              <p className="font-medium text-gray-900">启用AI自由对话</p>
+              <p className="text-xs text-gray-500 mt-1">
+                开启后，AI成员会在群里自由聊天互动
+              </p>
+            </div>
+            <button
+              onClick={() => setAiChatEnabled(!aiChatEnabled)}
+              className={`relative w-12 h-7 rounded-full transition-colors ${
+                aiChatEnabled ? 'bg-green-500' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                  aiChatEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+          
+          {/* 对话间隔设置 */}
+          {aiChatEnabled && (
+            <div className="p-3 bg-white rounded-xl mb-3">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">对话间隔</label>
+                <span className="text-sm text-gray-500">{aiChatInterval}秒</span>
+              </div>
+              <input
+                type="range"
+                min="10"
+                max="120"
+                step="10"
+                value={aiChatInterval}
+                onChange={(e) => setAiChatInterval(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>活跃(10s)</span>
+                <span>正常(60s)</span>
+                <span>安静(120s)</span>
+              </div>
+            </div>
+          )}
+          
+          <button
+            onClick={handleSaveAiChatSettings}
+            className="w-full py-2.5 bg-green-500 text-white rounded-xl text-sm font-medium ios-button"
+          >
+            保存设置
+          </button>
+          
+          <div className="mt-3 p-3 bg-blue-50 rounded-xl">
+            <p className="text-xs text-blue-700 leading-relaxed">
+              💡 <strong>说明：</strong>AI自由对话功能会让群内的AI成员自动发起话题、互相聊天。对话频率由间隔时间控制，间隔越短对话越频繁。
+            </p>
           </div>
         </div>
 

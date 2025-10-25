@@ -181,7 +181,7 @@ ${currentUser?.name || '你'}: ${inputText}
               <div className="text-center">
                 <p className="text-gray-400 text-lg mb-4">还没有角色</p>
                 <button
-                  onClick={() => navigate('/wechat/create-character')}
+                  onClick={() => navigate('/create-character')}
                   className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-xl active:scale-95 transition-transform"
                 >
                   创建角色

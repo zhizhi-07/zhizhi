@@ -4,7 +4,9 @@ export interface CoupleAlbumPhoto {
   id: string
   characterId: string
   characterName: string
+  uploaderName?: string
   description: string
+  imageUrl?: string
   timestamp: number
   createdAt: number
 }
@@ -32,23 +34,27 @@ export interface CoupleAnniversary {
 const STORAGE_KEYS = {
   ALBUM: 'couple_space_album',
   MESSAGES: 'couple_space_messages',
-  ANNIVERSARIES: 'couple_space_anniversaries'
+  ANNIVERSARIES: 'couple_space_anniversaries',
+  ANNIVERSARY_BG: 'couple_space_anniversary_background'
 }
 
 // ==================== 相册功能 ====================
 
 export const addCouplePhoto = (
   characterId: string,
-  characterName: string,
-  description: string
+  uploaderName: string,
+  description: string,
+  imageUrl?: string
 ): CoupleAlbumPhoto => {
   const photos = getCouplePhotos()
   
   const newPhoto: CoupleAlbumPhoto = {
     id: `photo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     characterId,
-    characterName,
+    characterName: uploaderName,
+    uploaderName,
     description,
+    imageUrl,
     timestamp: Date.now(),
     createdAt: Date.now()
   }
@@ -166,8 +172,8 @@ export const addCoupleAnniversary = (
   }
   
   anniversaries.push(newAnniversary)
-  // 按日期排序
-  anniversaries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  // 按创建时间倒序排列（最新创建的在前面）
+  anniversaries.sort((a, b) => b.createdAt - a.createdAt)
   
   localStorage.setItem(STORAGE_KEYS.ANNIVERSARIES, JSON.stringify(anniversaries))
   
@@ -219,8 +225,66 @@ export const getDaysUntil = (dateStr: string): number => {
 
 // 格式化日期显示
 export const formatAnniversaryDate = (dateStr: string): string => {
-  const date = new Date(dateStr)
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  return `${month}月${day}日`
+  const [, month, day] = dateStr.split('-')
+  return `${month}/${day}`
+}
+
+// 获取情侣空间内容摘要（用于AI prompt）
+export const getCoupleSpaceContentSummary = (characterId: string): string => {
+  const photos = getCouplePhotos(characterId)
+  const messages = getCoupleMessages(characterId)
+  const anniversaries = getCoupleAnniversaries(characterId)
+  
+  if (photos.length === 0 && messages.length === 0 && anniversaries.length === 0) {
+    return ''
+  }
+  
+  let summary = '\n\n## 情侣空间内容\n'
+  
+  // 最近的3张照片
+  if (photos.length > 0) {
+    summary += '📸 相册（最近）：\n'
+    photos.slice(0, 3).forEach(photo => {
+      const date = new Date(photo.timestamp).toLocaleDateString('zh-CN')
+      summary += `  - ${date} ${photo.uploaderName || photo.characterName}：${photo.description}\n`
+    })
+  }
+  
+  // 最近的3条留言
+  if (messages.length > 0) {
+    summary += '💌 留言板（最近）：\n'
+    messages.slice(0, 3).forEach(msg => {
+      const date = new Date(msg.timestamp).toLocaleDateString('zh-CN')
+      summary += `  - ${date} ${msg.characterName}：${msg.content}\n`
+    })
+  }
+  
+  // 所有纪念日
+  if (anniversaries.length > 0) {
+    summary += '🎂 纪念日：\n'
+    anniversaries.forEach(ann => {
+      const daysUntil = getDaysUntil(ann.date)
+      const statusText = daysUntil < 0 ? `已过${Math.abs(daysUntil)}天` : daysUntil === 0 ? '就是今天' : `还有${daysUntil}天`
+      summary += `  - ${ann.date} ${ann.title}（${statusText}）${ann.description ? ` - ${ann.description}` : ''}\n`
+    })
+  }
+  
+  return summary
+}
+
+// ==================== 纪念日背景 ====================
+
+// 设置纪念日背景图片
+export const setAnniversaryBackground = (imageUrl: string): void => {
+  localStorage.setItem(STORAGE_KEYS.ANNIVERSARY_BG, imageUrl)
+}
+
+// 获取纪念日背景图片
+export const getAnniversaryBackground = (): string | null => {
+  return localStorage.getItem(STORAGE_KEYS.ANNIVERSARY_BG)
+}
+
+// 删除纪念日背景图片
+export const removeAnniversaryBackground = (): void => {
+  localStorage.removeItem(STORAGE_KEYS.ANNIVERSARY_BG)
 }
