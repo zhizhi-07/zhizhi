@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import sparkIcon from '../assets/spark-icon.png'
-import memesIcon from '../assets/memes-icon.png'
-import musicIcon from '../assets/music-icon.png'
-import bubbleIcon from '../assets/bubble-icon.png'
-import fontIcon from '../assets/font-icon.png'
+import sparkIcon from '../assets/spark-icon.webp'
+import memesIcon from '../assets/memes-icon.webp'
+import musicIcon from '../assets/music-icon.webp'
+import bubbleIcon from '../assets/bubble-icon.webp'
+import fontIcon from '../assets/font-icon.webp'
 
 const MiniPrograms = () => {
   const navigate = useNavigate()

@@ -5,7 +5,7 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { useMemory } from '../hooks/useMemory'
-import memorySummaryIcon from '../assets/memory-summary-icon.png'
+import memorySummaryIcon from '../assets/memory-summary-icon.webp'
 
 const MemorySummary = () => {
   const { id } = useParams()

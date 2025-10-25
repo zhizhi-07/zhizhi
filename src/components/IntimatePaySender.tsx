@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import intimatePayIcon from '../assets/intimate-pay-icon.png'
+import intimatePayIcon from '../assets/intimate-pay-icon.webp'
 import { getBalance } from '../utils/walletUtils'
 
 interface IntimatePaySenderProps {

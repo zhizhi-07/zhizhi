@@ -5,7 +5,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { createCharacterIntimatePayRelation } from '../utils/walletUtils'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import intimatePayIcon from '../assets/intimate-pay-icon.png'
+import intimatePayIcon from '../assets/intimate-pay-icon.webp'
 
 const ReceiveIntimatePay = () => {
   const navigate = useNavigate()

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import photoPlaceholder from '../assets/photo-placeholder.png'
+import photoPlaceholder from '../assets/photo-placeholder.webp'
 
 interface FlipPhotoCardProps {
   description: string

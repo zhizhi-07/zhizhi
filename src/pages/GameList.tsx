@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import gomokuIcon from '../assets/gomoku-icon.png'
-import undercoverIcon from '../assets/undercover-icon.png'
+import gomokuIcon from '../assets/gomoku-icon.webp'
+import undercoverIcon from '../assets/undercover-icon.webp'
 
 // 井字棋图标
 const TicTacToeIcon = () => (

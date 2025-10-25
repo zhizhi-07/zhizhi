@@ -1,7 +1,7 @@
 {
-  "name": "微信 UI 克隆 - AI 聊天",
-  "short_name": "微信克隆",
-  "description": "一个功能完整的微信界面克隆，支持 AI 聊天、朋友圈、红包转账等功能",
+  "name": "汁汁 - AI智能聊天应用",
+  "short_name": "汁汁",
+  "description": "汁汁 - 功能完整的AI聊天应用，支持智能对话、朋友圈、红包转账等功能",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f7fa",

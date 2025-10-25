@@ -5,7 +5,7 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { memoryManager, Memory } from '../utils/memorySystem'
-import memoryIcon from '../assets/memory-icon.png'
+import memoryIcon from '../assets/memory-icon.webp'
 
 const MemoryViewer = () => {
   const { id } = useParams()

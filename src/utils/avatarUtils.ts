@@ -1,5 +1,5 @@
-import defaultAiAvatar from '../assets/default-ai-avatar.png'
-import defaultUserAvatar from '../assets/default-user-avatar.png'
+import defaultAiAvatar from '../assets/default-ai-avatar.webp'
+import defaultUserAvatar from '../assets/default-user-avatar.webp'
 
 /**
  * 获取头像URL，如果没有设置则返回默认头像

@@ -11,15 +11,15 @@ export interface Transaction {
 }
 
 // 导入图标
-import foodIcon from '../assets/accounting-icons/餐饮.png'
-import transportIcon from '../assets/accounting-icons/交通.png'
-import shoppingIcon from '../assets/accounting-icons/购物.png'
-import entertainmentIcon from '../assets/accounting-icons/娱乐.png'
-import healthIcon from '../assets/accounting-icons/医疗.png'
-import educationIcon from '../assets/accounting-icons/教育.png'
-import housingIcon from '../assets/accounting-icons/住宅.png'
-import utilitiesIcon from '../assets/accounting-icons/水电.png'
-import otherIcon from '../assets/accounting-icons/其他.png'
+import foodIcon from '../assets/accounting-icons/餐饮.webp'
+import transportIcon from '../assets/accounting-icons/交通.webp'
+import shoppingIcon from '../assets/accounting-icons/购物.webp'
+import entertainmentIcon from '../assets/accounting-icons/娱乐.webp'
+import healthIcon from '../assets/accounting-icons/医疗.webp'
+import educationIcon from '../assets/accounting-icons/教育.webp'
+import housingIcon from '../assets/accounting-icons/住宅.webp'
+import utilitiesIcon from '../assets/accounting-icons/水电.webp'
+import otherIcon from '../assets/accounting-icons/其他.webp'
 
 // 分类类型
 export interface Category {

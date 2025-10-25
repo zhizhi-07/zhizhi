@@ -6,10 +6,10 @@ import { BackIcon } from '../components/Icons'
 import { getDiaries, generateDiary, saveDiary, deleteDiary, exportDiaries, Diary } from '../utils/diarySystem'
 import { useCharacter } from '../context/CharacterContext'
 import FlipPhotoCard from '../components/FlipPhotoCard'
-import diaryIcon from '../assets/diary-icon.png'
-import pencilIcon from '../assets/pencil-icon.png'
-import calendarIcon from '../assets/calendar-icon.png'
-import trashIcon from '../assets/trash-icon.png'
+import diaryIcon from '../assets/diary-icon.webp'
+import pencilIcon from '../assets/pencil-icon.webp'
+import calendarIcon from '../assets/calendar-icon.webp'
+import trashIcon from '../assets/trash-icon.webp'
 
 const DiaryPage = () => {
   const navigate = useNavigate()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import statusIcons from '../assets/status-icons.png'
+import statusIcons from '../assets/status-icons.webp'
 import { storageObserver } from '../utils/storageObserver'
 
 const StatusBar = () => {

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
-import appIcon from '../assets/app-icon.png'
+import appIcon from '../assets/app-icon.webp'
 import { useState } from 'react'
 
 const About = () => {
