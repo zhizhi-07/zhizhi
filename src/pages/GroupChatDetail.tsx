@@ -164,6 +164,32 @@ const GroupChatDetail = () => {
     return filteredMembers
   }
 
+  // 判断是否应该显示时间戳（消息间隔超过5分钟才显示）
+  const shouldShowTimestamp = (currentIndex: number) => {
+    if (currentIndex === 0) return true // 第一条消息总是显示
+    
+    const currentMessage = messages[currentIndex]
+    const previousMessage = messages[currentIndex - 1]
+    
+    // 如果上一条是系统消息，跳过检查
+    if (previousMessage.messageType === 'system') {
+      // 继续往前找非系统消息
+      for (let i = currentIndex - 1; i >= 0; i--) {
+        if (messages[i].messageType !== 'system') {
+          const timeDiff = currentMessage.timestamp - messages[i].timestamp
+          return timeDiff >= 300000 // 5分钟 = 300000毫秒
+        }
+      }
+      return true
+    }
+    
+    // 计算时间差（毫秒）
+    const timeDiff = currentMessage.timestamp - previousMessage.timestamp
+    
+    // 如果间隔大于等于5分钟，显示时间戳
+    return timeDiff >= 300000 // 5分钟 = 300000毫秒
+  }
+
   // 渲染带@高亮的消息内容
   const renderMessageContent = (content: string) => {
     if (!group) return content
@@ -880,12 +906,13 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             </div>
           )}
 
-          {messages.map((message) => {
+          {messages.map((message, index) => {
             const isUser = message.senderType === 'user'
             const isSystem = message.messageType === 'system'
             const isRedEnvelope = message.messageType === 'redenvelope'
             const isEmoji = message.messageType === 'emoji'
             const isCustomAvatar = message.senderAvatar && message.senderAvatar.startsWith('data:image')
+            const showTimestamp = shouldShowTimestamp(index)
 
             // 系统消息居中显示
             if (isSystem) {
@@ -910,7 +937,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                         <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                       )}
                     </div>
-                    <span className="text-[9px] text-gray-400">{message.time}</span>
+                    {showTimestamp && <span className="text-[9px] text-gray-400">{message.time}</span>}
                   </div>
                   <div className={`max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
                     <img
@@ -946,7 +973,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                         <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                       )}
                     </div>
-                    <span className="text-[9px] text-gray-400">{message.time}</span>
+                    {showTimestamp && <span className="text-[9px] text-gray-400">{message.time}</span>}
                   </div>
                   <div className={`max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
                     <div 
@@ -1001,8 +1028,8 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                       <span className="text-lg">{message.senderAvatar || '🤖'}</span>
                     )}
                   </div>
-                  {/* 时间显示在头像下方 */}
-                  <span className="text-[9px] text-gray-400">{message.time}</span>
+                  {/* 时间显示在头像下方（超过5分钟才显示） */}
+                  {showTimestamp && <span className="text-[9px] text-gray-400">{message.time}</span>}
                 </div>
 
                 {/* 消息内容 */}

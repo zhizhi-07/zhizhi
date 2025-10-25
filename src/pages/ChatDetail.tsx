@@ -1707,6 +1707,11 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
       const streakData = id ? getStreakData(id) : null
       const streakDays = streakData?.currentStreak || 0
       
+      // 检查是否有活跃的情侣空间
+      const { hasActiveCoupleSpace } = await import('../utils/coupleSpaceUtils')
+      const hasCoupleSpace = id ? hasActiveCoupleSpace(id) : false
+      console.log('💑 情侣空间状态:', hasCoupleSpace ? '已开启' : '未开启')
+      
       // 获取用户最后一条消息
       const lastUserMsg = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
       const userMessageContent = lastUserMsg?.content || ''
@@ -1798,7 +1803,8 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           },
           enableNarration, // 传入旁白模式开关
           streakDays,
-          retrievedMemes // 传入热梗
+          retrievedMemes, // 传入热梗
+          hasCoupleSpace // 传入情侣空间状态
         )
         
         console.log('✅ 使用角色扮演提示词系统')
@@ -1816,7 +1822,8 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
           },
           enableNarration, // 传入旁白模式开关
           streakDays,
-          retrievedMemes // 传入热梗
+          retrievedMemes, // 传入热梗
+          hasCoupleSpace // 传入情侣空间状态
         )
       }
       
@@ -1993,18 +2000,6 @@ ${isVideoCall ? '现在视频通话中回复，记住多描述动作和表情' :
 第一条消息
 第二条消息
 第三条消息
-
-回复格式：
-1. 先写聊天内容（正常聊天）
-2. 最后添加状态标记：[状态:着装|动作|心情|心声|位置|天气]
-
-示例：
-在呢
-刚下班回家躺着
-
-[状态:黑色T恤，牛仔裤|躺在沙发上刷手机|有点累|今天好累啊|家里客厅|晴 23°C]
-
-注意：状态标记用户看不到，只是后台数据。着装和位置要保持连贯。
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${enableNarration ? `🎭 旁白模式已开启
@@ -2664,26 +2659,7 @@ ${recentMessages.slice(-10).map((msg) => {
       }
       
       // 📊 解析状态栏信息
-      const statusMatch = aiResponse.match(/\[状态:([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^\]]+)\]/)
-      
-      if (statusMatch && id) {
-        const statusData = {
-          outfit: statusMatch[1].trim(),
-          action: statusMatch[2].trim(),
-          mood: statusMatch[3].trim(),
-          thought: statusMatch[4].trim(),
-          location: statusMatch[5].trim(),
-          weather: statusMatch[6].trim(),
-          affection: 75,
-          timestamp: Date.now(),
-          characterId: id
-        }
-        
-        localStorage.setItem(`character_status_${id}`, JSON.stringify(statusData))
-        console.log('✅ 状态已保存:', statusData)
-      }
-      
-      // 清除状态标记（如果AI还是发送了）
+      // 注意：状态标记功能已禁用，不再解析和保存状态信息
       cleanedResponse = cleanedResponse.replace(/\[状态:[^\]]+\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[状态:[\s\S]*?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[.*?状态.*?\]/g, '').trim()
@@ -3953,45 +3929,45 @@ ${recentMessages.slice(-10).map((msg) => {
                        )}
                      </div>
                    ) : message.messageType === 'location' && message.location ? (
-                     <div 
-                       className="glass-card rounded-2xl overflow-hidden shadow-lg w-[280px] cursor-pointer hover:shadow-xl transition-shadow"
-                       onClick={() => handleViewLocation(message)}
-                     >
-                       {/* 地图缩略图 */}
-                       <div className="h-32 bg-gradient-to-br from-blue-100 to-green-100 relative overflow-hidden">
-                         {/* 模拟地图网格 */}
-                         <div className="absolute inset-0 opacity-20">
-                           <div className="grid grid-cols-8 grid-rows-8 h-full w-full">
-                             {Array.from({ length: 64 }).map((_, i) => (
-                               <div key={i} className="border border-gray-300"></div>
-                             ))}
-                           </div>
-                         </div>
-                         {/* 定位标记 */}
-                         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                           <svg className="w-8 h-8 text-red-500 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
-                             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                           </svg>
-                         </div>
-                       </div>
-                       
-                       {/* 位置信息 */}
-                       <div className="p-3 bg-white/90 backdrop-blur-sm">
-                         <div className="flex items-start gap-2">
-                           <svg className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
-                             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                           </svg>
-                           <div className="flex-1 min-w-0">
-                             <div className="font-medium text-gray-900 text-sm truncate">
-                               {message.location.name}
-                             </div>
-                             <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                               {message.location.address}
-                             </div>
-                           </div>
-                         </div>
-                       </div>
-                     </div>
+                    <div 
+                      className="glass-card rounded-2xl overflow-hidden shadow-lg w-[220px] cursor-pointer hover:shadow-xl transition-shadow"
+                      onClick={() => handleViewLocation(message)}
+                    >
+                      {/* 地图缩略图 */}
+                      <div className="h-24 bg-gradient-to-br from-blue-100 to-green-100 relative overflow-hidden">
+                        {/* 模拟地图网格 */}
+                        <div className="absolute inset-0 opacity-20">
+                          <div className="grid grid-cols-8 grid-rows-8 h-full w-full">
+                            {Array.from({ length: 64 }).map((_, i) => (
+                              <div key={i} className="border border-gray-300"></div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* 定位标记 */}
+                        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                          <svg className="w-7 h-7 text-red-500 drop-shadow-lg" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                          </svg>
+                        </div>
+                      </div>
+                      
+                      {/* 位置信息 */}
+                      <div className="p-2.5 h-[66px] bg-white/90 backdrop-blur-sm">
+                        <div className="flex items-start gap-2">
+                          <svg className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 text-sm truncate">
+                              {message.location.name}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                              {message.location.address}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                    ) : message.messageType === 'emoji' && message.emojiUrl ? (
                      <div className="rounded-2xl overflow-hidden shadow-lg max-w-[200px]">
                        <img 

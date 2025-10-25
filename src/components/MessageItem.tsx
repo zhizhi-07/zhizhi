@@ -481,7 +481,7 @@ const MessageItem = ({
             )}
           </div>
           <div 
-            className="bg-white rounded-lg shadow-sm overflow-hidden max-w-[240px] cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-white rounded-lg shadow-sm overflow-hidden w-[200px] cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => onViewLocation(message)}
             onTouchStart={(e) => onLongPressStart(message, e)}
             onTouchEnd={onLongPressEnd}
@@ -489,14 +489,14 @@ const MessageItem = ({
             onMouseUp={onLongPressEnd}
             onMouseLeave={onLongPressEnd}
           >
-            <div className="h-24 bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center">
-              <svg className="w-12 h-12 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+            <div className="h-20 bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center">
+              <svg className="w-10 h-10 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
             </div>
-            <div className="p-3">
-              <div className="font-medium text-sm text-gray-800 mb-1">{message.location.name}</div>
-              <div className="text-xs text-gray-500">{message.location.address}</div>
+            <div className="p-2.5 h-[60px]">
+              <div className="font-medium text-sm text-gray-800 mb-1 truncate">{message.location.name}</div>
+              <div className="text-xs text-gray-500 line-clamp-2">{message.location.address}</div>
             </div>
           </div>
         </div>
