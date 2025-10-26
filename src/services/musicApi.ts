@@ -53,8 +53,8 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
         limit: limit.toString()
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/music-api`
+      // 生产环境：使用Vercel API
+      apiUrl = `/api/music-api`
       params = new URLSearchParams({
         action: 'search',
         keyword: keyword,
@@ -122,8 +122,8 @@ export async function getSongUrl(id: number): Promise<string | null> {
         br: '320000'
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/music-api`
+      // 生产环境：使用Vercel API
+      apiUrl = `/api/music-api`
       params = new URLSearchParams({
         action: 'url',
         id: id.toString()
@@ -169,8 +169,8 @@ export async function getLyric(id: number): Promise<string | null> {
         tv: '-1'
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/music-api`
+      // 生产环境：使用Vercel API
+      apiUrl = `/api/music-api`
       params = new URLSearchParams({
         action: 'lyric',
         id: id.toString()
