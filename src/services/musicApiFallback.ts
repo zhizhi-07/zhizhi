@@ -16,37 +16,51 @@ export interface OnlineSong {
 
 /**
  * 使用QQ音乐API搜索（备用方案1）
- * 通过Vite代理避免CORS
+ * 开发环境使用Vite代理，生产环境使用Netlify Function
  */
 async function searchQQMusic(keyword: string, limit: number = 30): Promise<OnlineSong[]> {
   try {
-    // 使用Vite代理
-    const apiUrl = `/api/qq/soso/fcgi-bin/client_search_cp`
-    const params = new URLSearchParams({
-      ct: '24',
-      qqmusic_ver: '1298',
-      new_json: '1',
-      remoteplace: 'txt.yqq.song',
-      searchid: Math.random().toString(),
-      t: '0',
-      aggr: '1',
-      cr: '1',
-      catZhida: '1',
-      lossless: '0',
-      flag_qc: '0',
-      p: '1',
-      n: limit.toString(),
-      w: keyword,
-      g_tk: '5381',
-      loginUin: '0',
-      hostUin: '0',
-      format: 'json',
-      inCharset: 'utf8',
-      outCharset: 'utf-8',
-      notice: '0',
-      platform: 'yqq.json',
-      needNewCode: '0'
-    })
+    const isDev = import.meta.env.DEV
+    let apiUrl: string
+    let params: URLSearchParams
+    
+    if (isDev) {
+      // 开发环境：使用Vite代理
+      apiUrl = `/api/qq/soso/fcgi-bin/client_search_cp`
+      params = new URLSearchParams({
+        ct: '24',
+        qqmusic_ver: '1298',
+        new_json: '1',
+        remoteplace: 'txt.yqq.song',
+        searchid: Math.random().toString(),
+        t: '0',
+        aggr: '1',
+        cr: '1',
+        catZhida: '1',
+        lossless: '0',
+        flag_qc: '0',
+        p: '1',
+        n: limit.toString(),
+        w: keyword,
+        g_tk: '5381',
+        loginUin: '0',
+        hostUin: '0',
+        format: 'json',
+        inCharset: 'utf8',
+        outCharset: 'utf-8',
+        notice: '0',
+        platform: 'yqq.json',
+        needNewCode: '0'
+      })
+    } else {
+      // 生产环境：使用Netlify Function
+      apiUrl = `/.netlify/functions/music-api`
+      params = new URLSearchParams({
+        action: 'search-qq',
+        keyword: keyword,
+        limit: limit.toString()
+      })
+    }
 
     const response = await fetch(`${apiUrl}?${params}`, {
       method: 'GET'
