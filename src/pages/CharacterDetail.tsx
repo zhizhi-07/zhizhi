@@ -106,8 +106,13 @@ const CharacterDetail = () => {
         <div className="mb-3">
           <div className="glass-card rounded-2xl overflow-hidden">
             <div className="px-4 py-4 border-b border-gray-100">
-              <div className="text-xs text-gray-500 mb-2">角色名字</div>
+              <div className="text-xs text-gray-500 mb-2">真实名字</div>
               <div className="text-gray-900">{character.name}</div>
+            </div>
+
+            <div className="px-4 py-4 border-b border-gray-100">
+              <div className="text-xs text-gray-500 mb-2">网名</div>
+              <div className="text-gray-900">{character.nickname || character.name}</div>
             </div>
 
             <div className="px-4 py-4 border-b border-gray-100">

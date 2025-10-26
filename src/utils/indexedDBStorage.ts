@@ -29,23 +29,54 @@ export function resetDBConnection(): void {
  * 初始化数据库
  */
 export async function initDB(): Promise<IDBDatabase> {
-  if (dbInstance) return dbInstance
+  if (dbInstance) {
+    console.log('[initDB] 使用缓存的数据库实例')
+    return dbInstance
+  }
 
+  console.log('[initDB] 打开数据库...')
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
+    let resolved = false
+
+    // 超时保护：10秒后强制失败
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        console.error('[initDB] ❌ 数据库打开超时（10秒）！')
+        console.error('[initDB] 可能原因：')
+        console.error('  1. 其他标签页正在使用数据库')
+        console.error('  2. 数据库被锁定')
+        console.error('  3. 浏览器权限问题')
+        reject(new Error('IndexedDB 初始化超时'))
+      }
+    }, 10000)
 
     request.onerror = () => {
-      console.error('❌ IndexedDB 打开失败:', request.error)
-      reject(request.error)
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        console.error('[initDB] ❌ 打开失败:', request.error)
+        reject(request.error)
+      }
+    }
+
+    request.onblocked = () => {
+      console.warn('[initDB] ⚠️ 数据库被阻塞！请关闭其他标签页')
     }
 
     request.onsuccess = () => {
-      dbInstance = request.result
-      console.log('✅ IndexedDB 初始化成功')
-      resolve(dbInstance)
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        dbInstance = request.result
+        console.log('[initDB] ✅ 初始化成功')
+        resolve(dbInstance)
+      }
     }
 
     request.onupgradeneeded = (event) => {
+      console.log('[initDB] 触发数据库升级...')
       const db = (event.target as IDBOpenDBRequest).result
       const oldVersion = event.oldVersion
       
@@ -141,22 +172,43 @@ export async function getIndexedDBItem<T>(storeName: string, key: string): Promi
  */
 export async function getAllIndexedDBItems<T>(storeName: string): Promise<T[]> {
   try {
+    console.log(`[IndexedDB] 初始化数据库...`)
     const db = await initDB()
+    console.log(`[IndexedDB] 创建事务...`)
     const transaction = db.transaction([storeName], 'readonly')
     const store = transaction.objectStore(storeName)
+    console.log(`[IndexedDB] 执行 getAll()...`)
     const request = store.getAll()
     
     return new Promise((resolve, reject) => {
+      let resolved = false
+      
       request.onsuccess = () => {
-        resolve(request.result || [])
+        if (!resolved) {
+          resolved = true
+          console.log(`[IndexedDB] getAll() 成功，返回 ${(request.result || []).length} 条数据`)
+          resolve(request.result || [])
+        }
       }
       request.onerror = () => {
-        console.error(`❌ 读取所有 ${storeName} 失败:`, request.error)
-        reject(request.error)
+        if (!resolved) {
+          resolved = true
+          console.error(`[IndexedDB] getAll() 失败:`, request.error)
+          resolve([]) // 失败时返回空数组而不是reject
+        }
       }
+      
+      // 添加超时保护
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          console.error(`[IndexedDB] getAll() 超时（5秒）！强制返回空数组`)
+          resolve([])
+        }
+      }, 5000)
     })
   } catch (error) {
-    console.error('读取失败:', error)
+    console.error('[IndexedDB] 异常:', error)
     return []
   }
 }

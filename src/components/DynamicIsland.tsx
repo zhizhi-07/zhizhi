@@ -114,9 +114,9 @@ const DynamicIsland = ({
         }`}
         onClick={handleClick}
       >
-        <div className="bg-black rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg cursor-pointer hover:scale-105 transition-transform w-[200px]">
+        <div className="bg-black rounded-full px-2.5 py-1.5 flex items-center gap-1.5 shadow-lg cursor-pointer hover:scale-105 transition-transform w-[150px]">
           {/* 封面 */}
-          <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+          <div className="w-5 h-5 rounded-full overflow-hidden flex-shrink-0">
             <img
               src={currentSong.cover}
               alt={currentSong.title}
@@ -163,12 +163,12 @@ const DynamicIsland = ({
         }`}
       >
         <div 
-          className="bg-black rounded-3xl p-4 w-[350px] shadow-2xl"
+          className="bg-black rounded-3xl p-4 w-[320px] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* 顶部信息 */}
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0">
               <img
                 src={currentSong.cover}
                 alt={currentSong.title}

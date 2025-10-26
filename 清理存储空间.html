@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器存储空间诊断工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+        }
+        .info {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        button.danger {
+            background: #dc3545;
+        }
+        button.danger:hover {
+            background: #c82333;
+        }
+        .progress {
+            margin: 20px 0;
+        }
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .storage-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .storage-item button {
+            padding: 5px 15px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 浏览器存储空间诊断工具</h1>
+        
+        <div id="diagnosis" class="info">
+            <h3>📊 正在检测...</h3>
+        </div>
+
+        <div class="progress">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill">0%</div>
+            </div>
+        </div>
+
+        <div id="storageList"></div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="diagnose()">🔄 重新检测</button>
+            <button class="danger" onclick="clearOtherSites()">🗑️ 清理其他网站数据</button>
+            <button onclick="requestMore()">📈 申请更多空间</button>
+        </div>
+
+        <div id="instructions" style="margin-top: 30px;"></div>
+    </div>
+
+    <script>
+        async function diagnose() {
+            const diagDiv = document.getElementById('diagnosis');
+            const progressFill = document.getElementById('progressFill');
+            const listDiv = document.getElementById('storageList');
+            const instructDiv = document.getElementById('instructions');
+            
+            try {
+                // 检查 Storage API
+                if ('storage' in navigator && 'estimate' in navigator.storage) {
+                    const estimate = await navigator.storage.estimate();
+                    const usage = estimate.usage || 0;
+                    const quota = estimate.quota || 0;
+                    const usageMB = (usage / 1024 / 1024).toFixed(2);
+                    const quotaMB = (quota / 1024 / 1024).toFixed(2);
+                    const percentage = ((usage / quota) * 100).toFixed(1);
+                    
+                    progressFill.style.width = percentage + '%';
+                    progressFill.textContent = percentage + '%';
+                    
+                    let diagClass = 'info';
+                    let message = '';
+                    
+                    if (percentage > 90) {
+                        diagClass = 'error';
+                        message = `❌ 存储空间严重不足！`;
+                    } else if (percentage > 70) {
+                        diagClass = 'warning';
+                        message = `⚠️ 存储空间紧张！`;
+                    } else {
+                        diagClass = 'success';
+                        message = `✅ 存储空间充足！`;
+                    }
+                    
+                    diagDiv.className = 'info ' + diagClass;
+                    diagDiv.innerHTML = `
+                        <h3>${message}</h3>
+                        <p><strong>已使用：</strong>${usageMB} MB</p>
+                        <p><strong>总配额：</strong>${quotaMB} MB</p>
+                        <p><strong>可用：</strong>${(quotaMB - usageMB).toFixed(2)} MB</p>
+                        <p><strong>占用率：</strong>${percentage}%</p>
+                    `;
+                    
+                    // 检查 localStorage 占用
+                    checkLocalStorage(listDiv);
+                    
+                    // 提供建议
+                    if (percentage > 70) {
+                        instructDiv.innerHTML = `
+                            <div class="info warning">
+                                <h3>💡 解决建议：</h3>
+                                <ol>
+                                    <li><strong>清理浏览器缓存：</strong><br>
+                                        Chrome: 设置 → 隐私和安全 → 清除浏览数据<br>
+                                        只勾选"缓存的图片和文件"，不要勾选Cookie</li>
+                                    <li><strong>清理其他网站的localStorage：</strong><br>
+                                        点击上方"清理其他网站数据"按钮</li>
+                                    <li><strong>申请持久化存储：</strong><br>
+                                        点击上方"申请更多空间"按钮</li>
+                                </ol>
+                            </div>
+                        `;
+                    }
+                } else {
+                    diagDiv.className = 'info error';
+                    diagDiv.innerHTML = '<h3>❌ 浏览器不支持 Storage API</h3>';
+                }
+            } catch (error) {
+                diagDiv.className = 'info error';
+                diagDiv.innerHTML = `<h3>❌ 检测失败：${error.message}</h3>`;
+            }
+        }
+        
+        function checkLocalStorage(container) {
+            container.innerHTML = '<h3>📦 localStorage 占用详情：</h3>';
+            
+            let total = 0;
+            const items = [];
+            
+            for (let key in localStorage) {
+                if (localStorage.hasOwnProperty(key)) {
+                    const value = localStorage.getItem(key);
+                    const size = new Blob([value]).size;
+                    total += size;
+                    items.push({ key, size });
+                }
+            }
+            
+            items.sort((a, b) => b.size - a.size);
+            
+            container.innerHTML += `<p><strong>总计：</strong>${(total / 1024 / 1024).toFixed(2)} MB (${items.length} 个条目)</p>`;
+            
+            items.slice(0, 10).forEach(item => {
+                const sizeMB = (item.size / 1024 / 1024).toFixed(2);
+                const isEmoji = item.key.includes('custom_emojis');
+                container.innerHTML += `
+                    <div class="storage-item" style="${isEmoji ? 'background: #d4edda;' : ''}">
+                        <div>
+                            <strong>${item.key}</strong>
+                            <span style="color: #666;"> - ${sizeMB} MB</span>
+                        </div>
+                        ${!isEmoji ? `<button onclick="deleteItem('${item.key}')">删除</button>` : '<span style="color: #28a745;">✓ 当前应用</span>'}
+                    </div>
+                `;
+            });
+        }
+        
+        function deleteItem(key) {
+            if (confirm(`确定要删除 "${key}" 吗？`)) {
+                localStorage.removeItem(key);
+                diagnose();
+                alert('已删除！');
+            }
+        }
+        
+        function clearOtherSites() {
+            if (confirm('这将清除本域名下除表情包外的所有 localStorage 数据，确定吗？')) {
+                const toKeep = [];
+                for (let key in localStorage) {
+                    if (localStorage.hasOwnProperty(key) && key.includes('custom_emojis')) {
+                        toKeep.push({ key, value: localStorage.getItem(key) });
+                    }
+                }
+                
+                localStorage.clear();
+                
+                toKeep.forEach(item => {
+                    localStorage.setItem(item.key, item.value);
+                });
+                
+                diagnose();
+                alert('✅ 清理完成！');
+            }
+        }
+        
+        async function requestMore() {
+            if ('storage' in navigator && 'persist' in navigator.storage) {
+                const isPersisted = await navigator.storage.persist();
+                if (isPersisted) {
+                    alert('✅ 持久化存储已授权！刷新页面查看新配额。');
+                    window.location.reload();
+                } else {
+                    alert('⚠️ 持久化存储未授权。\n\n请手动设置：\n1. 点击地址栏左侧的锁图标 🔒\n2. 网站设置 → 权限\n3. 允许此网站存储数据');
+                }
+            } else {
+                alert('❌ 浏览器不支持持久化存储 API');
+            }
+        }
+        
+        // 自动运行
+        diagnose();
+    </script>
+</body>
+</html>

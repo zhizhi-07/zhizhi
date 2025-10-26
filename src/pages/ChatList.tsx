@@ -8,6 +8,8 @@ import { getStreakData } from '../utils/streakSystem'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { getAiAvatar } from '../utils/avatarUtils'
+import { getUnreadCount } from '../utils/unreadMessages'
+import { isAIReplying } from '../utils/backgroundAI'
 
 interface Chat {
   id: string
@@ -35,6 +37,8 @@ const ChatList = () => {
   })
   const [showMenu, setShowMenu] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({})
 
   // 保存聊天列表到localStorage
   useEffect(() => {
@@ -88,6 +92,38 @@ const ChatList = () => {
       return hasChanges ? updated : prev
     })
   }, [groups])
+
+  // 实时更新未读消息数和AI输入状态
+  useEffect(() => {
+    const updateStatus = () => {
+      const newUnreadCounts: Record<string, number> = {}
+      const newTypingStatus: Record<string, boolean> = {}
+      
+      chats.forEach(chat => {
+        if (chat.type === 'single' && chat.characterId) {
+          // 获取未读消息数
+          const unread = getUnreadCount(chat.characterId)
+          if (unread > 0) {
+            newUnreadCounts[chat.characterId] = unread
+          }
+          
+          // 检查AI是否正在回复
+          newTypingStatus[chat.characterId] = isAIReplying(chat.characterId)
+        }
+      })
+      
+      setUnreadCounts(newUnreadCounts)
+      setTypingStatus(newTypingStatus)
+    }
+    
+    // 立即执行一次
+    updateStatus()
+    
+    // 每500ms更新一次
+    const interval = setInterval(updateStatus, 500)
+    
+    return () => clearInterval(interval)
+  }, [chats])
 
   // 获取未添加到聊天列表的角色
   const availableCharacters = characters.filter(
@@ -144,7 +180,7 @@ const ChatList = () => {
       id: characterId,
       characterId: characterId,
       type: 'single',
-      name: character.name,
+      name: character.nickname || character.name,
       avatar: character.avatar,
       lastMessage: '开始聊天吧',
       time: new Date().toLocaleTimeString('zh-CN', {
@@ -246,8 +282,12 @@ const ChatList = () => {
           </div>
         ) : (
           chats.map((chat) => {
-            const isCustomAvatar = chat.avatar && chat.avatar.startsWith('data:image')
             const isGroup = chat.type === 'group'
+            
+            // 获取角色最新的数据（实时同步网名和头像）
+            const character = chat.characterId ? characters.find(c => c.id === chat.characterId) : null
+            const displayName = isGroup ? chat.name : (character?.nickname || character?.name || chat.name)
+            const displayAvatar = isGroup ? chat.avatar : (character?.avatar || chat.avatar) // 使用最新头像
             
             return (
               <div
@@ -260,7 +300,7 @@ const ChatList = () => {
                   renderGroupAvatar(chat.groupId)
                 ) : (
                   <div className="w-14 h-14 rounded-2xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
-                    <img src={getAiAvatar(chat.avatar)} alt={chat.name} className="w-full h-full object-cover" />
+                    <img src={getAiAvatar(displayAvatar)} alt={displayName} className="w-full h-full object-cover" />
                   </div>
                 )}
 
@@ -268,7 +308,7 @@ const ChatList = () => {
               <div className="flex-1 ml-4 overflow-hidden">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-gray-900">{chat.name}</span>
+                    <span className="font-medium text-gray-900">{displayName}</span>
                     {isGroup && chat.memberCount && (
                       <span className="text-xs text-gray-400">({chat.memberCount})</span>
                     )}
@@ -284,18 +324,30 @@ const ChatList = () => {
                   <span className="text-xs text-gray-400">{chat.time}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-500 truncate flex-1">
-                    {chat.lastMessage}
-                  </p>
-                  {chat.unread && (
-                    <span
-                      className={`ml-2 px-2 min-w-[20px] h-5 rounded-full text-xs text-white flex items-center justify-center ${
-                        chat.muted ? 'bg-gray-400' : 'bg-red-500'
-                      } shadow-md`}
-                    >
-                      {chat.unread > 99 ? '99+' : chat.unread}
-                    </span>
+                  {/* 显示"正在输入..."或最后一条消息 */}
+                  {chat.characterId && typingStatus[chat.characterId] ? (
+                    <p className="text-sm text-green-500 truncate flex-1">
+                      正在输入...
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 truncate flex-1">
+                      {chat.lastMessage}
+                    </p>
                   )}
+                  
+                  {/* 显示未读消息数（实时） */}
+                  {(() => {
+                    const unreadCount = chat.characterId ? unreadCounts[chat.characterId] : (chat.unread || 0)
+                    return unreadCount > 0 ? (
+                      <span
+                        className={`ml-2 px-2 min-w-[20px] h-5 rounded-full text-xs text-white flex items-center justify-center ${
+                          chat.muted ? 'bg-gray-400' : 'bg-red-500'
+                        } shadow-md`}
+                      >
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    ) : null
+                  })()}
                 </div>
               </div>
             </div>
@@ -350,10 +402,10 @@ const ChatList = () => {
                         className="flex items-center p-4 glass-card rounded-2xl ios-button cursor-pointer hover:bg-gray-50"
                       >
                         <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden">
-                          <img src={getAiAvatar(character.avatar)} alt={character.name} className="w-full h-full object-cover" />
+                          <img src={getAiAvatar(character.avatar)} alt={character.nickname || character.name} className="w-full h-full object-cover" />
                         </div>
                         <div className="ml-3 flex-1 overflow-hidden">
-                          <h3 className="font-medium text-gray-900">{character.name}</h3>
+                          <h3 className="font-medium text-gray-900">{character.nickname || character.name}</h3>
                           {character.signature && (
                             <p className="text-sm text-gray-500 truncate">{character.signature}</p>
                           )}

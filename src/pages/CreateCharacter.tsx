@@ -17,6 +17,7 @@ const CreateCharacter = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    nickname: '',  // 网名
     username: '',
     avatar: '',
     signature: '',
@@ -37,6 +38,7 @@ const CreateCharacter = () => {
   const [avatarPreview, setAvatarPreview] = useState('')
   const [isUploading, setIsUploading] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [importedLorebookId, setImportedLorebookId] = useState<string | null>(null)
 
   // 处理头像上传
   const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,10 +55,39 @@ const CreateCharacter = () => {
 
     // 读取图片并转换为base64
     const reader = new FileReader()
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64String = reader.result as string
       setAvatarPreview(base64String)
       setFormData({ ...formData, avatar: base64String })
+      
+      // 🔍 触发AI头像识图（在保存角色时会用）
+      try {
+        console.log('👁️ 开始识别AI角色头像...')
+        const visionResponse = await fetch('/.netlify/functions/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: base64String,
+            prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+          })
+        })
+        
+        if (visionResponse.ok) {
+          const visionData = await visionResponse.json()
+          const avatarDescription = visionData.description || visionData.result
+          
+          // 临时保存识图结果（角色创建后会用角色ID重新保存）
+          sessionStorage.setItem('pending_character_avatar_description', avatarDescription)
+          // 🔑 临时保存头像指纹（前200字符）
+          sessionStorage.setItem('pending_character_avatar_fingerprint', base64String.substring(0, 200))
+          console.log('✅ AI角色头像识别完成:', avatarDescription)
+        } else {
+          console.warn('⚠️ 头像识别失败')
+        }
+      } catch (error) {
+        console.error('❌ 头像识别异常:', error)
+      }
+      
       setIsUploading(false)
     }
     reader.onerror = () => {
@@ -106,6 +137,7 @@ const CreateCharacter = () => {
         // 填充表单
         setFormData({
           name: converted.name,
+          nickname: '',  // 导入的角色卡默认没有网名，留空
           username: converted.username,
           avatar: converted.avatar,
           signature: converted.signature,
@@ -153,7 +185,8 @@ const CreateCharacter = () => {
               const importedLorebook = lorebookManager.importLorebook(JSON.stringify(lorebookData))
               if (importedLorebook) {
                 lorebookImported = true
-                console.log('世界书导入成功:', importedLorebook.name)
+                setImportedLorebookId(importedLorebook.id) // 保存世界书ID，等角色创建后关联
+                console.log('世界书导入成功:', importedLorebook.name, 'ID:', importedLorebook.id)
               }
             } catch (error) {
               console.error('世界书导入失败:', error)
@@ -248,8 +281,34 @@ const CreateCharacter = () => {
       }
       
       console.log('准备保存角色...')
-      addCharacter(characterData)
+      const newCharacter = addCharacter(characterData)
       console.log('角色保存成功，准备跳转...')
+      
+      // 🔍 保存头像识图结果
+      const avatarDescription = sessionStorage.getItem('pending_character_avatar_description')
+      const avatarFingerprint = sessionStorage.getItem('pending_character_avatar_fingerprint')
+      if (avatarDescription && newCharacter?.id) {
+        localStorage.setItem(`character_avatar_description_${newCharacter.id}`, avatarDescription)
+        localStorage.setItem(`character_avatar_recognized_at_${newCharacter.id}`, Date.now().toString())
+        if (avatarFingerprint) {
+          localStorage.setItem(`character_avatar_fingerprint_${newCharacter.id}`, avatarFingerprint)
+        }
+        sessionStorage.removeItem('pending_character_avatar_description')
+        sessionStorage.removeItem('pending_character_avatar_fingerprint')
+        console.log('✅ AI角色头像识图结果已保存')
+      }
+      
+      // 如果有导入的世界书，关联到新创建的角色
+      if (importedLorebookId && newCharacter) {
+        const lorebook = lorebookManager.getLorebook(importedLorebookId)
+        if (lorebook) {
+          const updatedCharacterIds = [...lorebook.character_ids, newCharacter.id]
+          lorebookManager.updateLorebook(importedLorebookId, {
+            character_ids: updatedCharacterIds
+          })
+          console.log('✅ 世界书已自动关联到角色:', newCharacter.name, '世界书ID:', importedLorebookId)
+        }
+      }
       
       // 使用 setTimeout 确保状态更新完成
       setTimeout(() => {
@@ -381,12 +440,27 @@ const CreateCharacter = () => {
           </div>
           <div className="glass-card rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <label className="block text-xs text-gray-500 mb-1">角色名字 *</label>
+              <label className="block text-xs text-gray-500 mb-1">真实名字 *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="请输入角色名字"
+                placeholder="请输入角色真实名字"
+                maxLength={20}
+                className="w-full bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+              />
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-500 mb-1">
+                网名
+                <span className="text-gray-400 ml-2">（留空则显示真实名字）</span>
+              </label>
+              <input
+                type="text"
+                value={formData.nickname}
+                onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                placeholder="角色的网名，AI可自主修改"
                 maxLength={20}
                 className="w-full bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
               />

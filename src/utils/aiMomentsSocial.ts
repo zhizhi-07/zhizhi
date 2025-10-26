@@ -1,5 +1,6 @@
 import { callAI } from './api'
 import { Moment } from '../context/MomentsContext'
+import { addMomentNotification } from './momentsNotification'
 
 // 构建AI查看朋友圈的提示词（包括其他AI的朋友圈）
 export const buildSocialMomentsPrompt = (
@@ -420,6 +421,16 @@ export const triggerAIReactToComment = async (
           console.log(`👍 ${result.characterName} 决定点赞，正在执行...`)
           likeMoment(momentId, result.characterId, result.characterName, character.avatar)
           console.log(`✅ ${result.characterName} 点赞成功！`)
+          
+          // 添加通知
+          addMomentNotification({
+            type: 'like',
+            momentId: momentId,
+            momentContent: moment.content,
+            fromUserId: result.characterId,
+            fromUserName: result.characterName,
+            fromUserAvatar: character.avatar
+          })
         } else {
           console.log(`⏭️ ${result.characterName} 已经点赞过了`)
         }
@@ -439,6 +450,17 @@ export const triggerAIReactToComment = async (
           addComment(momentId, result.characterId, result.characterName, character.avatar, result.comment)
           console.log(`💬 ${result.characterName} 回复了: ${result.comment}`)
           existingComments.push(result.comment.toLowerCase().trim())
+          
+          // 添加通知
+          addMomentNotification({
+            type: 'comment',
+            momentId: momentId,
+            momentContent: moment.content,
+            fromUserId: result.characterId,
+            fromUserName: result.characterName,
+            fromUserAvatar: character.avatar,
+            comment: result.comment
+          })
         }
       }
       

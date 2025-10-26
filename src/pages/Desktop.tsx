@@ -6,7 +6,7 @@ import CalendarWidget from '../components/CalendarWidget'
 import { 
   MusicIcon, HeartIcon, PauseIcon, SkipForwardIcon, PlayIcon,
   ChatIcon, SettingsIcon, FileIcon, ImageIcon,
-  CameraIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon, BookIcon
+  CameraIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon
 } from '../components/Icons'
 
 // 应用数据类型
@@ -28,6 +28,7 @@ const Desktop = () => {
   const touchEndX = useRef(0)
   const touchStartY = useRef(0)
   const touchEndY = useRef(0)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // 更新时间
   useEffect(() => {
@@ -36,6 +37,41 @@ const Desktop = () => {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
+  
+  // 阻止浏览器的滑动手势（后退/前进）
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    
+    let startX = 0
+    let startY = 0
+    
+    const handleTouchStartPassive = (e: TouchEvent) => {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+    }
+    
+    const handleTouchMovePassive = (e: TouchEvent) => {
+      const touch = e.touches[0]
+      const diffX = Math.abs(touch.clientX - startX)
+      const diffY = Math.abs(touch.clientY - startY)
+      
+      // 如果是水平滑动（X方向移动大于Y方向，且移动超过10px），阻止浏览器的后退手势
+      if (diffX > diffY && diffX > 10) {
+        e.preventDefault()
+      }
+      // 如果主要是垂直滑动，允许页面内滚动
+    }
+    
+    // 使用原生事件监听，设置 passive: false 让 preventDefault 生效
+    container.addEventListener('touchstart', handleTouchStartPassive)
+    container.addEventListener('touchmove', handleTouchMovePassive, { passive: false })
+    
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStartPassive)
+      container.removeEventListener('touchmove', handleTouchMovePassive)
+    }
+  }, [])
 
   // 第一页应用
   const page1Apps: AppItem[] = [
@@ -43,7 +79,7 @@ const Desktop = () => {
     { id: 'preset', name: '预设', icon: SettingsIcon, color: 'glass-card', route: '/preset' },
     { id: 'worldbook', name: '世界书', icon: FileIcon, color: 'glass-card', route: '/worldbook' },
     { id: 'music-app', name: '音乐', icon: MusicIcon, color: 'glass-card', route: '/music-player' },
-    { id: 'settings', name: '应用设置', icon: SettingsIcon, color: 'glass-card', route: '/settings' },
+    { id: 'settings', name: '系统设置', icon: SettingsIcon, color: 'glass-card', route: '/settings-new' },
   ]
 
   // 第二页应用
@@ -58,7 +94,7 @@ const Desktop = () => {
 
   // Dock 应用
   const dockApps: AppItem[] = [
-    { id: 'story', name: '故事', icon: BookIcon, color: 'glass-card', route: '/story' },
+    { id: 'offline', name: '线下', icon: ChatIcon, color: 'glass-card', route: '/offline-chat' },
     { id: 'wechat', name: '微信', icon: ChatIcon, color: 'glass-card', route: '/wechat' },
     { id: 'music', name: '音乐', icon: MusicIcon, color: 'glass-card', route: '/music-player' },
     { id: 'browser', name: '浏览器', icon: BrowserIcon, color: 'glass-card', route: '/browser' },
@@ -84,15 +120,6 @@ const Desktop = () => {
   const handleTouchMove = (e: React.TouchEvent) => {
     touchEndX.current = e.touches[0].clientX
     touchEndY.current = e.touches[0].clientY
-    
-    // 计算滑动距离
-    const diffX = Math.abs(touchEndX.current - touchStartX.current)
-    const diffY = Math.abs(touchEndY.current - touchStartY.current)
-    
-    // 如果是水平滑动（X方向移动大于Y方向），阻止默认行为（防止浏览器返回）
-    if (diffX > diffY && diffX > 10) {
-      e.preventDefault()
-    }
   }
 
   // 触摸结束 - 判断滑动方向
@@ -112,7 +139,7 @@ const Desktop = () => {
   }
 
   return (
-    <div className="h-screen w-full relative overflow-hidden bg-[#f5f7fa]">
+    <div className="h-screen w-full relative overflow-hidden bg-[#f5f7fa]" style={{ touchAction: 'pan-y pinch-zoom' }}>
       {/* 背景 */}
       <div className="absolute inset-0 bg-gradient-to-b from-white/50 to-gray-100/30" />
       
@@ -122,7 +149,9 @@ const Desktop = () => {
 
         {/* 主要内容区域 - 整页滑动 */}
         <div 
+          ref={containerRef}
           className="flex-1 overflow-hidden"
+          style={{ touchAction: 'none' }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -132,7 +161,7 @@ const Desktop = () => {
             style={{ transform: `translateX(-${currentPage * 100}%)` }}
           >
             {/* ========== 第一页 ========== */}
-            <div className="min-w-full h-full px-4 py-2 overflow-y-auto flex flex-col">
+            <div className="min-w-full h-full px-4 py-2 overflow-y-auto flex flex-col hide-scrollbar">
               {/* 大时间 */}
               <div className="p-6 mb-4 text-center">
                 <div className="text-8xl font-bold text-gray-900 mb-2">
@@ -256,7 +285,7 @@ const Desktop = () => {
             </div>
 
             {/* ========== 第二页 ========== */}
-            <div className="min-w-full h-full px-4 py-2 overflow-y-auto flex flex-col">
+            <div className="min-w-full h-full px-4 py-2 overflow-y-auto flex flex-col hide-scrollbar">
               {/* 天气小组件 */}
               <div className="glass-card rounded-3xl p-4 shadow-lg border border-white/30 relative bg-gradient-to-br from-white/80 to-white/40 mb-4" style={{ overflow: 'visible' }}>
                 <div className="absolute -top-2 -right-2 w-20 h-20">

@@ -11,7 +11,16 @@ export interface ApiSettings {
 
 interface Message {
   role: 'system' | 'user' | 'assistant'
-  content: string
+  content: string | MessageContent[]
+}
+
+interface MessageContent {
+  type: 'text' | 'image_url'
+  text?: string
+  image_url?: {
+    url: string
+    detail?: 'low' | 'high' | 'auto'
+  }
 }
 
 /**
@@ -70,6 +79,16 @@ async function callOpenAIFormatAPI(messages: Message[], settings: ApiSettings): 
       throw new Error(`API认证失败 (${response.status})，请检查API密钥`)
     }
     
+    // 检测是否是Vision模型错误
+    if (response.status === 400 && (
+      errorText.includes('VLM') || 
+      errorText.includes('Vision') ||
+      errorText.includes('image') ||
+      errorText.includes('multimodal')
+    )) {
+      throw new Error('VISION_NOT_SUPPORTED')
+    }
+    
     throw new Error(`API调用失败 (${response.status})`)
   }
   
@@ -109,13 +128,65 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
   console.log('📡 请求URL:', `${baseUrl}/models/${model}:generateContent`)
   console.log('🤖 使用模型:', model)
   
-  // 转换消息格式为Google格式
-  const prompt = messages.map(msg => {
-    if (msg.role === 'system') return msg.content
-    if (msg.role === 'user') return `用户: ${msg.content}`
-    if (msg.role === 'assistant') return `助手: ${msg.content}`
-    return msg.content
-  }).join('\n\n')
+  // 转换消息格式为Gemini格式（支持Vision）
+  const geminiContents = []
+  let systemPrompt = ''
+  
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      // 系统提示词合并到第一条用户消息
+      systemPrompt = typeof msg.content === 'string' ? msg.content : ''
+      continue
+    }
+    
+    const parts = []
+    
+    // 如果有系统提示词，添加到第一条用户消息
+    if (systemPrompt && msg.role === 'user') {
+      parts.push({ text: systemPrompt })
+      systemPrompt = '' // 只添加一次
+    }
+    
+    if (typeof msg.content === 'string') {
+      // 纯文字消息
+      parts.push({ text: msg.content })
+    } else if (Array.isArray(msg.content)) {
+      // 包含图片的消息
+      for (const item of msg.content) {
+        if (item.type === 'text' && item.text) {
+          parts.push({ text: item.text })
+        } else if (item.type === 'image_url' && item.image_url) {
+          const imageUrl = item.image_url.url
+          // 检查是base64还是URL
+          if (imageUrl.startsWith('data:image')) {
+            // base64格式
+            const matches = imageUrl.match(/data:image\/(\w+);base64,(.+)/)
+            if (matches) {
+              parts.push({
+                inline_data: {
+                  mime_type: `image/${matches[1]}`,
+                  data: matches[2]
+                }
+              })
+              console.log('📷 添加base64图片到Gemini请求')
+            }
+          } else if (imageUrl.startsWith('http')) {
+            // HTTP URL - Gemini需要先下载转base64
+            console.warn('⚠️ Gemini不直接支持HTTP URL图片，需要转换为base64')
+            // 暂时跳过HTTP URL图片
+            parts.push({
+              text: '[图片链接: ' + imageUrl + ']'
+            })
+          }
+        }
+      }
+    }
+    
+    geminiContents.push({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: parts
+    })
+  }
   
   const response = await fetchWithTimeout(url, {
     method: 'POST',
@@ -123,11 +194,7 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      contents: [{
-        parts: [{
-          text: prompt
-        }]
-      }],
+      contents: geminiContents,
       generationConfig: {
         temperature: settings.temperature ?? 0.7,
         maxOutputTokens: settings.maxTokens || 2000
@@ -191,8 +258,9 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
   
   if (baseUrl.includes('generativelanguage.googleapis.com') || 
       baseUrl.includes('zhizhi.2373922440jhj.workers.dev') ||
-      baseUrl.includes('netlify/functions/gemini-proxy')) {
-    // Google Gemini 官方 API 或你的 Gemini 反代
+      baseUrl.includes('netlify/functions/gemini-proxy') ||
+      baseUrl.includes('hiapi.online')) {
+    // Google Gemini 官方 API 或反代
     actualProvider = 'google'
   } else if (baseUrl.includes('api.openai.com')) {
     actualProvider = 'openai'
@@ -217,7 +285,11 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
     : [{ role: 'user', content: messages }]
   
   console.log('💬 发送消息数量:', apiMessages.length)
-  console.log('📝 最后一条消息:', apiMessages[apiMessages.length - 1]?.content?.substring(0, 100) + '...')
+  const lastContent = apiMessages[apiMessages.length - 1]?.content
+  const contentPreview = typeof lastContent === 'string' 
+    ? lastContent.substring(0, 100) 
+    : '[包含图片]'
+  console.log('📝 最后一条消息:', contentPreview + '...')
   
   let lastError: Error | null = null
   

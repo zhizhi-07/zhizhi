@@ -23,8 +23,13 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
   }, [show])
 
   const loadEmojis = async () => {
-    const loaded = await getEmojis()
-    setEmojis(loaded)
+    try {
+      const loaded = await getEmojis()
+      setEmojis(loaded)
+    } catch (error) {
+      console.error('加载失败:', error)
+      setEmojis([])
+    }
   }
 
   const handleBatchFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,13 +105,13 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
         }
       }
       
-      // 显示结果
+      // 显示结果（只在有错误时弹窗）
       if (successCount > 0 && failedCount === 0) {
-        alert(`✅ 成功添加 ${successCount} 个表情包！`)
+        console.log(`✅ 成功添加 ${successCount} 个表情包！`)
       } else if (successCount > 0 && failedCount > 0) {
-        alert(`⚠️ 部分成功！\n\n成功：${successCount} 个\n失败：${failedCount} 个\n\n可能原因：存储空间不足`)
-      } else {
-        alert(`❌ 添加失败！\n\n请检查：\n1. 存储空间是否充足\n2. 图片是否过大\n3. 尝试删除一些现有表情包`)
+        console.warn(`⚠️ 部分成功！成功：${successCount} 个，失败：${failedCount} 个`)
+      } else if (failedCount > 0) {
+        console.error(`❌ 添加失败，请检查存储空间`)
       }
       
       // 重置
@@ -134,8 +139,13 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
 
   const handleDelete = async (id: number) => {
     if (confirm('确定要删除这个表情包吗？')) {
-      await deleteEmoji(id)
-      await loadEmojis()
+      try {
+        await deleteEmoji(id)
+        await loadEmojis()
+      } catch (error) {
+        console.error('删除失败:', error)
+        alert('删除失败，可能是无痕模式限制')
+      }
     }
   }
 
@@ -145,19 +155,24 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
       return
     }
     
-    const dataStr = await exportEmojis()
-    const blob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `emojis-backup-${Date.now()}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    
-    alert(`成功导出 ${emojis.length} 个表情包！`)
+    try {
+      const dataStr = await exportEmojis()
+      const blob = new Blob([dataStr], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `emojis-backup-${Date.now()}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      alert(`成功导出 ${emojis.length} 个表情包！`)
+    } catch (error) {
+      console.error('导出失败:', error)
+      alert('导出失败，可能是无痕模式限制')
+    }
   }
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,6 +205,7 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
     const reader = new FileReader()
     reader.onload = async (event) => {
       try {
+        // 直接导入
         const result = await importEmojis(event.target?.result as string, replaceMode)
         
         if (result.success) {
@@ -203,7 +219,11 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
         }
       } catch (error) {
         console.error('导入失败:', error)
-        alert('导入失败，请检查文件格式: ' + (error instanceof Error ? error.message : ''))
+        if (error instanceof Error && error.message === '导入超时') {
+          alert('⚠️ 导入失败\n\n原因：当前处于无痕/隐私浏览模式\n\n解决方案：\n1. 使用普通浏览模式\n2. 在浏览器设置中允许存储数据')
+        } else {
+          alert('导入失败，请检查文件格式: ' + (error instanceof Error ? error.message : ''))
+        }
       }
     }
     reader.onerror = () => {
@@ -220,9 +240,14 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
     }
     
     if (confirm(`确定要清空所有 ${emojis.length} 个表情包吗？\n\n此操作无法撤销！建议先导出备份。`)) {
-      await clearAllEmojis()
-      await loadEmojis()
-      alert('已清空所有表情包')
+      try {
+        await clearAllEmojis()
+        await loadEmojis()
+        alert('已清空所有表情包')
+      } catch (error) {
+        console.error('清空失败:', error)
+        alert('清空失败，可能是无痕模式限制')
+      }
     }
   }
 

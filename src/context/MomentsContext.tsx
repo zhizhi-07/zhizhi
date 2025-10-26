@@ -88,8 +88,8 @@ export const MomentsProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem('moments', JSON.stringify(minimalMoments))
           console.log('✅ 已压缩保存50条朋友圈')
         } catch (err) {
-          console.error('存储空间严重不足，请清理数据')
-          alert('存储空间不足！\n\n请前往【我】->【设置】->【存储管理】清理数据')
+          console.error('存储空间严重不足，静默失败')
+          // 不再弹窗提示，静默处理
         }
       }
     }

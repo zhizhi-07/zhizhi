@@ -335,7 +335,7 @@ export const deleteIntimatePayRelation = (characterId: string): boolean => {
   return true
 }
 
-// 用户使用AI的亲密付消费
+// AI使用用户给的亲密付消费
 export const useCharacterIntimatePay = (
   characterId: string,
   amount: number,
@@ -344,7 +344,7 @@ export const useCharacterIntimatePay = (
 ): boolean => {
   const relations = getIntimatePayRelations()
   const relationIndex = relations.findIndex(
-    r => r.characterId === characterId && r.type === 'character_to_user'
+    r => r.characterId === characterId && r.type === 'user_to_character'  // ✅ 改成AI用用户给的额度
   )
   
   if (relationIndex === -1) {

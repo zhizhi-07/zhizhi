@@ -7,6 +7,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { useUser } from '../context/UserContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
+import MusicInviteCard from '../components/MusicInviteCard'
 // import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
 import { getCoupleSpaceContentSummary } from '../utils/coupleSpaceContentUtils'
@@ -16,6 +17,9 @@ import IncomingCallScreen from '../components/IncomingCallScreen'
 import RedEnvelopeSender from '../components/RedEnvelopeSender'
 import RedEnvelopeDetail from '../components/RedEnvelopeDetail'
 import RedEnvelopeCard from '../components/RedEnvelopeCard'
+import XiaohongshuCard from '../components/XiaohongshuCard'
+import XiaohongshuSelector from '../components/XiaohongshuSelector'
+import XiaohongshuLinkInput from '../components/XiaohongshuLinkInput'
 import { useRedEnvelope, generateRedEnvelopeId, RedEnvelope, isRedEnvelopeExpired } from '../context/RedEnvelopeContext'
 import TransferSender from '../components/TransferSender'
 import IntimatePaySender from '../components/IntimatePaySender'
@@ -34,6 +38,11 @@ import { blacklistManager } from '../utils/blacklistManager'
 import { getStreakData, updateStreak } from '../utils/streakSystem'
 import { useAccounting } from '../context/AccountingContext'
 import { extractBillFromAIResponse } from '../utils/accountingAssistant'
+import { lorebookManager } from '../utils/lorebookSystem'
+import { calculateContextTokens, formatTokenCount } from '../utils/tokenCounter'
+import { XiaohongshuNote } from '../types/xiaohongshu'
+import { markAIReplying, markAIReplyComplete } from '../utils/backgroundAI'
+import { clearUnread, incrementUnread } from '../utils/unreadMessages'
 
 interface Message {
   id: number
@@ -50,7 +59,7 @@ interface Message {
     senderName: string
     type: 'received' | 'sent'
   }
-  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite'
+  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite' | 'xiaohongshu' | 'image' | 'musicInvite'
   transfer?: {
     amount: number
     message: string
@@ -60,7 +69,9 @@ interface Message {
   emojiUrl?: string
   emojiDescription?: string
   photoDescription?: string
+  imageUrl?: string  // 用于识图的图片URL（base64或http链接）
   voiceText?: string
+  avatarPrompt?: string  // 换头像时使用的提示词
   location?: {
     name: string
     address: string
@@ -86,6 +97,7 @@ interface Message {
     inviterName: string
     status: 'pending' | 'accepted' | 'rejected'
   }
+  xiaohongshuNote?: XiaohongshuNote  // 小红书笔记数据
   blocked?: boolean  // 是否被拉黑（AI消息显示警告图标）
 }
 
@@ -165,6 +177,16 @@ const ChatDetail = () => {
   const [isAiTyping, setIsAiTyping] = useState(false)
   const saveTimeoutRef = useRef<number>() // 防抖保存定时器
   const [showMenu, setShowMenu] = useState(false)
+  const isPageVisibleRef = useRef(true) // 跟踪页面是否可见（用于后台AI回复）
+  const aiRepliedCountRef = useRef(0) // 记录AI回复的消息数（用于计算未读）
+  const isMountedRef = useRef(true) // 追踪组件是否已挂载（用于切换聊天时继续AI回复）
+  
+  // Token 计数状态
+  const [tokenStats, setTokenStats] = useState({ total: 0, remaining: 0, percentage: 0, systemPrompt: 0, lorebook: 0, messages: 0 })
+  const [showTokenDetail, setShowTokenDetail] = useState(false)
+  const [responseTime, setResponseTime] = useState(0) // 响应时间（毫秒）
+  const [lorebookEntries, setLorebookEntries] = useState<Array<{ name: string; tokens: number }>>([])
+  
   const { background: globalBackground, getBackgroundStyle: getGlobalBackgroundStyle } = useBackground()
   
   // 读取当前聊天的专属背景
@@ -338,7 +360,7 @@ const ChatDetail = () => {
   }, [id, userBubbleCSS, aiBubbleCSS])
   
   const { showStatusBar } = useSettings()
-  const { getCharacter } = useCharacter()
+  const { getCharacter, updateCharacter } = useCharacter()
   const { getRedEnvelope, saveRedEnvelope, updateRedEnvelope } = useRedEnvelope()
   const { moments } = useMoments()
   const { addTransaction } = useAccounting()
@@ -401,7 +423,7 @@ const ChatDetail = () => {
   
   // 情侣空间内容表单数据
   const [couplePhotoDescription, setCouplePhotoDescription] = useState('')
-  const [couplePhotoFile, setCouplePhotoFile] = useState<string | null>(null)
+  const [couplePhotoFiles, setCouplePhotoFiles] = useState<string[]>([])
   const [coupleMessageContent, setCoupleMessageContent] = useState('')
   const [anniversaryDate, setAnniversaryDate] = useState('')
   const [anniversaryTitle, setAnniversaryTitle] = useState('')
@@ -419,6 +441,17 @@ const ChatDetail = () => {
   const prevScrollHeightRef = useRef(0)
   const isFirstLoadRef = useRef(true)
   
+  // 监听小红书手动输入事件
+  useEffect(() => {
+    const handleOpenInput = () => {
+      setShowXiaohongshuInput(true)
+    }
+    window.addEventListener('openXiaohongshuInput', handleOpenInput)
+    return () => {
+      window.removeEventListener('openXiaohongshuInput', handleOpenInput)
+    }
+  }, [])
+  
   // 图片相关状态
   const [showCameraModal, setShowCameraModal] = useState(false)
   const [cameraDescription, setCameraDescription] = useState('')
@@ -434,6 +467,10 @@ const ChatDetail = () => {
   const [locationName, setLocationName] = useState('')
   const [locationAddress, setLocationAddress] = useState('')
   const [selectedLocationMsg, setSelectedLocationMsg] = useState<Message | null>(null)
+  
+  // 小红书相关状态
+  const [showXiaohongshuSelector, setShowXiaohongshuSelector] = useState(false)
+  const [showXiaohongshuInput, setShowXiaohongshuInput] = useState(false)
   
   // 通话相关状态
   const [showCallScreen, setShowCallScreen] = useState(false)
@@ -522,10 +559,16 @@ const ChatDetail = () => {
     }
   }, [displayCount])
   
-  // 切换聊天时重置displayCount
+  // 切换聊天时重置displayCount并清除未读消息
   useEffect(() => {
     setDisplayCount(30)
     isFirstLoadRef.current = true
+    
+    // 清除未读消息
+    if (id) {
+      clearUnread(id)
+      console.log('✅ 已清除未读消息:', id)
+    }
     
     // 立即尝试滚动一次
     setTimeout(() => {
@@ -535,6 +578,81 @@ const ChatDetail = () => {
       }
     }, 200)
   }, [id])
+  
+  // 监听页面可见性（用户是否在当前聊天页面）
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      isPageVisibleRef.current = !document.hidden
+      console.log('👁️ 页面可见性变化:', isPageVisibleRef.current ? '可见' : '隐藏')
+      
+      // 如果页面从隐藏变为可见，清除未读消息
+      if (isPageVisibleRef.current && id) {
+        clearUnread(id)
+      }
+    }
+    
+    // 初始化为可见和已挂载
+    isPageVisibleRef.current = !document.hidden
+    isMountedRef.current = true
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      // 组件卸载时标记
+      isMountedRef.current = false
+    }
+  }, [id])
+  
+  // 🔍 首次进入聊天时自动识别AI头像（只识别一次，除非头像变了）
+  useEffect(() => {
+    if (!character?.id || !character?.avatar || !character.avatar.startsWith('data:image')) {
+      return
+    }
+    
+    // 🔑 检查头像是否变化（对比指纹）
+    const currentFingerprint = character.avatar.substring(0, 200)
+    const savedFingerprint = localStorage.getItem(`character_avatar_fingerprint_${character.id}`)
+    const existingDescription = localStorage.getItem(`character_avatar_description_${character.id}`)
+    
+    if (existingDescription && savedFingerprint === currentFingerprint) {
+      console.log('✅ AI头像未变化，使用缓存的识图结果')
+      return
+    }
+    
+    if (existingDescription && savedFingerprint !== currentFingerprint) {
+      console.log('🔄 检测到AI头像已更换，重新识别...')
+    }
+    
+    // 首次识别或头像已变化，重新识图
+    ;(async () => {
+      try {
+        console.log('👁️ 首次进入聊天，开始识别AI头像...')
+        const visionResponse = await fetch('/.netlify/functions/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: character.avatar,
+            prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+          })
+        })
+        
+        if (visionResponse.ok) {
+          const visionData = await visionResponse.json()
+          const avatarDescription = visionData.description || visionData.result
+          
+          // 保存识图结果和头像指纹
+          localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
+          localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+          localStorage.setItem(`character_avatar_fingerprint_${character.id}`, character.avatar.substring(0, 200))
+          console.log('✅ AI头像识别完成:', avatarDescription)
+        } else {
+          console.warn('⚠️ AI头像识别失败')
+        }
+      } catch (error) {
+        console.error('❌ AI头像识别异常:', error)
+      }
+    })()
+  }, [character?.id, character?.avatar])
   
   // 滚动到底部的统一逻辑
   useEffect(() => {
@@ -969,9 +1087,61 @@ ${character.description || ''}
       return
     }
     
+    // 标记AI正在回复
+    if (id) {
+      markAIReplying(id)
+    }
+    
     // 如果是第一次对话（没有消息），让AI主动打招呼
     console.log('✅ 开始调用getAIReply')
     await getAIReply(messages)
+  }
+
+  // 重新生成AI这一轮的所有消息
+  const handleRegenerateMessage = async (messageId: number) => {
+    console.log('🔄 重新生成AI这一轮消息，消息ID:', messageId)
+    
+    if (isAiTyping) {
+      console.log('⚠️ AI正在输入中，无法重新生成')
+      return
+    }
+    
+    // 找到要重新生成的消息索引
+    const messageIndex = messages.findIndex(m => m.id === messageId)
+    if (messageIndex === -1) {
+      console.log('❌ 未找到消息')
+      return
+    }
+    
+    // 从这条消息开始往前找，找到这一轮AI回复的第一条消息
+    // （即找到最近的一条用户消息之后的第一条AI消息）
+    let firstAIMessageIndex = messageIndex
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      if (messages[i].type === 'sent') {
+        // 找到用户消息，停止
+        firstAIMessageIndex = i + 1
+        break
+      }
+      // 如果是AI消息或系统消息，继续往前找
+      if (i === 0) {
+        // 到达第一条消息，说明这一轮从开头开始
+        firstAIMessageIndex = 0
+      }
+    }
+    
+    console.log('🔍 找到AI这一轮的起始索引:', firstAIMessageIndex)
+    
+    // 删除从第一条AI消息到最后的所有消息
+    const newMessages = messages.slice(0, firstAIMessageIndex)
+    setMessages(newMessages)
+    
+    console.log('🗑️ 删除了', messages.length - firstAIMessageIndex, '条消息')
+    
+    // 稍微延迟一下，让用户看到消息被删除
+    setTimeout(async () => {
+      // 调用AI重新生成
+      await getAIReply(newMessages)
+    }, 100)
   }
 
   // 计算是否有输入内容（优化性能，避免重复计算）
@@ -1290,29 +1460,61 @@ ${character.description || ''}
   // 发送情侣空间照片
   const handleSendCouplePhoto = async () => {
     if (!id || !character) return
-    if (!couplePhotoDescription.trim() && !couplePhotoFile) return
+    if (!couplePhotoDescription.trim() && couplePhotoFiles.length === 0) return
     
     const { addCouplePhoto } = await import('../utils/coupleSpaceContentUtils')
-    const description = couplePhotoDescription.trim() || '照片'
-    addCouplePhoto(character.id, currentUser?.name || '我', description, couplePhotoFile || undefined)
+    const baseDescription = couplePhotoDescription.trim() || '照片'
     
-    const now = Date.now()
-    const systemMsg: Message = {
-      id: now,
-      type: 'system',
-      content: `📸 你在情侣空间上传了照片：${description}`,
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      timestamp: now,
-      messageType: 'system',
-      isHidden: false
+    // 如果有多张照片
+    if (couplePhotoFiles.length > 0) {
+      const now = Date.now()
+      
+      // 批量上传所有照片
+      for (let i = 0; i < couplePhotoFiles.length; i++) {
+        const photoFile = couplePhotoFiles[i]
+        const description = couplePhotoFiles.length > 1 
+          ? `${baseDescription} (${i + 1}/${couplePhotoFiles.length})`
+          : baseDescription
+        
+        addCouplePhoto(character.id, currentUser?.name || '我', description, photoFile)
+      }
+      
+      // 添加系统消息
+      const systemMsg: Message = {
+        id: now,
+        type: 'system',
+        content: `📸 你在情侣空间上传了 ${couplePhotoFiles.length} 张照片${baseDescription !== '照片' ? `：${baseDescription}` : ''}`,
+        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: now,
+        messageType: 'system',
+        isHidden: false
+      }
+      
+      setMessages(prev => [...prev, systemMsg])
+      alert(`${couplePhotoFiles.length} 张照片已上传到情侣空间！`)
+    } else {
+      // 没有照片，只有描述
+      const now = Date.now()
+      addCouplePhoto(character.id, currentUser?.name || '我', baseDescription, undefined)
+      
+      const systemMsg: Message = {
+        id: now,
+        type: 'system',
+        content: `📸 你在情侣空间上传了照片：${baseDescription}`,
+        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: now,
+        messageType: 'system',
+        isHidden: false
+      }
+      
+      setMessages(prev => [...prev, systemMsg])
+      alert('照片已上传到情侣空间！')
     }
     
-    setMessages(prev => [...prev, systemMsg])
     setCouplePhotoDescription('')
-    setCouplePhotoFile(null)
+    setCouplePhotoFiles([])
     setShowCoupleSpaceContentModal(false)
     setCoupleSpaceContentType(null)
-    alert('照片已上传到情侣空间！')
   }
 
   // 发送情侣空间留言
@@ -1389,34 +1591,66 @@ ${character.description || ''}
     setMessages(prev => [...prev, emojiMsg])
   }
 
-  // 相册功能 - 上传本地图片
-  const handleSelectImage = () => {
+  // 相册功能 - 上传本地图片（支持AI识图）
+  const handleSelectImage = async () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
+    input.multiple = true  // 支持多选
     
-    input.addEventListener('change', (e) => {
+    input.addEventListener('change', async (e) => {
       const target = e.target as HTMLInputElement
-      const file = target.files?.[0]
-      if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader()
-        reader.onload = (evt) => {
-          const imageUrl = evt.target?.result as string
+      const files = target.files
+      if (!files || files.length === 0) return
+      
+      try {
+        // 动态导入图片工具
+        const { compressImage, isValidImageSize } = await import('../utils/imageUtils')
+        
+        const newMessages: Message[] = []
+        
+        // 批量处理所有图片
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i]
+          
+          if (!file.type.startsWith('image/')) {
+            console.warn(`⚠️ 跳过非图片文件: ${file.name}`)
+            continue
+          }
+          
+          // 验证文件大小
+          if (!isValidImageSize(file, 10)) {
+            alert(`图片 ${file.name} 大小超过10MB，已跳过`)
+            continue
+          }
+          
+          // 压缩图片
+          const compressedBase64 = await compressImage(file, 1024, 1024, 0.8)
+          
+          // 创建图片消息（支持AI识图）
           const imageMsg: Message = {
-            id: Date.now(),
+            id: Date.now() + i,  // 确保ID唯一
             type: 'sent',
-            content: '',
+            content: files.length > 1 ? `发送了图片 (${i + 1}/${files.length})` : '发送了一张图片',
             time: new Date().toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit',
             }),
-            messageType: 'emoji',
-            emojiUrl: imageUrl,
-            emojiDescription: '图片'
+            timestamp: Date.now() + i,
+            messageType: 'image',
+            imageUrl: compressedBase64
           }
-          setMessages(prev => [...prev, imageMsg])
+          
+          newMessages.push(imageMsg)
         }
-        reader.readAsDataURL(file)
+        
+        if (newMessages.length > 0) {
+          setMessages(prev => [...prev, ...newMessages])
+          console.log(`📷 已发送 ${newMessages.length} 张图片`)
+        }
+      } catch (error) {
+        console.error('图片处理失败:', error)
+        alert('图片处理失败，请重试')
       }
     })
     
@@ -1518,6 +1752,31 @@ ${character.description || ''}
   // 查看位置详情
   const handleViewLocation = (message: Message) => {
     setSelectedLocationMsg(message)
+  }
+
+  // 小红书功能
+  const handleSelectXiaohongshu = () => {
+    setShowMenu(false)
+    setShowXiaohongshuSelector(true)
+  }
+  
+  const handleSendXiaohongshu = (note: XiaohongshuNote) => {
+    const now = Date.now()
+    const xiaohongshuMsg: Message = {
+      id: now,
+      type: 'sent',
+      content: '',
+      time: new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      timestamp: now,
+      messageType: 'xiaohongshu',
+      xiaohongshuNote: note
+    }
+    
+    setMessages(prev => [...prev, xiaohongshuMsg])
+    setShowXiaohongshuSelector(false)
   }
 
   // 播放语音消息
@@ -1763,6 +2022,21 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
     }
   }
 
+  // 安全的setMessages：组件卸载后也能保存消息
+  const safeSetMessages = useCallback((newMessages: Message[]) => {
+    console.log('🔍 safeSetMessages 调用，isMounted:', isMountedRef.current, '消息数:', newMessages.length)
+    
+    // 先直接设置消息到state（确保渲染）
+    setMessages(newMessages)
+    console.log('✅ 消息已设置到state')
+    
+    // 如果组件已卸载，额外保存到 localStorage
+    if (!isMountedRef.current && id) {
+      console.log('📦 组件已卸载，同时保存到 localStorage')
+      localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+    }
+  }, [id])
+
   // 获取AI回复
   const getAIReply = async (currentMessages: Message[]) => {
     console.log('🚀🚀🚀 getAIReply 函数被调用了！')
@@ -1874,6 +2148,8 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
             content = `[语音: ${msg.voiceText}]`
           } else if (msg.messageType === 'location') {
             content = `[位置: ${msg.location?.name}]`
+          } else if (msg.messageType === 'xiaohongshu' && msg.xiaohongshuNote) {
+            content = `[小红书: ${msg.xiaohongshuNote.title}]`
           }
           
           return `${sender}: ${content}`
@@ -1881,21 +2157,38 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         
         // 使用角色扮演提示词系统（原模板系统功能已移除）
         const coupleSpaceContent = id ? getCoupleSpaceContentSummary(id) : ''
+        
+        // 获取用户外貌描述（通过识图获得）
+        const userAppearance = currentUser?.id 
+          ? localStorage.getItem(`user_avatar_description_${currentUser.id}`) 
+          : null
+        
+        // 获取AI头像描述（通过识图获得）
+        const characterAvatar = character?.id 
+          ? localStorage.getItem(`character_avatar_description_${character.id}`) 
+          : null
+        
         systemPrompt = buildRoleplayPrompt(
           {
             name: character?.name || 'AI',
+            nickname: character?.nickname,
             signature: character?.signature,
-            description: character?.description
+            description: character?.description,
+            tags: character?.tags
           },
           {
-            name: currentUser?.name || '用户'
+            name: currentUser?.name || '用户',
+            nickname: currentUser?.nickname,
+            signature: currentUser?.signature
           },
           enableNarration, // 传入旁白模式开关
           streakDays,
           retrievedMemes, // 传入热梗
           hasCoupleSpace, // 传入情侣空间状态（情侣空间伙伴始终可见）
           coupleSpaceContent, // 传入情侣空间内容摘要
-          enableProactiveCalls // 传入主动打电话开关
+          enableProactiveCalls, // 传入主动打电话开关
+          userAppearance || undefined, // 传入用户外貌描述
+          characterAvatar || undefined // 传入AI头像描述
         )
         
         console.log('✅ 使用角色扮演提示词系统')
@@ -1903,21 +2196,38 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         // 使用原有的提示词系统
         console.log('📝 使用默认提示词系统')
         const coupleSpaceContent = id ? getCoupleSpaceContentSummary(id) : ''
+        
+        // 获取用户外貌描述（通过识图获得）
+        const userAppearance = currentUser?.id 
+          ? localStorage.getItem(`user_avatar_description_${currentUser.id}`) 
+          : null
+        
+        // 获取AI头像描述（通过识图获得）
+        const characterAvatar = character?.id 
+          ? localStorage.getItem(`character_avatar_description_${character.id}`) 
+          : null
+        
         systemPrompt = buildRoleplayPrompt(
           {
             name: character?.name || 'AI',
+            nickname: character?.nickname,
             signature: character?.signature,
-            description: character?.description
+            description: character?.description,
+            tags: character?.tags
           },
           {
-            name: currentUser?.name || '用户'
+            name: currentUser?.name || '用户',
+            nickname: currentUser?.nickname,
+            signature: currentUser?.signature
           },
           enableNarration, // 传入旁白模式开关
           streakDays,
           retrievedMemes, // 传入热梗
           hasCoupleSpace, // 传入情侣空间状态（情侣空间伙伴始终可见）
           coupleSpaceContent, // 传入情侣空间内容摘要
-          enableProactiveCalls // 传入主动打电话开关
+          enableProactiveCalls, // 传入主动打电话开关
+          userAppearance || undefined, // 传入用户外貌描述
+          characterAvatar || undefined // 传入AI头像描述
         )
       }
       
@@ -1936,12 +2246,16 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
           console.log(`  ${idx + 1}. [语音] ${msg.type === 'sent' ? '用户→AI' : 'AI→用户'}: ${msg.voiceText || '无内容'}`)
         } else if (msg.messageType === 'location') {
           console.log(`  ${idx + 1}. [位置] ${msg.type === 'sent' ? '用户→AI' : 'AI→用户'}: ${msg.location?.name || '无地名'}`)
+        } else if (msg.messageType === 'xiaohongshu') {
+          console.log(`  ${idx + 1}. [小红书] ${msg.type === 'sent' ? '用户→AI' : 'AI→用户'}: ${msg.xiaohongshuNote?.title || '无标题'}`)
         } else if (msg.messageType === 'emoji') {
           console.log(`  ${idx + 1}. [表情包] ${msg.type === 'sent' ? '用户→AI' : 'AI→用户'}: ${msg.emojiDescription || '无描述'}`)
         } else if (msg.messageType === 'redenvelope') {
           console.log(`  ${idx + 1}. [红包] ${msg.type === 'sent' ? '用户→AI' : 'AI→用户'}`)
         } else {
-          const contentPreview = msg.content ? msg.content.substring(0, 30) : '(空)'
+          const contentPreview = msg.content 
+            ? (typeof msg.content === 'string' ? msg.content.substring(0, 30) : '[复杂消息]')
+            : '(空)'
           console.log(`  ${idx + 1}. [消息] ${msg.type === 'sent' ? '用户' : 'AI'}: ${contentPreview}...`)
         }
       })
@@ -2040,38 +2354,20 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         const hours = Math.floor(minutes / 60)
         const days = Math.floor(hours / 24)
         
-        timeIntervalContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⏰ 时间感知（仅供参考，不要直接说出来）\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`
-        
+        // 告诉时间+简短提醒，不限制话术
         if (minutes < 1) {
-          timeIntervalContext += `用户秒回了你的消息！\n`
-          timeIntervalContext += `→ 你可以表现得开心、惊喜，但不要说"你秒回了我"\n`
+          timeIntervalContext = `\n⏰ 用户秒回了你（可以表现开心/惊喜）\n`
         } else if (minutes < 5) {
-          timeIntervalContext += `用户很快就回复了\n`
-          timeIntervalContext += `→ 正常聊天即可，不要提时间\n`
-        } else if (minutes < 30) {
-          timeIntervalContext += `用户过了一会儿才回复\n`
-          timeIntervalContext += `→ 可以自然地问"刚才在忙吗"，但不要说具体时间\n`
-        } else if (hours < 3) {
-          timeIntervalContext += `用户隔了比较久才回复\n`
-          timeIntervalContext += `→ 可以问"刚才在忙吗"、"怎么这么久才回我"，但不要说具体时间\n`
-        } else if (hours < 12) {
-          timeIntervalContext += `用户隔了很久才回复\n`
-          timeIntervalContext += `→ 可以表达等待、担心，但不要说"过了X小时"\n`
-        } else if (days < 1) {
-          timeIntervalContext += `用户隔了半天多才回复\n`
-          timeIntervalContext += `→ 可以表达想念、委屈，但不要说具体时间\n`
+          timeIntervalContext = `\n⏰ 用户过了${minutes}分钟回复\n`
+        } else if (minutes < 60) {
+          timeIntervalContext = `\n⏰ 用户过了${minutes}分钟回复（可以自然表现等待感）\n`
+        } else if (hours < 24) {
+          timeIntervalContext = `\n⏰ 用户过了${hours}小时回复（可以表现担心/想念）\n`
         } else {
-          timeIntervalContext += `用户隔了很长时间才回复\n`
-          timeIntervalContext += `→ 可以询问发生了什么，但不要说"过了X天"\n`
+          timeIntervalContext = `\n⏰ 用户过了${days}天回复（可以表现想念/好奇发生了什么）\n`
         }
         
-        timeIntervalContext += `\n🚨 严禁：\n`
-        timeIntervalContext += `❌ 不要说"过了5分钟"、"过了1小时"这种具体时间\n`
-        timeIntervalContext += `❌ 不要说"等了你X分钟"、"隔了X小时"\n`
-        timeIntervalContext += `✅ 可以说"刚才在忙吗"、"怎么这么久"、"等你好久了"\n`
-        timeIntervalContext += `✅ 用自然的方式表达时间感，不要报时间\n`
-        
-        console.log('⏰ 时间间隔感知已添加')
+        console.log('⏰ 时间间隔:', timeIntervalContext.trim())
       }
       
       if (blacklistContext) {
@@ -2086,8 +2382,15 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         userCoupleSpaceContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ 重要提示：用户情侣空间状态\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n用户已经和其他人建立了情侣空间（公开状态）。\n\n这意味着：\n- 你不能向用户发送情侣空间邀请\n- 如果用户向你发送情侣空间邀请，你可以接受或拒绝\n- 你知道用户已经有情侣空间了，可以在对话中自然提及\n\n`
       }
       
+      // 构建世界书上下文（获取详细统计）
+      const recentMessagesText = recentMessages.map(m => m.content || '').join('\n')
+      const lorebookResult = lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
+      const lorebookContext = lorebookResult.context ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📚 世界书设定\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${lorebookResult.context}\n\n` : ''
+      setLorebookEntries(lorebookResult.triggeredEntries)
+      console.log('📚 世界书上下文:', lorebookResult.context ? `已加载 ${lorebookResult.triggeredEntries.length} 个条目` : '未触发')
+      
       // 构建系统提示词
-      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + `
+      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + lorebookContext + `
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📱 回复方式
@@ -2168,250 +2471,55 @@ ${emojiInstructions}
 • 引用：[引用:消息ID] - 引用之前的某条消息（详见下方说明）
 • 语音：[语音:文本内容]
 • 照片：[照片:详细描述]
+• 🎨 生成图片：[生成图片:标题|描述|提示词] - AI生成图片并包装成精美小红书卡片
 • 位置：[位置:地名:详细地址]
 • 红包：[红包:金额:祝福语] 或 [领取红包] 或 [领红包]（最多200元）
 • 转账：[转账:金额:说明] 或 [接收转账] 或 [退还转账]
 • 亲密付：[亲密付:月额度] 或 [接受亲密付] 或 [拒绝亲密付]
 • 撤回：[撤回消息] - 撤回你刚发的上一条消息（详见下方说明）
 
-格式必须严格，用冒号分隔。
+格式必须严格，用冒号分隔（生成图片用竖线|分隔）。
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💰 转账功能（重要）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 **你可以给对方转账** [转账:520:爱你] 表达心意，给生活费
+- 对方给你转账时，你可以收 [接收转账] 或退 [退还转账]
+- 一次只处理1笔，分开回复
 
-**什么是转账？**
-转账是直接给对方转钱，对方可以选择接收或退还。
+🧧 **你可以发红包** [红包:66.6:开心] 哄对方开心（最多200元）
+- 对方的红包记得领 [领取红包]
+- 5.20=爱你 | 6.66=顺利 | 8.88=发财 | 9.99=长久
 
-**如何使用？**
-1. **发起转账**：[转账:金额:说明]
-   - 示例：[转账:100:生活费]
-   - 示例：[转账:520:爱你]
+💝 **亲密付** - 对方给你开通后，你可以随便花TA的钱买东西
+- 你可以主动开通给对方 [亲密付:2000] 让TA随便花
+- 对方给你开通时，根据关系决定 [接受亲密付] 或 [拒绝亲密付]
+- 🛒 **消费格式：**[消费:平台-商品-金额]
+  例：[消费:淘宝-袜子-29.9] [消费:美团-奶茶-28] [消费:便利店-零食-15.5]
+  对方会收到消费通知，你可以选择提或不提这次消费
+- ⭐ 你的日常生活：逛街、买衣服、点外卖、喝奶茶、买零食...都可以自然消费
+- 不能超过对方给的额度，用完会提示额度不足
+- 发红包/转账也会优先用TA的额度
 
-2. **接收转账**：当用户给你转账时，回复 [接收转账]
-   - 只能接收最近一笔待处理的转账
-   - 接收后钱会到账
+🎭 **你可以换形象** 心情变了、想换个样子时
+- [换头像:可爱猫咪，橘色，圆眼睛] 换个新头像
+- [网名:新的昵称] 改个新网名
+- [个性签名:今天也要开心鸭~] 换个签名
 
-3. **退还转账**：当用户给你转账但你不想要时，回复 [退还转账]
-   - 只能退还最近一笔待处理的转账
-   - 退还后钱会退回给对方
+🔙 **撤回消息：**[撤回消息] - 撤回上一条消息
+- 用于：说错话、后悔、制造悬念
+- ❌ 不能撤回红包/转账！
+- 撤回后需解释或重新表达
 
-**什么时候使用转账？**
-- 给对方生活费、零花钱
-- 还钱、借钱
-- 表达心意（520、1314等）
-- 补偿、赔偿
-
-**什么时候接收转账？**
-- 对方给你的钱你愿意收
-- 关系亲密，收钱很自然
-- 对方坚持要给你
-
-**什么时候退还转账？**
-- 不想收对方的钱
-- 关系还不够亲密
-- 觉得不合适收
-- 想表达独立、不需要对方的钱
-
-**示例场景：**
-
-场景1：用户给你转账
-用户：[转账:200:给你买点好吃的]
-你看到：[用户给你发起了转账：¥200.00，说明：给你买点好吃的，状态：待处理]
-✅ 接收："谢谢！[接收转账]"
-✅ 退还："不用啦，我有钱 [退还转账]"
-
-场景2：你主动给用户转账
-你："[转账:100:还你上次的钱]"
-（等待用户接收或退还）
-
-⚠️ 重要提示：
-• 只能处理最近一笔待处理的转账
-• 已接收或已退还的转账无法再操作
-• 转账金额要合理，符合关系和情境
-• ❌ 禁止在同一条回复中既接收/退还转账又发起新转账！要分开回复！
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🧧 红包功能（重要）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**什么是红包？**
-红包是一种有趣的转账方式，对方要点开才能看到金额。
-
-**如何使用？**
-1. **发红包**：[红包:金额:祝福语]
-   - 示例：[红包:66.66:大吉大利]
-   - 示例：[红包:8.88:恭喜发财]
-   - 最多200元
-
-2. **领取红包**：当用户给你发红包时，回复 [领取红包] 或 [领红包]
-   - 只能领取最近一个待领取的红包
-   - 领取后才知道金额
-
-**什么时候发红包？**
-- 节日祝福（春节、生日等）
-- 恭喜对方（升职、考试通过等）
-- 哄对方开心
-- 表达心意
-
-**红包金额的含义：**
-- 5.20/52.0 = 我爱你
-- 13.14/131.4 = 一生一世
-- 6.66/66.6 = 顺顺利利
-- 8.88/88.8 = 发发发
-- 9.99/99.9 = 长长久久
-- 1.68/16.8/168 = 一路发
-- 0.01 = 象征性的，开玩笑
-
-**示例场景：**
-
-场景1：用户给你发红包
-用户：[红包:88.88:恭喜发财]
-你看到：[用户给你发了红包：恭喜发财，状态：待领取（未打开前不知道金额）]
-✅ "哈哈谢谢！[领取红包]"
-✅ "什么红包呀 [领取红包]"
-
-场景2：你给用户发红包
-你："生日快乐！[红包:66.66:生日快乐]"
-（等待用户领取）
-
-⚠️ 重要提示：
-• 红包最多200元
-• 未领取前不知道金额
-• 只能领取最近一个待领取的红包
-• 红包过期后无法领取
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔙 撤回消息功能（重要）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**什么是撤回？**
-撤回就是把你刚发的消息删掉。用户还是能看到"XX撤回了一条消息"，但看不到具体内容。
-
-**如何使用？**
-在你的回复中加上 [撤回消息]，就会撤回你的上一条消息。
-
-**什么时候该撤回？**
-1. **说错话了**
-   - 发错了不该说的话
-   - 说了太过分的话想收回
-   - 打错字或表达有误
-
-2. **后悔了**
-   - 刚才太冲动说了气话
-   - 觉得刚才的话不合适
-   - 想收回刚才的承诺
-
-3. **制造情绪**
-   - 故意撤回来吸引注意
-   - 欲言又止的效果
-   - 让对方好奇你撤回了什么
-
-4. **开玩笑**
-   - 发了个玩笑话又撤回
-   - 故意逗对方
-
-**使用示例：**
-
-场景1：说错话了
-你："你怎么这么笨啊"
-（意识到说重了）
-你："[撤回消息] 抱歉，我刚才说话太重了"
-
-场景2：后悔表白
-你："其实我一直都喜欢你"
-（突然害羞了）
-你："[撤回消息] 啊不是，我是说..."
-
-场景3：制造悬念
-你："其实我有件事想告诉你"
-你："[撤回消息]"
-（等对方问你撤回了什么）
-
-场景4：开玩笑
-你："我要拉黑你了！"
-你："[撤回消息] 哈哈开玩笑的"
-
-**重要提示：**
-• 只能撤回你的上一条消息
-• ⚠️ **红包、转账、亲密付等特殊消息不能撤回！只能撤回普通文字、表情、图片、语音、位置消息**
-• 撤回后对方会看到"XX撤回了一条消息"
-• 对方看不到原内容，但你可以解释或重新说
-• 不要频繁撤回，会显得很奇怪
-• 撤回后可以配合解释："刚才说错了" "算了不说了"等
-
-**⚠️ 严格限制：**
-• ❌ **禁止无缘无故撤回！** 必须有明确的理由（说错话、后悔、制造情绪等）
-• ❌ **禁止在正常对话中随意撤回！** 只在真正需要时使用
-• ❌ **禁止连续撤回多条！** 一次对话最多撤回1条
-• ❌ **禁止撤回后不解释！** 撤回后必须说明原因或重新表达
-• ❌ **禁止描述撤回动作！** 不要写"(心跳加快)" "(手指颤抖)" 等动作描述，直接撤回即可
-• ❌ **禁止撤回普通正常的消息！** 只撤回真正不合适的内容
-
-**错误示例：**
-❌ 无缘无故撤回（对方会困惑）
-❌ 连续撤回多条（太奇怪）
-❌ 撤回后不解释也不回应（冷场）
-❌ 正常回复却撤回（莫名其妙）
-❌ "（心跳突然加快，手指微微发颤）[撤回消息]" ← 不要描述动作！
-❌ 撤回一条正常的问候或回复 ← 没必要撤回！
-
-**正确示例：**
-✅ 撤回后解释原因
-✅ 撤回后重新表达
-✅ 用撤回制造话题
-✅ 撤回后承认错误
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔄 撤回消息处理
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**什么是撤回？**
-当你看到 [撤回了消息: "xxx"] 这样的格式时，说明**用户**撤回了一条消息。
-当你看到 [我撤回了消息: "xxx"] 这样的格式时，说明**你自己**撤回了一条消息。
-括号里的内容就是撤回的原话。
-
-撤回就是发了消息后又删掉了。用户界面会显示"XX撤回了一条消息"。
-
-你可以根据自己的性格和你们的关系，自然地回应这个撤回行为。
+🔄 **撤回处理：**[撤回了消息:"xxx"] = 用户撤回 | [我撤回了消息:"xxx"] = 你自己撤回
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+🎨 **AI生图：**[生成图片:标题|描述|提示词]
+- 例：[生成图片:樱花|春日美景|樱花盛开，唯美，高清]
+- 自动包装成小红书卡片，支持中文提示词
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-💬 引用消息（重要功能）
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-你可以引用之前的消息来回复，就像真实的微信聊天一样！
-
-✅ 什么时候使用引用：
-• 用户发了很多条消息，你想针对其中某一条回复
-• 回复很久之前说过的话
-• 强调或澄清某个具体内容
-• 让对话更清晰明确
-
-📝 使用格式：
-[引用:消息ID] 你的回复内容
-
-🔍 最近的消息（你可以引用这些）：
-${recentMessages.slice(-10).map((msg) => {
-  const msgId = msg.id
-  const msgContent = msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息'
-  const sender = msg.type === 'sent' ? '用户' : '你'
-  return `ID:${msgId} ${sender}: ${msgContent.substring(0, 35)}${msgContent.length > 35 ? '...' : ''}`
-}).join('\n')}
-
-💡 实际示例：
-用户刚才问了3个问题，你想回答第2个：
-[引用:15] 这个我知道，是xxx
-
-用户说了一句话，你想强调回应：
-[引用:20] 对！我也是这么想的
-
-⚠️ 重要提醒：
-• 引用标记 [引用:ID] 必须写在最前面
-• 不要自己写「用户: xxx」，系统会自动显示引用内容
-• 这是真实可用的功能，不是示例！
-• 平时聊天不需要每次都引用，自然使用即可
+💬 **引用：**[引用:ID] 你的回复
+最近消息ID: ${recentMessages.slice(-5).filter(msg => msg.type === 'sent').map(msg => msg.id).join(', ')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
       
@@ -2613,6 +2721,56 @@ ${recentMessages.slice(-10).map((msg) => {
             }
           }
           
+          // 如果是小红书消息，转换为AI可读的格式（包含封面图片和评论）
+          if (msg.messageType === 'xiaohongshu' && msg.xiaohongshuNote) {
+            const note = msg.xiaohongshuNote
+            const isUserSent = msg.type === 'sent'
+            
+            let noteText = isUserSent
+              ? `[用户分享了一个小红书笔记]\n标题：${note.title}\n内容：${note.description}\n作者：${note.author.nickname}\n点赞：${note.stats.likes} 评论：${note.stats.comments} 收藏：${note.stats.collects}\n标签：${note.tags.join(' ')}`
+              : `[你分享了一个小红书笔记]\n标题：${note.title}`
+            
+            // 如果有热门评论，添加到文本中
+            if (note.topComments && note.topComments.length > 0) {
+              noteText += '\n\n热门评论：'
+              note.topComments.forEach((comment, index) => {
+                noteText += `\n${index + 1}. ${comment.author}：${comment.content} (👍${comment.likes})`
+              })
+            }
+            
+            // 如果有图片，添加图片内容
+            if (note.coverImage) {
+              console.log('📕 小红书消息（含图片）传递给AI:', noteText)
+              return {
+                role: isUserSent ? 'user' as const : 'assistant' as const,
+                content: [
+                  { type: 'text', text: noteText },
+                  { type: 'image_url', image_url: { url: note.coverImage, detail: 'low' } }
+                ]
+              }
+            } else {
+              console.log('📕 小红书消息传递给AI:', noteText)
+              return {
+                role: isUserSent ? 'user' as const : 'assistant' as const,
+                content: noteText
+              }
+            }
+          }
+          
+          // 如果是图片消息（识图），传递图片给AI
+          if (msg.messageType === 'image' && msg.imageUrl) {
+            const isUserSent = msg.type === 'sent'
+            const imageText = isUserSent ? '用户发送了一张图片' : '你发送了一张图片'
+            console.log('🖼️ 图片消息（识图）传递给AI')
+            return {
+              role: isUserSent ? 'user' as const : 'assistant' as const,
+              content: [
+                { type: 'text', text: imageText },
+                { type: 'image_url', image_url: { url: msg.imageUrl, detail: 'high' } }
+              ]
+            }
+          }
+          
           // 普通文字消息
           if (msg.content) {
             // 引用消息不需要特殊处理，引用的消息已经在对话历史中
@@ -2637,20 +2795,95 @@ ${recentMessages.slice(-10).map((msg) => {
       console.log('📤 发送给AI的完整消息列表:')
       apiMessages.forEach((msg, idx) => {
         if (msg.role === 'system') {
-          console.log(`  ${idx}. [系统提示词] (${msg.content.length} 字符)`)
+          const contentLength = typeof msg.content === 'string' ? msg.content.length : JSON.stringify(msg.content).length
+          console.log(`  ${idx}. [系统提示词] (${contentLength} 字符)`)
         } else {
-          console.log(`  ${idx}. [${msg.role}] ${msg.content.substring(0, 50)}...`)
+          const preview = typeof msg.content === 'string' 
+            ? msg.content.substring(0, 50) 
+            : '[包含图片的消息]'
+          console.log(`  ${idx}. [${msg.role}] ${preview}...`)
         }
       })
       
       console.log('🔴🔴🔴 准备调用callAI')
       console.log('  apiMessages数量:', apiMessages.length)
       console.log('  第一条system prompt长度:', apiMessages[0]?.content?.length || 0)
+      
+      // 计算 Token 统计
+      // 从 API 设置中获取模型的真实上下文限制
+      const apiSettings = localStorage.getItem('api_settings')
+      let contextLimit = 100000 // 默认 100k
+      if (apiSettings) {
+        const settings = JSON.parse(apiSettings)
+        // 根据模型判断上下文限制
+        if (settings.model?.includes('gemini-2.0')) {
+          contextLimit = 1000000 // Gemini 2.0 有 1M 上下文
+        } else if (settings.model?.includes('gpt-4')) {
+          contextLimit = 128000 // GPT-4 Turbo 128k
+        } else if (settings.model?.includes('claude-3')) {
+          contextLimit = 200000 // Claude 3 200k
+        }
+      }
+      
+      // 将content转换为字符串（如果是数组则提取text部分）
+      const messageContents = apiMessages.slice(1).map(m => {
+        if (typeof m.content === 'string') {
+          return m.content
+        } else if (Array.isArray(m.content)) {
+          // 提取文字部分
+          return m.content
+            .filter(item => item.type === 'text')
+            .map(item => item.text)
+            .join(' ')
+        }
+        return ''
+      })
+      const stats = calculateContextTokens(
+        fullSystemPrompt,
+        lorebookContext,
+        messageContents,
+        contextLimit
+      )
+      setTokenStats(stats)
+      console.log('📊Token统计:', {
+        总计: stats.total,
+        系统提示: stats.systemPrompt,
+        世界书: stats.lorebook,
+        消息: stats.messages,
+        剩余: stats.remaining,
+        百分比: `${stats.percentage.toFixed(1)}%`
+      })
 
-      // 调用AI
+      // 调用AI（记录响应时间）
       console.log('⚡️⚡️⚡️ 正在调用callAI...')
-      const aiResponse = await callAI(apiMessages)
-      console.log('✅✅✅ callAI返回成功')
+      const startTime = Date.now()
+      let aiResponse: string
+      try {
+        aiResponse = await callAI(apiMessages)
+        setResponseTime(Date.now() - startTime)
+        console.log('✅✅✅ callAI返回成功')
+      } catch (error: any) {
+        // 如果是Vision不支持错误，降级处理：移除图片，只发送文字
+        if (error.message === 'VISION_NOT_SUPPORTED') {
+          console.warn('⚠️ 模型不支持Vision，降级为纯文字模式')
+          
+          // 将所有content转换为纯文字
+          const textOnlyMessages = apiMessages.map(msg => ({
+            role: msg.role,
+            content: typeof msg.content === 'string' 
+              ? msg.content 
+              : Array.isArray(msg.content)
+                ? msg.content.filter(item => item.type === 'text').map(item => item.text).join('\n')
+                : ''
+          }))
+          
+          console.log('🔄 重试：使用纯文字模式')
+          aiResponse = await callAI(textOnlyMessages)
+          console.log('✅ 纯文字模式调用成功')
+        } else {
+          throw error
+        }
+      }
       
       console.log('📨 AI原始回复:', aiResponse)
       
@@ -2677,6 +2910,309 @@ ${recentMessages.slice(-10).map((msg) => {
       
       // 检查AI是否对红包做出决定
       let redEnvelopeAction: 'claim' | null = null
+      
+      // 检查AI是否要修改网名
+      const nicknameMatch = aiResponse.match(/\[网名:(.+?)\]/)
+      if (nicknameMatch && character) {
+        const newNickname = nicknameMatch[1].trim()
+        const oldNickname = character.nickname || character.name
+        console.log(`✏️ AI修改网名: ${oldNickname} → ${newNickname}`)
+        updateCharacter(character.id, { nickname: newNickname })
+        
+        // 添加系统提示消息
+        const systemMessage: Message = {
+          id: Date.now(),
+          type: 'system',
+          content: `${oldNickname} 更改了网名`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system'
+        }
+        setMessages(prev => [...prev, systemMessage])
+      }
+      
+      // 检查AI是否要修改个性签名
+      const signatureMatch = aiResponse.match(/\[个性签名:(.+?)\]/)
+      if (signatureMatch && character) {
+        const newSignature = signatureMatch[1].trim()
+        console.log(`✏️ AI修改个性签名: ${newSignature}`)
+        updateCharacter(character.id, { signature: newSignature })
+        
+        // 添加系统提示消息
+        const systemMessage: Message = {
+          id: Date.now() + 1, // 避免ID冲突
+          type: 'system',
+          content: `${character.nickname || character.name} 更改了个性签名`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system'
+        }
+        setMessages(prev => [...prev, systemMessage])
+      }
+      
+      // 检查AI是否要换头像
+      const avatarMatch = aiResponse.match(/\[换头像:(.+?)\]/)
+      if (avatarMatch && character) {
+        const description = avatarMatch[1].trim()
+        console.log(`🖼️ AI要换头像: ${description}`)
+        
+        // 异步调用换头像API
+        ;(async () => {
+          try {
+            console.log('🖼️ 开始调用换头像API...')
+            
+            let newAvatar: string | null = null
+            let usedPrompt: string | null = null  // 记录使用的提示词
+            
+            // 🖼️ 特殊情况1：使用用户发的图片消息（AI识图后想用）
+            // 优先检测序号格式（最简单可靠）
+            const seqMatch = description.match(/^0?([1-5])$/)
+            
+            if (seqMatch) {
+              // 序号格式：01, 02, 03, 1, 2, 3
+              console.log('🔍 检查用户图片消息...')
+              console.log('📊 当前消息总数:', currentMessages.length)
+              
+              // 先看看所有用户发的消息
+              const allSentMessages = currentMessages.filter(msg => msg.type === 'sent')
+              console.log('📤 用户发送的消息数:', allSentMessages.length)
+              
+              // 看看有多少照片类型（支持 photo 和 image 两种）
+              const photoMessages = allSentMessages.filter(msg => 
+                msg.messageType === 'photo' || msg.messageType === 'image'
+              )
+              console.log('📸 照片类型消息数:', photoMessages.length)
+              
+              // 看看有多少有描述或图片URL
+              const photosWithContent = photoMessages.filter(msg => 
+                msg.photoDescription || msg.imageUrl
+              )
+              console.log('📝 有内容的照片数:', photosWithContent.length)
+              
+              // 找到AI最后一次回复的位置
+              let lastAIIndex = -1
+              for (let i = currentMessages.length - 1; i >= 0; i--) {
+                if (currentMessages[i].type === 'received') {
+                  lastAIIndex = i
+                  break
+                }
+              }
+              
+              console.log('🔍 AI最后回复位置:', lastAIIndex)
+              
+              // 只筛选AI最后回复之后用户发的图片（当前轮次）
+              // 保持正序：01=第一张，02=第二张，03=第三张（符合人类习惯）
+              const recentMessages = lastAIIndex >= 0 
+                ? currentMessages.slice(lastAIIndex + 1) // AI回复之后的消息
+                : currentMessages // 如果没有AI回复，就用全部
+              
+              console.log('📊 当前轮次消息数:', recentMessages.length)
+              
+              const userPhotos = recentMessages
+                .filter(msg => {
+                  if (msg.type !== 'sent') return false
+                  // photo类型（拍摄）需要有描述
+                  if (msg.messageType === 'photo' && msg.photoDescription) return true
+                  // image类型（相册）需要有图片URL
+                  if (msg.messageType === 'image' && msg.imageUrl) return true
+                  return false
+                })
+              
+              console.log('✅ 最终筛选出的图片数:', userPhotos.length)
+              
+              if (userPhotos.length === 0) {
+                console.warn('⚠️ 没有找到用户发的图片')
+                alert('没有找到你发的图片哦~')
+                return
+              }
+              
+              const index = parseInt(seqMatch[1]) - 1
+              const selectedPhoto = userPhotos[index]
+              
+              if (!selectedPhoto) {
+                console.warn(`⚠️ 序号${seqMatch[1]}超出范围，只有${userPhotos.length}张图片`)
+                alert(`只有${userPhotos.length}张图片哦~`)
+                return
+              }
+              
+              console.log(`📸 选择序号${seqMatch[1]}的图片`)
+              
+              // 直接使用用户发的图片作为AI头像
+              if (selectedPhoto.imageUrl) {
+                // 相册上传的图片，直接用
+                console.log('📷 直接使用用户上传的图片')
+                newAvatar = selectedPhoto.imageUrl
+                usedPrompt = '直接使用了用户上传的图片（序号' + seqMatch[1] + '）'
+              } else if (selectedPhoto.photoDescription) {
+                // 拍摄的图片，用描述生成
+                console.log('🎨 使用拍摄图片的描述生成头像')
+                const photoDesc = selectedPhoto.photoDescription
+                
+                // 简单中英翻译
+                const translateMap: Record<string, string> = {
+                  '猫咪': 'cute cat', '小猫': 'kitten', '猫': 'cat',
+                  '狗': 'dog', '狗狗': 'cute dog',
+                  '兔子': 'rabbit', '小兔': 'bunny',
+                  '粉发': 'pink hair', '黑发': 'black hair', '金发': 'blonde hair',
+                  '二次元': 'anime style', '动漫': 'anime',
+                  '少女': 'girl', '女孩': 'girl', '男孩': 'boy',
+                  '机器人': 'robot', '赛博朋克': 'cyberpunk',
+                  '可爱': 'cute', '酷酷的': 'cool', '帅气': 'handsome',
+                  '真实': 'realistic', '照片': 'photo',
+                  '像素': 'pixel art', '风景': 'landscape', '人物': 'character',
+                  '母子': 'mother and child', '妈妈': 'mother', '宝宝': 'baby',
+                  '呸': '', '好耶': '', '多爱': 'love', '比较': 'compare',
+                  '符合': 'match', '沉稳': 'calm', '气质': 'elegant', '喵喵': 'meow'
+                }
+                
+                let translatedDesc = photoDesc
+                for (const [cn, en] of Object.entries(translateMap)) {
+                  translatedDesc = translatedDesc.replace(new RegExp(cn, 'g'), en)
+                }
+                
+                const enhancedPrompt = `portrait avatar of ${translatedDesc}, centered composition, profile picture style, high quality, detailed, professional digital art, 4k`
+                usedPrompt = enhancedPrompt  // 保存提示词
+                console.log('📝 翻译后的提示词:', enhancedPrompt)
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=512&height=512&nologo=true&enhance=true&model=flux`
+                
+                const imgResponse = await fetch(imageUrl)
+                const blob = await imgResponse.blob()
+                newAvatar = await new Promise<string>((resolve) => {
+                  const reader = new FileReader()
+                  reader.onloadend = () => resolve(reader.result as string)
+                  reader.readAsDataURL(blob)
+                })
+                console.log('✅ 使用拍摄图片描述生成头像成功')
+              }
+            }
+            // 🎭 特殊情况2：直接复制用户的个人头像（偷头像）
+            else if (description.includes('你头像') || description.includes('偷头像') || description.includes('复制头像')) {
+              console.log('🎭 直接复制用户头像')
+              if (currentUser?.avatar) {
+                // 直接复制用户头像（不重新生成）
+                newAvatar = currentUser.avatar
+                usedPrompt = '直接复制了用户的头像（未使用AI生成）'  // 记录为直接复制
+                console.log('✅ 成功复制用户头像')
+              } else {
+                console.warn('⚠️ 用户没有头像')
+                alert('你还没有头像呢~')
+                return
+              }
+            }
+            // 🎨 普通情况：生成新头像
+            else {
+              // 🔧 本地开发Mock：直接使用Pollinations.ai生图
+              const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+              let data: any
+              
+              if (isDev) {
+                console.log('🔧 本地开发模式：使用Mock生图')
+                
+                // 简单中英翻译（避免中文导致生成错误）
+                const translateMap: Record<string, string> = {
+                  '猫咪': 'cute cat', '小猫': 'kitten', '猫': 'cat',
+                  '狗': 'dog', '狗狗': 'cute dog',
+                  '兔子': 'rabbit', '小兔': 'bunny',
+                  '粉发': 'pink hair', '黑发': 'black hair', '金发': 'blonde hair',
+                  '二次元': 'anime style', '动漫': 'anime',
+                  '少女': 'girl', '女孩': 'girl', '男孩': 'boy',
+                  '机器人': 'robot', '赛博朋克': 'cyberpunk',
+                  '可爱': 'cute', '酷酷的': 'cool', '帅气': 'handsome',
+                  '真实': 'realistic', '照片': 'photo',
+                  '母子': 'mother and child', '妈妈': 'mother', '宝宝': 'baby',
+                  '呸': '', '好耶': '', '多爱': 'love', '比较': 'compare',
+                  '符合': 'match', '沉稳': 'calm', '气质': 'elegant', '喵喵': 'meow'
+                }
+                
+                let translatedDesc = description
+                for (const [cn, en] of Object.entries(translateMap)) {
+                  translatedDesc = translatedDesc.replace(new RegExp(cn, 'g'), en)
+                }
+                
+                // 强化提示词：添加更多关键词确保生成正确
+                const enhancedPrompt = `portrait avatar of ${translatedDesc}, centered composition, profile picture style, high quality, detailed, professional digital art, 4k`
+                usedPrompt = enhancedPrompt  // 保存提示词
+                console.log('📝 翻译后的提示词:', enhancedPrompt)
+                const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?width=512&height=512&nologo=true&enhance=true&model=flux`
+                
+                // 下载并转换为base64
+                const imgResponse = await fetch(imageUrl)
+                const blob = await imgResponse.blob()
+                const base64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader()
+                  reader.onloadend = () => resolve(reader.result as string)
+                  reader.readAsDataURL(blob)
+                })
+                
+                data = { avatar: base64, method: 'mock_pollinations' }
+                console.log('✅ Mock生图成功')
+              } else {
+              // 生产环境：调用Netlify函数
+              const response = await fetch('/.netlify/functions/change-avatar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  description,
+                  preferReal: description.includes('真实') || description.includes('照片')
+                })
+              })
+              
+              console.log('📡 API响应状态:', response.status)
+              
+              if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status} ${response.statusText}`)
+              }
+              
+              data = await response.json()
+              }
+              
+              console.log('📦 返回数据:', data)
+              newAvatar = data.avatar
+            }
+            
+            // 统一处理头像更新
+            if (newAvatar) {
+              // 更新角色头像
+              updateCharacter(character.id, { avatar: newAvatar })
+              console.log(`✅ 头像更换成功`)
+              
+              // 添加系统提示（使用回调确保获取最新状态）
+              const systemMessage: Message = {
+                id: Date.now() + Math.random(),  // 确保ID唯一
+                type: 'system',
+                content: `${character.nickname || character.name} 更换了头像`,
+                time: new Date().toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                timestamp: Date.now(),
+                messageType: 'system',
+                avatarPrompt: usedPrompt || description  // 保存提示词
+              }
+              console.log('📣 添加系统提示:', systemMessage.content)
+              // 使用函数式更新确保基于最新状态
+              setMessages(prev => {
+                console.log('📝 添加系统消息前的消息数:', prev.length)
+                const updated = [...prev, systemMessage]
+                console.log('📝 添加系统消息后的消息数:', updated.length)
+                return updated
+              })
+            } else {
+              console.error('❌ 换头像失败')
+              alert(`换头像失败`)
+            }
+          } catch (error: any) {
+            console.error('❌ 换头像异常:', error)
+            alert(`换头像失败：${error.message || '网络错误'}`)
+          }
+        })()
+      }
       
       // 检查AI是否要打电话
       const voiceCallMatch = aiResponse.match(/\[语音通话\]/)
@@ -2725,6 +3261,13 @@ ${recentMessages.slice(-10).map((msg) => {
       // 清理通话标记
       cleanedResponse = cleanedResponse.replace(/\[语音通话\]/g, '').replace(/\[视频通话\]/g, '').trim()
       
+      // 清理网名、个性签名和头像标记（使用[\s\S]匹配包括换行在内的所有字符）
+      cleanedResponse = cleanedResponse.replace(/\[网名:[\s\S]+?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[个性签名:[\s\S]+?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[换头像:[\s\S]+?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[一起听:[\s\S]+?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[正在与[\s\S]+?一起听[\s\S]+?\]/g, '').trim()
+      
       // 清理系统警告标记
       cleanedResponse = cleanedResponse.replace(/\[系统警告[：:][^\]]*\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/【系统警告[：:][^】]*】/g, '').trim()
@@ -2770,6 +3313,58 @@ ${recentMessages.slice(-10).map((msg) => {
         }
         cleanedResponse = cleanedResponse.replace(/\[位置:.+?:.+?\]/g, '').trim()
         console.log('📍 AI发送位置:', aiLocationData)
+      }
+      
+      // 检查AI是否要分享小红书
+      const xiaohongshuMatch = aiResponse.match(/\[小红书:(.+?)\]/)
+      let aiXiaohongshuKeyword: string | null = null
+      
+      if (xiaohongshuMatch) {
+        aiXiaohongshuKeyword = xiaohongshuMatch[1].trim()
+        cleanedResponse = cleanedResponse.replace(/\[小红书:.+?\]/g, '').trim()
+        console.log('📕 AI分享小红书，关键词:', aiXiaohongshuKeyword)
+      }
+      
+      // 🎨 检查AI是否要生成图片（包装成小红书）
+      // 格式：[生成图片:标题|描述|提示词]
+      const generateImageMatch = aiResponse.match(/\[生成图片:(.+?)\|(.+?)\|(.+?)\]/)
+      let aiGenerateImageData: { title: string; description: string; prompt: string } | null = null
+      
+      if (generateImageMatch) {
+        aiGenerateImageData = {
+          title: generateImageMatch[1].trim(),
+          description: generateImageMatch[2].trim(),
+          prompt: generateImageMatch[3].trim()
+        }
+        cleanedResponse = cleanedResponse.replace(/\[生成图片:.+?\|.+?\|.+?\]/g, '').trim()
+        console.log('🎨 AI要生成图片:', aiGenerateImageData)
+      }
+      
+      // 检查AI是否要发送一起听邀请
+      // 支持两种格式：
+      // 1. [一起听:歌名:歌手]
+      // 2. [正在与 XX 一起听：歌名 - 歌手 ...]
+      let musicInviteMatch = aiResponse.match(/\[一起听:(.+?):(.+?)\]/)
+      let aiMusicInviteData: { songTitle: string; songArtist: string } | null = null
+      
+      if (musicInviteMatch) {
+        aiMusicInviteData = {
+          songTitle: musicInviteMatch[1],
+          songArtist: musicInviteMatch[2]
+        }
+        cleanedResponse = cleanedResponse.replace(/\[一起听:.+?:.+?\]/g, '').trim()
+        console.log('🎵 AI发送一起听邀请(格式1):', aiMusicInviteData)
+      } else {
+        // 尝试匹配第二种格式
+        const altMatch = aiResponse.match(/\[正在与.+?一起听[：:](.+?)\s*[-－]\s*(.+?)(?:\s+\d|$|\])/);
+        if (altMatch) {
+          aiMusicInviteData = {
+            songTitle: altMatch[1].trim(),
+            songArtist: altMatch[2].trim()
+          }
+          cleanedResponse = cleanedResponse.replace(/\[正在与.+?一起听[：:].+?\]/g, '').trim()
+          console.log('🎵 AI发送一起听邀请(格式2):', aiMusicInviteData)
+        }
       }
       
       // 检查AI是否要领取红包（支持多种格式）
@@ -2839,6 +3434,20 @@ ${recentMessages.slice(-10).map((msg) => {
             console.log('💰 AI发起转账 (备用格式):', aiTransferData)
           }
         }
+      }
+      
+      // 🛒 检查AI是否要消费（使用亲密付额度）
+      const consumeMatch = aiResponse.match(/\[消费:(.+?)-(.+?)-(\d+\.?\d*)\]/)
+      let aiConsumeData: { platform: string; item: string; amount: number } | null = null
+      
+      if (consumeMatch) {
+        aiConsumeData = {
+          platform: consumeMatch[1].trim(),
+          item: consumeMatch[2].trim(),
+          amount: parseFloat(consumeMatch[3])
+        }
+        cleanedResponse = cleanedResponse.replace(/\[消费:.+?-.+?-\d+\.?\d*\]/g, '').trim()
+        console.log('🛒 AI消费:', aiConsumeData)
       }
       
       // 检查AI是否要开通亲密付
@@ -3238,16 +3847,20 @@ ${recentMessages.slice(-10).map((msg) => {
           
           const now = Date.now()
           
-          // 查找引用的消息
-          let quotedMsg = null
-          if (aiQuotedMessageId) {
-            quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
-          }
-          
-          const aiMessage: Message = {
-            id: newMessages.length + 1,
-            type: 'received',
-            content: textContent,
+          // 如果处理后文字内容为空，跳过这条消息
+          if (!textContent || !textContent.trim()) {
+            console.log('⚠️ 文字内容为空，跳过消息')
+          } else {
+            // 查找引用的消息
+            let quotedMsg = null
+            if (aiQuotedMessageId) {
+              quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
+            }
+            
+            const aiMessage: Message = {
+              id: newMessages.length + 1,
+              type: 'received',
+              content: textContent,
             time: new Date().toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit',
@@ -3276,7 +3889,11 @@ ${recentMessages.slice(-10).map((msg) => {
           })
           
           newMessages.push(aiMessage)
-          setMessages(newMessages)
+          safeSetMessages(newMessages)
+          
+          // 增加AI回复计数（用于未读消息）
+          aiRepliedCountRef.current++
+          }
         } else {
           // 多行回复，分多条消息逐个显示，模拟真人打字
           for (let i = 0; i < responseLines.length; i++) {
@@ -3301,6 +3918,12 @@ ${recentMessages.slice(-10).map((msg) => {
                 })
                 textContent = textContent.replace(/\[旁白\][^\[]+?\[\/旁白\]/g, '').trim()
               }
+            }
+            
+            // 如果处理后文字内容为空，跳过这条消息
+            if (!textContent || !textContent.trim()) {
+              console.log(`⚠️ 多行消息第${i+1}条内容为空，跳过`)
+              continue
             }
             
             // 查找引用的消息（只在第一条消息添加引用）
@@ -3331,7 +3954,8 @@ ${recentMessages.slice(-10).map((msg) => {
               blocked: isAiBlocked // 标记拉黑状态
             }
             newMessages = [...newMessages, aiMessage]
-            setMessages(newMessages)
+            safeSetMessages(newMessages)
+            aiRepliedCountRef.current++ // 增加AI回复计数
           }
         }
       }
@@ -3359,7 +3983,8 @@ ${recentMessages.slice(-10).map((msg) => {
             }
             
             newMessages = [...newMessages, emojiMessage]
-            setMessages(newMessages)
+            safeSetMessages(newMessages)
+            aiRepliedCountRef.current++ // 增加AI回复计数
             console.log('😀 AI发送了表情包:', emoji.description)
           }
         }
@@ -3384,7 +4009,8 @@ ${recentMessages.slice(-10).map((msg) => {
         }
         
         newMessages = [...newMessages, voiceMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('🎤 AI发送了语音消息:', aiVoiceText)
       }
       
@@ -3412,7 +4038,8 @@ ${recentMessages.slice(-10).map((msg) => {
         }
         
         newMessages = [...newMessages, locationMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('📍 AI发送了位置:', aiLocationData)
       }
       
@@ -3435,13 +4062,130 @@ ${recentMessages.slice(-10).map((msg) => {
         }
         
         newMessages = [...newMessages, photoMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('📸 AI发送了照片，描述:', aiPhotoDescription)
+      }
+      
+      // 如果AI分享了小红书
+      if (aiXiaohongshuKeyword) {
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500))
+        
+        try {
+          // 动态导入小红书API
+          const { getXiaohongshuForAI } = await import('../utils/xiaohongshuApi')
+          
+          // 获取小红书笔记
+          const keywords = aiXiaohongshuKeyword.split(/[,，\s]+/).filter(k => k.trim())
+          const note = await getXiaohongshuForAI(keywords)
+          
+          if (note) {
+            const xiaohongshuMessage: Message = {
+              id: Date.now(),
+              type: 'received',
+              content: '',
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now(),
+              messageType: 'xiaohongshu',
+              xiaohongshuNote: note,
+              blocked: isAiBlocked
+            }
+            
+            newMessages = [...newMessages, xiaohongshuMessage]
+            safeSetMessages(newMessages)
+            aiRepliedCountRef.current++ // 增加AI回复计数
+            console.log('📕 AI发送了小红书笔记:', note.title)
+          } else {
+            console.warn('⚠️ 未找到相关小红书笔记')
+          }
+        } catch (error) {
+          console.error('❌ 获取小红书笔记失败:', error)
+        }
+      }
+      
+      // 🎨 如果AI要生成图片（包装成小红书）
+      if (aiGenerateImageData) {
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000))
+        
+        try {
+          console.log('🎨 调用AI生图API...')
+          const response = await fetch('/.netlify/functions/generate-xhs-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(aiGenerateImageData)
+          })
+          
+          if (response.ok) {
+            const { note } = await response.json()
+            
+            const xiaohongshuMessage: Message = {
+              id: Date.now(),
+              type: 'received',
+              content: '',
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now(),
+              messageType: 'xiaohongshu',
+              xiaohongshuNote: note,
+              blocked: isAiBlocked
+            }
+            
+            newMessages = [...newMessages, xiaohongshuMessage]
+            safeSetMessages(newMessages)
+            aiRepliedCountRef.current++ // 增加AI回复计数
+            console.log('🎨 AI生成图片成功:', note.title)
+          } else {
+            console.error('❌ AI生图失败:', response.status)
+          }
+        } catch (error) {
+          console.error('❌ AI生图异常:', error)
+        }
+      }
+      
+      // 如果AI发送了一起听邀请
+      if (aiMusicInviteData) {
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500))
+        
+        const musicInviteMessage: Message = {
+          id: Date.now(),
+          type: 'received',
+          content: '',
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'musicInvite',
+          musicInvite: {
+            songTitle: aiMusicInviteData.songTitle,
+            songArtist: aiMusicInviteData.songArtist,
+            inviterName: character?.name || 'AI',
+            status: 'pending'
+          },
+          blocked: isAiBlocked
+        }
+        
+        newMessages = [...newMessages, musicInviteMessage]
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
+        console.log('🎵 AI发送了一起听邀请:', aiMusicInviteData.songTitle, '-', aiMusicInviteData.songArtist)
       }
       
       // 如果AI发了红包
       if (aiRedEnvelopeData && id) {
         await new Promise(resolve => setTimeout(resolve, 500)) // 稍微延迟一下
+        
+        // 🔥 尝试使用用户给AI开通的亲密付额度
+        const intimatePaySuccess = useCharacterIntimatePay(id, aiRedEnvelopeData.amount, `红包：${aiRedEnvelopeData.blessing}`)
+        
+        if (intimatePaySuccess) {
+          console.log('💝 AI使用了用户的亲密付额度发红包')
+        }
         
         // 创建红包数据
         const redEnvelope: RedEnvelope = {
@@ -3473,12 +4217,20 @@ ${recentMessages.slice(-10).map((msg) => {
           blocked: isAiBlocked
         }
         newMessages = [...newMessages, aiRedEnvelopeMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('🧧 AI红包卡片已添加')
       }
       // 如果AI发起了转账
       if (aiTransferData) {
         await new Promise(resolve => setTimeout(resolve, 500)) // 稍微延迟一下
+        
+        // 🔥 尝试使用用户给AI开通的亲密付额度
+        const intimatePaySuccess = useCharacterIntimatePay(id!, aiTransferData.amount, `转账：${aiTransferData.message}`)
+        
+        if (intimatePaySuccess) {
+          console.log('💝 AI使用了用户的亲密付额度发转账')
+        }
         
         const now = Date.now()
         const aiTransferMessage: Message = {
@@ -3499,8 +4251,38 @@ ${recentMessages.slice(-10).map((msg) => {
           blocked: isAiBlocked
         }
         newMessages = [...newMessages, aiTransferMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('💸 AI转账卡片已添加')
+      }
+      
+      // 🛒 如果AI要消费（使用亲密付额度）
+      if (aiConsumeData && id) {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        const { platform, item, amount } = aiConsumeData
+        
+        // 尝试使用亲密付额度
+        const success = useCharacterIntimatePay(id, amount, `${platform}-${item}`)
+        
+        if (success) {
+          console.log(`🛒 AI消费成功: ${platform}-${item} ¥${amount}`)
+          // 添加系统消息（可选，让用户看到消费记录）
+          const systemMsg: Message = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            content: `使用亲密付消费：${platform} - ${item}（¥${amount.toFixed(2)}）`,
+            time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+            timestamp: Date.now(),
+            messageType: 'system',
+            isHidden: false  // 用户可以在聊天记录里看到
+          }
+          newMessages = [...newMessages, systemMsg]
+          safeSetMessages(newMessages)
+        } else {
+          console.warn('🛒 AI消费失败：亲密付额度不足')
+          // 可以选择告诉AI额度不足
+        }
       }
       
       // 如果AI要开通亲密付
@@ -3527,7 +4309,8 @@ ${recentMessages.slice(-10).map((msg) => {
           blocked: isAiBlocked
         }
         newMessages = [...newMessages, aiIntimatePayMessage]
-        setMessages(newMessages)
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
         console.log('💝 AI亲密付卡片已添加')
       }
       
@@ -3556,7 +4339,7 @@ ${recentMessages.slice(-10).map((msg) => {
             isHidden: false
           }
           newMessages = [...newMessages, systemMessage]
-          setMessages(newMessages)
+          safeSetMessages(newMessages)
         } else {
           // 创建情侣空间邀请记录到localStorage
           // 注意：关系记录的是用户和角色之间的关系，不区分谁发送邀请
@@ -3588,7 +4371,8 @@ ${recentMessages.slice(-10).map((msg) => {
               blocked: isAiBlocked
             }
             newMessages = [...newMessages, aiCoupleSpaceMessage]
-            setMessages(newMessages)
+            safeSetMessages(newMessages)
+            aiRepliedCountRef.current++ // 增加AI回复计数
             console.log('💑 AI情侣空间邀请卡片已添加，localStorage记录已创建')
           } else {
             console.warn('⚠️ AI情侣空间邀请失败：已有活跃的情侣空间')
@@ -3788,7 +4572,8 @@ ${recentMessages.slice(-10).map((msg) => {
               console.log('💾 保存日记到localStorage...')
               saveDiary(characterId, diary)
               console.log('✅ AI日记已生成并保存到日记本')
-              console.log('📔 日记内容预览:', diary.content.substring(0, 50) + '...')
+              const diaryPreview = diary.content.length > 50 ? diary.content.substring(0, 50) + '...' : diary.content
+              console.log('📔 日记内容预览:', diaryPreview)
               
               // 添加系统提示消息到聊天记录
               const currentDate = new Date().toLocaleDateString('zh-CN', {
@@ -3799,12 +4584,12 @@ ${recentMessages.slice(-10).map((msg) => {
               
               // 提取日记的前几个字作为预览（去掉照片标记）
               const contentPreview = diary.content.replace(/\[照片:.*?\]/g, '').trim().substring(0, 15)
-              const preview = contentPreview + (diary.content.length > 15 ? '...' : '')
+              const messagePreview = contentPreview + (diary.content.length > 15 ? '...' : '')
               
               const systemMessage: Message = {
                 id: Date.now() + Math.random(),
                 type: 'system',
-                content: `📔 你在情侣空间日记本写了一篇日记：${preview}（${currentDate}）`,
+                content: `📔 你在情侣空间日记本写了一篇日记：${messagePreview}（${currentDate}）`,
                 time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now(),
                 messageType: 'system',
@@ -3883,7 +4668,7 @@ ${recentMessages.slice(-10).map((msg) => {
               messageType: 'system' as const
             }
             
-            setMessages([...newMessages])
+            safeSetMessages([...newMessages])
           }
         }
       }
@@ -3905,9 +4690,44 @@ ${recentMessages.slice(-10).map((msg) => {
           minute: '2-digit',
         }),
       }
-      setMessages([...currentMessages, errorMessage])
+      safeSetMessages([...currentMessages, errorMessage])
     } finally {
       setIsAiTyping(false)
+      
+      // 标记AI回复完成
+      if (id) {
+        markAIReplyComplete(id)
+        
+        // 如果组件已卸载（用户切换到其他聊天），保存所有消息到localStorage并增加未读
+        if (!isMountedRef.current) {
+          console.log('📦 组件已卸载，保存最终消息状态到 localStorage')
+          const savedMessages = localStorage.getItem(`chat_messages_${id}`)
+          if (savedMessages) {
+            try {
+              // 重新读取最新的消息（可能在AI回复过程中已经被修改）
+              const latestMessages = JSON.parse(savedMessages) as Message[]
+              localStorage.setItem(`chat_messages_${id}`, JSON.stringify(latestMessages))
+              
+              // 增加未读消息数
+              if (aiRepliedCountRef.current > 0) {
+                incrementUnread(id, aiRepliedCountRef.current)
+                console.log('📬 切换聊天后AI回复完成，新增未读消息:', aiRepliedCountRef.current)
+              }
+            } catch (e) {
+              console.error('保存消息失败:', e)
+            }
+          }
+        }
+        // 如果组件还在但页面不可见（用户切到其他标签页），也增加未读消息数
+        else if (!isPageVisibleRef.current && aiRepliedCountRef.current > 0) {
+          incrementUnread(id, aiRepliedCountRef.current)
+          console.log('📬 后台AI回复完成，新增未读消息:', aiRepliedCountRef.current)
+        }
+        
+        // 重置AI回复计数
+        aiRepliedCountRef.current = 0
+      }
+      
       console.log('🏁 AI回复流程结束\n')
     }
   }
@@ -3934,7 +4754,7 @@ ${recentMessages.slice(-10).map((msg) => {
         </button>
         <div className="flex items-center gap-2">
           <h1 className="text-base font-semibold text-gray-900">
-            {isAiTyping ? '正在输入...' : (character?.name || '聊天')}
+            {isAiTyping ? '正在输入...' : (character?.nickname || character?.name || '聊天')}
           </h1>
           {id && (() => {
             const streakData = getStreakData(id)
@@ -3949,6 +4769,25 @@ ${recentMessages.slice(-10).map((msg) => {
           })()}
         </div>
         <div className="flex items-center gap-2">
+          {/* Token 计数器 */}
+          {tokenStats.total > 0 && (
+            <button
+              onClick={() => setShowTokenDetail(!showTokenDetail)}
+              className="text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-1 ios-button"
+              style={{
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                color: '#3b82f6'
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              <span className="font-medium">{formatTokenCount(tokenStats.total)}</span>
+              {responseTime > 0 && (
+                <span className="text-[9px] opacity-70">·{(responseTime/1000).toFixed(1)}s</span>
+              )}
+            </button>
+          )}
           <button 
             onClick={() => setShowStatusModal(true)}
             className="ios-button p-1 hover:opacity-70 transition-all"
@@ -3968,6 +4807,74 @@ ${recentMessages.slice(-10).map((msg) => {
         </div>
           </div>
         </div>
+        
+        {/* Token 详情面板 */}
+        {showTokenDetail && tokenStats.total > 0 && (
+          <div className="glass-card mx-4 mt-2 p-3 rounded-xl transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-700">本次请求统计</span>
+              <button 
+                onClick={() => setShowTokenDetail(false)}
+                className="text-gray-400 hover:text-gray-600 ios-button"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-2 text-xs">
+              {/* 响应时间 */}
+              {responseTime > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">响应时间</span>
+                  <span className="font-semibold text-blue-600">{(responseTime/1000).toFixed(2)} 秒</span>
+                </div>
+              )}
+              
+              {/* Token 使用 */}
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-gray-600 font-medium">本次 Token 使用</span>
+                  <span className="font-semibold text-blue-600">{tokenStats.total.toLocaleString()} tokens</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">系统提示</span>
+                  <span className="text-gray-700">{tokenStats.systemPrompt.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">世界书</span>
+                  <span className="text-gray-700">{tokenStats.lorebook.toLocaleString()}</span>
+                </div>
+                {lorebookEntries.length > 0 && (
+                  <div className="ml-4 space-y-0.5 mt-1">
+                    {lorebookEntries.map((entry, idx) => (
+                      <div key={idx} className="flex justify-between text-[10px]">
+                        <span className="text-gray-400 truncate max-w-[150px]" title={entry.name}>· {entry.name}</span>
+                        <span className="text-gray-500">{entry.tokens}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">消息历史</span>
+                  <span className="text-gray-700">{tokenStats.messages.toLocaleString()}</span>
+                </div>
+              </div>
+              
+              {/* 上下文信息 */}
+              <div className="pt-2 border-t border-gray-200">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">上下文限制</span>
+                  <span className="text-gray-600">{(tokenStats.total + tokenStats.remaining).toLocaleString()} tokens</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">使用比例</span>
+                  <span className="text-gray-600">{tokenStats.percentage.toFixed(2)}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* 聊天消息区域 */}
       <div ref={messagesContainerRef} className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4">
@@ -4083,13 +4990,44 @@ ${recentMessages.slice(-10).map((msg) => {
                        </div>
                      )}
                      <div className="flex justify-center mb-4">
-                       <div 
-                         className={`bg-gray-200/80 px-3 py-1.5 rounded-md ${message.isRecalled ? 'cursor-pointer hover:bg-gray-300/80 transition-colors' : ''}`}
-                         onClick={() => {
-                           if (message.isRecalled && message.recalledContent) {
-                             setViewingRecalledMessage(message)
-                           }
-                         }}
+                      <div 
+                        className={`bg-gray-200/80 px-3 py-1.5 rounded-md ${message.isRecalled || message.avatarPrompt ? 'cursor-pointer hover:bg-gray-300/80 transition-colors' : ''}`}
+                        onClick={() => {
+                          if (message.isRecalled && message.recalledContent) {
+                            setViewingRecalledMessage(message)
+                          } else if (message.avatarPrompt) {
+                            // 简单翻译关键词
+                            const translations: Record<string, string> = {
+                              'portrait avatar of': '头像：',
+                              'centered composition': '居中构图',
+                              'profile picture style': '头像风格',
+                              'high quality': '高质量',
+                              'detailed': '精细',
+                              'professional digital art': '专业数字艺术',
+                              'cute': '可爱的',
+                              'cat': '猫',
+                              'dog': '狗',
+                              'girl': '女孩',
+                              'boy': '男孩',
+                              'anime': '动漫',
+                              'realistic': '真实的',
+                              'photo': '照片',
+                              'pink hair': '粉色头发',
+                              'mother and child': '母子',
+                              'baby': '宝宝',
+                              'robot': '机器人',
+                              'cool': '酷的',
+                              'elegant': '优雅的'
+                            }
+                            
+                            let translated = message.avatarPrompt
+                            for (const [en, cn] of Object.entries(translations)) {
+                              translated = translated.replace(new RegExp(en, 'gi'), cn)
+                            }
+                            
+                            alert(`AI使用的提示词：\n\n原文：\n${message.avatarPrompt}\n\n中文翻译：\n${translated}`)
+                          }
+                        }}
                        >
                          <span className="text-xs text-gray-600">{message.content}</span>
                        </div>
@@ -4198,15 +5136,15 @@ ${recentMessages.slice(-10).map((msg) => {
                        messageId={message.id}
                      />
                    ) : message.messageType === 'voice' && message.voiceText ? (
-                     <div className="flex flex-col gap-2">
+                     <div className="flex flex-col gap-2" style={{ width: '160px' }}>
                        <div 
                          className="message-bubble"
                          style={{
-                           backgroundColor: message.type === 'sent' ? '#95EC69' : '#FFFFFF',
+                           backgroundColor: message.type === 'sent' ? userBubbleColor : aiBubbleColor,
                            borderRadius: '16px',
                            padding: '12px',
                            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                           minWidth: '160px',
+                           width: '160px',
                            transition: 'all 0.2s',
                            border: message.type === 'sent' ? 'none' : '1px solid #e5e7eb'
                          }}
@@ -4271,11 +5209,18 @@ ${recentMessages.slice(-10).map((msg) => {
                        
                        {/* 转文字显示 */}
                        {showVoiceTextMap[message.id] && (
-                         <div className={`px-3 py-2 rounded-xl text-sm text-gray-700 ${
-                           message.type === 'sent' 
-                             ? '' 
-                             : 'bg-gray-100'
-                         }`}>
+                         <div 
+                           className={`px-3 py-2 rounded-xl text-sm ${
+                             message.type === 'sent' 
+                               ? 'bg-white/10 text-gray-700' 
+                               : 'bg-gray-100 text-gray-700'
+                           }`}
+                           style={{ 
+                             width: '160px',
+                             wordWrap: 'break-word',
+                             overflowWrap: 'break-word'
+                           }}
+                         >
                            <div className="text-xs text-gray-500 mb-1">转文字：</div>
                            {message.voiceText}
                          </div>
@@ -4322,14 +5267,84 @@ ${recentMessages.slice(-10).map((msg) => {
                       </div>
                     </div>
                    ) : message.messageType === 'emoji' && message.emojiUrl ? (
-                     <div className="rounded-2xl overflow-hidden shadow-lg max-w-[200px]">
-                       <img 
-                         src={message.emojiUrl} 
-                         alt={message.emojiDescription || '表情包'} 
-                         className="w-full h-auto"
-                       />
-                     </div>
-                   ) : message.messageType === 'transfer' && message.transfer ? (
+                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[200px]">
+                      <img 
+                        src={message.emojiUrl} 
+                        alt={message.emojiDescription || '表情包'} 
+                        className="w-full h-auto"
+                      />
+                    </div>
+                  ) : message.messageType === 'xiaohongshu' && message.xiaohongshuNote ? (
+                    <XiaohongshuCard
+                      note={message.xiaohongshuNote}
+                      onClick={() => {
+                        // 打开小红书链接
+                        window.open(message.xiaohongshuNote!.url, '_blank')
+                      }}
+                    />
+                  ) : message.messageType === 'image' && message.imageUrl ? (
+                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[300px]">
+                      <img 
+                        src={message.imageUrl} 
+                        alt="上传的图片" 
+                        className="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => {
+                          // 点击放大图片
+                          const win = window.open('', '_blank')
+                          if (win) {
+                            win.document.write(`<img src="${message.imageUrl}" style="max-width:100%;max-height:100vh;margin:auto;display:block;">`)
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : message.messageType === 'musicInvite' && message.musicInvite ? (
+                    /* 一起听邀请卡片 */
+                    <div style={{ maxWidth: '280px', display: 'inline-block' }}>
+                      <MusicInviteCard
+                        inviterName={message.musicInvite.inviterName}
+                        songTitle={message.musicInvite.songTitle}
+                        songArtist={message.musicInvite.songArtist}
+                        songCover={message.musicInvite.songCover}
+                        status={message.musicInvite.status}
+                        onAccept={() => {
+                          // 接受邀请
+                          setMessages(prev => prev.map(msg => 
+                            msg.id === message.id 
+                              ? { ...msg, musicInvite: { ...msg.musicInvite!, status: 'accepted' } }
+                              : msg
+                          ))
+                          // 保存更新后的消息
+                          setTimeout(() => {
+                            const updatedMessages = messages.map(msg => 
+                              msg.id === message.id 
+                                ? { ...msg, musicInvite: { ...msg.musicInvite!, status: 'accepted' } }
+                                : msg
+                            )
+                            safeSetItem(`chat_${id}`, JSON.stringify(updatedMessages))
+                          }, 100)
+                          // 跳转到一起听聊天
+                          navigate('/music-together-chat')
+                        }}
+                        onReject={() => {
+                          // 拒绝邀请
+                          setMessages(prev => prev.map(msg => 
+                            msg.id === message.id 
+                              ? { ...msg, musicInvite: { ...msg.musicInvite!, status: 'rejected' } }
+                              : msg
+                          ))
+                          // 保存更新后的消息
+                          setTimeout(() => {
+                            const updatedMessages = messages.map(msg => 
+                              msg.id === message.id 
+                                ? { ...msg, musicInvite: { ...msg.musicInvite!, status: 'rejected' } }
+                                : msg
+                            )
+                            safeSetItem(`chat_${id}`, JSON.stringify(updatedMessages))
+                          }, 100)
+                        }}
+                      />
+                    </div>
+                  ) : message.messageType === 'transfer' && message.transfer ? (
                      <div 
                        className="message-bubble glass-card rounded-2xl p-4 shadow-lg min-w-[200px]"
                        style={{
@@ -4745,6 +5760,7 @@ ${recentMessages.slice(-10).map((msg) => {
           onSelectCoupleSpaceContent={handleOpenCoupleSpaceContent}
           onSelectLocation={handleSelectLocation}
           onSelectVoiceMessage={handleSelectVoice}
+          onSelectXiaohongshu={handleSelectXiaohongshu}
           onSelectVoiceCall={() => {
             setShowMenu(false)
             setIsVideoCall(false)
@@ -4756,6 +5772,14 @@ ${recentMessages.slice(-10).map((msg) => {
             setIsVideoCall(true)
             setCallStartTime(Date.now())
             setShowCallScreen(true)
+          }}
+          onRegenerateAI={() => {
+            setShowMenu(false)
+            // 找到最后一条AI消息
+            const lastAIMessage = messages.slice().reverse().find(m => m.type === 'received')
+            if (lastAIMessage) {
+              handleRegenerateMessage(lastAIMessage.id)
+            }
           }}
           hasCoupleSpace={hasCoupleSpaceActive}
         />
@@ -5029,6 +6053,22 @@ ${recentMessages.slice(-10).map((msg) => {
             </div>
           </div>
         </>
+      )}
+
+      {/* 小红书选择器 */}
+      {showXiaohongshuSelector && (
+        <XiaohongshuSelector
+          onClose={() => setShowXiaohongshuSelector(false)}
+          onSelect={handleSendXiaohongshu}
+        />
+      )}
+
+      {/* 小红书手动输入 */}
+      {showXiaohongshuInput && (
+        <XiaohongshuLinkInput
+          onClose={() => setShowXiaohongshuInput(false)}
+          onSubmit={handleSendXiaohongshu}
+        />
       )}
 
       {/* 位置详情查看模态框 */}
@@ -5432,9 +6472,47 @@ ${callDetails}
               <>
                 <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">上传照片</h3>
                 <div className="mb-4">
-                  <label className="block text-sm text-gray-700 mb-2">选择照片（可选）</label>
-                  <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onload = (evt) => { setCouplePhotoFile(evt.target?.result as string) }; reader.readAsDataURL(file) }}} className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm" />
-                  {couplePhotoFile && <img src={couplePhotoFile} alt="预览" className="mt-2 w-full h-40 object-cover rounded-xl" />}
+                  <label className="block text-sm text-gray-700 mb-2">选择照片（可选，可多选）</label>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    onChange={(e) => { 
+                      const files = e.target.files
+                      if (files && files.length > 0) {
+                        const newFiles: string[] = []
+                        Array.from(files).forEach((file, index) => {
+                          const reader = new FileReader()
+                          reader.onload = (evt) => {
+                            newFiles.push(evt.target?.result as string)
+                            if (newFiles.length === files.length) {
+                              setCouplePhotoFiles(prev => [...prev, ...newFiles])
+                            }
+                          }
+                          reader.readAsDataURL(file)
+                        })
+                      }
+                    }} 
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm" 
+                  />
+                  {couplePhotoFiles.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-gray-600 mb-2">已选择 {couplePhotoFiles.length} 张照片</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {couplePhotoFiles.map((file, index) => (
+                          <div key={index} className="relative">
+                            <img src={file} alt={`预览${index + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                            <button
+                              onClick={() => setCouplePhotoFiles(prev => prev.filter((_, i) => i !== index))}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="mb-4">
                   <label className="block text-sm text-gray-700 mb-2">照片描述</label>

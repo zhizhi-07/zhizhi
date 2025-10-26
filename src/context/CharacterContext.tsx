@@ -4,10 +4,11 @@ import * as IDB from '../utils/indexedDB'
 
 export interface Character {
   id: string
-  name: string
+  name: string  // 真实名字
+  nickname?: string  // 网名（AI可以自主修改）
   username: string
   avatar: string
-  signature: string  // 个性签名，显示在资料页
+  signature: string  // 个性签名（AI可以自主修改）
   description: string  // AI角色描述：背景、性格等，用于AI角色扮演
   createdAt: string
   
@@ -30,7 +31,7 @@ export interface Character {
 
 interface CharacterContextType {
   characters: Character[]
-  addCharacter: (character: Omit<Character, 'id' | 'createdAt'>) => void
+  addCharacter: (character: Omit<Character, 'id' | 'createdAt'>) => Character
   updateCharacter: (id: string, character: Partial<Character>) => void
   deleteCharacter: (id: string) => void
   getCharacter: (id: string) => Character | undefined
@@ -194,13 +195,14 @@ export const CharacterProvider = ({ children }: { children: ReactNode }) => {
     saveCharacters()
   }, [characters, isLoading])
 
-  const addCharacter = (characterData: Omit<Character, 'id' | 'createdAt'>) => {
+  const addCharacter = (characterData: Omit<Character, 'id' | 'createdAt'>): Character => {
     const newCharacter: Character = {
       ...characterData,
       id: Date.now().toString(),
       createdAt: new Date().toISOString()
     }
     setCharacters(prev => [...prev, newCharacter])
+    return newCharacter
   }
 
   const updateCharacter = (id: string, characterData: Partial<Character>) => {

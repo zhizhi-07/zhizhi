@@ -14,7 +14,8 @@ export const STORES = {
   SETTINGS: 'settings',
   LOREBOOKS: 'lorebooks',
   MOMENTS: 'moments',
-  GROUPS: 'groups'
+  GROUPS: 'groups',
+  EMOJIS: 'emojis'
 } as const
 
 /**
@@ -71,6 +72,12 @@ export function initDB(): Promise<IDBDatabase> {
       // 创建群聊存储
       if (!db.objectStoreNames.contains(STORES.GROUPS)) {
         db.createObjectStore(STORES.GROUPS, { keyPath: 'id' })
+      }
+      
+      // 创建表情包存储
+      if (!db.objectStoreNames.contains(STORES.EMOJIS)) {
+        const emojiStore = db.createObjectStore(STORES.EMOJIS, { keyPath: 'id' })
+        emojiStore.createIndex('addTime', 'addTime', { unique: false })
       }
     }
   })

@@ -18,6 +18,7 @@ import { SettingsProvider } from './context/SettingsContext'
 import { UserProvider } from './context/UserContext'
 import { CharacterProvider } from './context/CharacterContext'
 import { MomentsProvider } from './context/MomentsContext'
+import './utils/clearAvatarCache' // 导入清理工具，使其在控制台可用
 import { ApiProvider } from './context/ApiContext'
 import { RedEnvelopeProvider } from './context/RedEnvelopeContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -89,6 +90,7 @@ const CreateUser = lazy(() => import('./pages/CreateUser'))
 
 // 朋友圈相关
 const PublishMoment = lazy(() => import('./pages/PublishMoment'))
+const MomentNotifications = lazy(() => import('./pages/MomentNotifications'))
 
 // 钱包相关
 const Wallet = lazy(() => import('./pages/Wallet'))
@@ -140,6 +142,9 @@ const FontCustomizer = lazy(() => import('./pages/FontCustomizer'))
 // 音乐播放器
 const MusicPlayer = lazy(() => import('./pages/MusicPlayer'))
 const UploadSong = lazy(() => import('./pages/UploadSong'))
+const MusicSearch = lazy(() => import('./pages/MusicSearch'))
+const MusicTogetherChat = lazy(() => import('./pages/MusicTogetherChat'))
+const MusicInviteDemo = lazy(() => import('./pages/MusicInviteDemo'))
 
 // 游戏
 const GomokuGame = lazy(() => import('./pages/GomokuGame'))
@@ -152,6 +157,8 @@ const Desktop = lazy(() => import('./pages/Desktop'))
 const StoryMode = lazy(() => import('./pages/StoryMode'))
 const WorldBook = lazy(() => import('./pages/WorldBook'))
 const EditWorldBook = lazy(() => import('./pages/EditWorldBook'))
+const PresetManager = lazy(() => import('./pages/PresetManager'))
+const OfflineChat = lazy(() => import('./pages/OfflineChat'))
 const StorageMigration = lazy(() => import('./pages/StorageMigration'))
 const MiniPrograms = lazy(() => import('./pages/MiniPrograms'))
 const SettingsNew = lazy(() => import('./pages/SettingsNew'))
@@ -290,10 +297,18 @@ function App() {
                                   <Route path="/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
                                   <Route path="/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
                                   <Route path="/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
+                                  {/* 兼容带 /wechat 前缀的 API 路由 */}
+                                  <Route path="/wechat/api-config" element={<PageWrapper><ApiConfig /></PageWrapper>} />
+                                  <Route path="/wechat/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
+                                  <Route path="/wechat/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
+                                  <Route path="/wechat/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
                                   <Route path="/character/:id" element={<PageWrapper><CharacterDetail /></PageWrapper>} />
                                   <Route path="/edit-character/:id" element={<PageWrapper><EditCharacter /></PageWrapper>} />
                                   <Route path="/moments" element={<PageWrapper><Moments /></PageWrapper>} />
                                   <Route path="/publish-moment" element={<PageWrapper><PublishMoment /></PageWrapper>} />
+                                  <Route path="/moment-notifications" element={<PageWrapper><MomentNotifications /></PageWrapper>} />
+                                  {/* 兼容带 /wechat 前缀的朋友圈路由 */}
+                                  <Route path="/wechat/moments" element={<PageWrapper><Moments /></PageWrapper>} />
                                   <Route path="/send-transfer/:id" element={<PageWrapper><SendTransfer /></PageWrapper>} />
                                   <Route path="/chat-settings/:id" element={<PageWrapper><ChatSettings /></PageWrapper>} />
                                   <Route path="/memory/:characterId" element={<PageWrapper><MemoryViewer /></PageWrapper>} />
@@ -332,12 +347,18 @@ function App() {
                                   <Route path="/font-customizer" element={<PageWrapper><FontCustomizer /></PageWrapper>} />
                                   <Route path="/music-player" element={<PageWrapper><MusicPlayer /></PageWrapper>} />
                                   <Route path="/upload-song" element={<PageWrapper><UploadSong /></PageWrapper>} />
+                                  <Route path="/music-search" element={<PageWrapper><MusicSearch /></PageWrapper>} />
+                                  <Route path="/music-together-chat" element={<PageWrapper><MusicTogetherChat /></PageWrapper>} />
+                                  <Route path="/music-invite-demo" element={<PageWrapper><MusicInviteDemo /></PageWrapper>} />
                                   <Route path="/game/gomoku/:characterId" element={<PageWrapper><GomokuGame /></PageWrapper>} />
                                   <Route path="/game/character-select" element={<PageWrapper><GameCharacterSelect /></PageWrapper>} />
                                   <Route path="/game-list" element={<PageWrapper><GameList /></PageWrapper>} />
                                   <Route path="/game/undercover/:groupId" element={<PageWrapper><UndercoverGame /></PageWrapper>} />
                                   <Route path="/desktop" element={<PageWrapper><Desktop /></PageWrapper>} />
                                   <Route path="/story-mode/:characterId" element={<PageWrapper><StoryMode /></PageWrapper>} />
+                                  <Route path="/preset" element={<PageWrapper><PresetManager /></PageWrapper>} />
+                                  <Route path="/offline-chat" element={<PageWrapper><OfflineChat /></PageWrapper>} />
+                                  <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                   <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />

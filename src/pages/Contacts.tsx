@@ -93,10 +93,10 @@ const Contacts = () => {
                   className="flex items-center px-4 py-3 ios-button glass-card mb-2 rounded-2xl cursor-pointer"
                 >
                   <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg overflow-hidden bg-gray-200">
-                    <img src={getAiAvatar(character.avatar)} alt={character.name} className="w-full h-full object-cover" />
+                    <img src={getAiAvatar(character.avatar)} alt={character.nickname || character.name} className="w-full h-full object-cover" />
                   </div>
                   <div className="ml-4 flex-1 overflow-hidden">
-                    <h3 className="text-gray-900 font-medium">{character.name}</h3>
+                    <h3 className="text-gray-900 font-medium">{character.nickname || character.name}</h3>
                     {character.signature && (
                       <p className="text-sm text-gray-500 truncate mt-0.5">{character.signature}</p>
                     )}

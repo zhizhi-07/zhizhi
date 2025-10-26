@@ -511,3 +511,12 @@ export const BookIcon = ({ size = 24, className = '' }: IconProps) => (
   </svg>
 )
 
+export const XiaohongshuIcon = ({ size = 24, className = '' }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="4" stroke="currentColor" strokeWidth="2"/>
+    <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+    <circle cx="12" cy="12" r="2" fill="currentColor"/>
+    <path d="M8 8l8 8M16 8l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" opacity="0.3"/>
+  </svg>
+)
+

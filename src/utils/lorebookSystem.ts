@@ -265,6 +265,84 @@ class LorebookManager {
   }
 
   /**
+   * 构建世界书上下文（返回详细信息）
+   */
+  buildContextWithStats(
+    characterId: string,
+    recentMessages: string,
+    maxTokens: number = 2000
+  ): { context: string; triggeredEntries: Array<{ name: string; tokens: number }> } {
+    const lorebooks = this.getCharacterLorebooks(characterId)
+    if (lorebooks.length === 0) return { context: '', triggeredEntries: [] }
+
+    const allTriggered: LorebookEntry[] = []
+
+    // 收集所有触发的条目
+    for (const lorebook of lorebooks) {
+      const triggered = this.matchEntries(lorebook, recentMessages)
+      allTriggered.push(...triggered)
+    }
+
+    if (allTriggered.length === 0) return { context: '', triggeredEntries: [] }
+
+    // 按优先级和插入顺序排序
+    allTriggered.sort((a, b) => {
+      if (a.priority !== b.priority) {
+        return b.priority - a.priority // 高优先级在前
+      }
+      return a.insertion_order - b.insertion_order
+    })
+
+    // Token 预算管理（简单估算）
+    const selected: LorebookEntry[] = []
+    const triggeredEntries: Array<{ name: string; tokens: number }> = []
+    let currentTokens = 0
+
+    for (const entry of allTriggered) {
+      const estimatedTokens = Math.ceil(entry.content.length / 2)
+      
+      if (currentTokens + estimatedTokens <= maxTokens) {
+        selected.push(entry)
+        triggeredEntries.push({ name: entry.key, tokens: estimatedTokens })
+        currentTokens += estimatedTokens
+      }
+    }
+
+    // 按位置分组
+    const byPosition: Record<string, LorebookEntry[]> = {
+      top: [],
+      before_char: [],
+      after_char: [],
+      bottom: []
+    }
+
+    for (const entry of selected) {
+      byPosition[entry.position].push(entry)
+    }
+
+    // 构建文本
+    const parts: string[] = []
+
+    if (byPosition.top.length > 0) {
+      parts.push(byPosition.top.map(e => e.content).join('\n\n'))
+    }
+    if (byPosition.before_char.length > 0) {
+      parts.push(byPosition.before_char.map(e => e.content).join('\n\n'))
+    }
+    if (byPosition.after_char.length > 0) {
+      parts.push(byPosition.after_char.map(e => e.content).join('\n\n'))
+    }
+    if (byPosition.bottom.length > 0) {
+      parts.push(byPosition.bottom.map(e => e.content).join('\n\n'))
+    }
+
+    return { 
+      context: parts.filter(Boolean).join('\n\n'),
+      triggeredEntries
+    }
+  }
+
+  /**
    * 构建世界书上下文
    */
   buildContext(

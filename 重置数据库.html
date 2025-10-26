@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndexedDB 数据库重置工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #f5576c;
+            text-align: center;
+        }
+        .info {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+        button {
+            background: #f5576c;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 18px;
+            width: 100%;
+            margin: 10px 0;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #e04556;
+            transform: translateY(-2px);
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 IndexedDB 数据库重置工具</h1>
+        
+        <div class="info">
+            <h3>⚠️ 使用说明：</h3>
+            <p>如果你的表情包导入一直卡住，说明 IndexedDB 数据库被锁定了。</p>
+            <p><strong>解决步骤：</strong></p>
+            <ol>
+                <li><strong>关闭所有相关标签页</strong>（非常重要）</li>
+                <li>点击下方"删除数据库"按钮</li>
+                <li>等待删除完成</li>
+                <li>重新打开应用页面</li>
+                <li>再次尝试导入</li>
+            </ol>
+        </div>
+
+        <button onclick="deleteDB()">🗑️ 删除 IndexedDB 数据库</button>
+        <button class="secondary" onclick="checkDB()">🔍 检查数据库状态</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const DB_NAME = 'WeChatAppDB';
+
+        function showResult(message, isSuccess) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = isSuccess ? 'success' : 'error';
+            resultDiv.style.display = 'block';
+        }
+
+        function deleteDB() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = '⏳ 正在删除数据库...';
+            resultDiv.className = '';
+            resultDiv.style.display = 'block';
+
+            const request = indexedDB.deleteDatabase(DB_NAME);
+
+            request.onsuccess = () => {
+                showResult(`✅ 成功删除数据库 "${DB_NAME}"！\n\n现在可以关闭此页面，重新打开应用，再次导入表情包。`, true);
+            };
+
+            request.onerror = () => {
+                showResult(`❌ 删除失败: ${request.error}\n\n请确保已关闭所有相关标签页！`, false);
+            };
+
+            request.onblocked = () => {
+                showResult(`⚠️ 删除被阻塞！\n\n请关闭所有使用此数据库的标签页，然后重试。`, false);
+            };
+        }
+
+        function checkDB() {
+            indexedDB.databases().then(databases => {
+                const found = databases.find(db => db.name === DB_NAME);
+                if (found) {
+                    showResult(`📊 数据库存在\n名称: ${found.name}\n版本: ${found.version}`, true);
+                } else {
+                    showResult(`✅ 数据库不存在（已被清理）`, true);
+                }
+            }).catch(error => {
+                showResult(`❌ 检查失败: ${error}`, false);
+            });
+        }
+    </script>
+</body>
+</html>

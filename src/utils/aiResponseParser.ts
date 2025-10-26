@@ -11,6 +11,7 @@ export interface ParsedAIResponse {
     photo?: { description: string }
     voice?: { text: string }
     location?: { name: string; address: string }
+    musicInvite?: { songTitle: string; songArtist: string }
     recall?: boolean
     quote?: { messageId: string }
   }
@@ -139,7 +140,29 @@ export function parseAIResponse(aiResponse: string): ParsedAIResponse {
     }
   }
 
-  // 11. 撤回识别 - 只识别明确的撤回标记
+  // 11. 一起听邀请识别（标准格式）
+  const standardMusicInvite = aiResponse.match(/\[一起听:(.+?):(.+?)\]/)
+  if (standardMusicInvite) {
+    actions.musicInvite = {
+      songTitle: standardMusicInvite[1],
+      songArtist: standardMusicInvite[2]
+    }
+    cleanText = cleanText.replace(/\[一起听:.+?:.+?\]/g, '')
+  }
+  // 12. 一起听邀请识别（自然语言）
+  else {
+    const naturalMusicInvite = aiResponse.match(/(?:一起听|听歌|听听|听首)(?:歌)?[，,]?\s*[《「]?(.+?)[》」]/i)
+    if (naturalMusicInvite) {
+      const songTitle = naturalMusicInvite[1].trim()
+      // 尝试提取歌手信息
+      const artistMatch = aiResponse.match(/[《「].+?[》」][，,]?\s*(.+?)(?:的|唱的)?/i)
+      const songArtist = artistMatch ? artistMatch[1].trim() : '未知歌手'
+      actions.musicInvite = { songTitle, songArtist }
+      cleanText = cleanText.replace(/(?:一起听|听歌|听听|听首)(?:歌)?[，,]?\s*[《「]?.+?[》」]/gi, '')
+    }
+  }
+
+  // 13. 撤回识别 - 只识别明确的撤回标记
   if (/\[撤回消息\]/i.test(aiResponse)) {
     actions.recall = true
     cleanText = cleanText.replace(/\[撤回消息\]/gi, '')
@@ -181,6 +204,9 @@ export function actionsToStandardFormat(actions: ParsedAIResponse['actions']): s
   }
   if (actions.location) {
     parts.push(`[位置:${actions.location.name}:${actions.location.address}]`)
+  }
+  if (actions.musicInvite) {
+    parts.push(`[一起听:${actions.musicInvite.songTitle}:${actions.musicInvite.songArtist}]`)
   }
   if (actions.recall) {
     parts.push(`[撤回消息]`)

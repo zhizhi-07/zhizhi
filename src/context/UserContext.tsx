@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 export interface User {
   id: string
-  name: string
+  name: string  // 真实名字
+  nickname?: string  // 网名
   username: string
   avatar: string
   signature: string  // 个性签名，显示在用户界面

@@ -22,15 +22,13 @@ export const getMomentsContext = (
     
     let text = `• ${author} ${timeAgo}发布：${m.content}`
     
-    // 添加互动信息
-    const likes = m.likes.map(l => l.userName).join('、')
-    if (likes) {
-      text += `\n  点赞：${likes}`
+    // 添加互动信息（简化显示，只显示数量）
+    if (m.likes.length > 0) {
+      text += `\n  收到${m.likes.length}个赞`
     }
     
     if (m.comments.length > 0) {
-      const comments = m.comments.map(c => `${c.userName}: ${c.content}`).join('; ')
-      text += `\n  评论：${comments}`
+      text += `\n  收到${m.comments.length}条评论`
     }
     
     return text

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackIcon, CameraIcon, LikeIcon, CommentIcon, MoreVerticalIcon, HeartFilledIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
@@ -8,6 +8,7 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { triggerAIReactToComment } from '../utils/aiMomentsSocial'
+import { getUnreadNotificationCount } from '../utils/momentsNotification'
 
 const Moments = () => {
   const navigate = useNavigate()
@@ -26,6 +27,21 @@ const Moments = () => {
   const [viewerImages, setViewerImages] = useState<string[]>([])
   const [viewerIndex, setViewerIndex] = useState(0)
   const [showViewer, setShowViewer] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  
+  // 监听未读通知数量
+  useEffect(() => {
+    const updateUnreadCount = () => {
+      setUnreadCount(getUnreadNotificationCount())
+    }
+    
+    updateUnreadCount()
+    
+    // 每秒检查一次
+    const interval = setInterval(updateUnreadCount, 1000)
+    
+    return () => clearInterval(interval)
+  }, [])
 
   // 获取头像显示
   const getAvatarDisplay = (avatar: string, size: 'small' | 'medium' | 'large' = 'medium') => {
@@ -93,29 +109,12 @@ const Moments = () => {
     
     addComment(momentId, currentUser.id, currentUser.name, currentUser.avatar, finalComment)
     
-    // 如果是回复AI角色的评论，同步到聊天记录并触发AI反应
+    // 如果是回复AI角色的评论，触发AI反应
     if (replyToUserId && replyToUserId !== currentUser.id) {
       const character = getCharacter(replyToUserId)
       if (character) {
-        const chatMessages = localStorage.getItem(`chat_messages_${replyToUserId}`)
-        const messages = chatMessages ? JSON.parse(chatMessages) : []
-        
-        // 添加用户的回复到聊天记录
-        const replyMessage = {
-          id: Date.now() + Math.random(),
-          type: 'sent',
-          content: `💬 你回复了TA的朋友圈评论：${commentText.trim()}`,
-          time: new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          timestamp: Date.now(),
-          messageType: 'text'
-        }
-        
-        messages.push(replyMessage)
-        localStorage.setItem(`chat_messages_${replyToUserId}`, JSON.stringify(messages))
-        console.log(`💾 你的回复已同步到与 ${character.name} 的聊天记录`)
+        // 不再添加到聊天记录，只记录到朋友圈
+        console.log(`💾 你的回复已保存到朋友圈（不显示在聊天中）`)
         
         // 触发AI的反应（让AI决定回复评论还是私信）
         const moment = moments.find(m => m.id === momentId)
@@ -192,9 +191,9 @@ const Moments = () => {
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {/* 顶部：StatusBar + 导航栏一体化 */}
-      <div className="glass-effect sticky top-0 z-50">
+    <div className="h-full flex flex-col bg-white">
+      {/* 顶部：StatusBar + 导航栏一体化（固定不滚动） */}
+      <div className="glass-effect z-50 flex-shrink-0">
         {showStatusBar && <StatusBar />}
         <div className="px-4 py-3 flex items-center justify-between">
           <button 
@@ -206,20 +205,44 @@ const Moments = () => {
           >
              <BackIcon size={20} className="text-gray-700" />
            </button>
-           <button 
-             onClick={(e) => {
-               e.stopPropagation()
-               navigate('/publish-moment')
-             }}
-             className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
-           >
-             <CameraIcon size={20} className="text-gray-700" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* 通知图标 */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/moment-notifications')
+              }}
+              className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button relative"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-700">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              {unreadCount > 0 && (
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                </div>
+              )}
+            </button>
+            
+            {/* 相机图标 */}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate('/publish-moment')
+              }}
+              className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
+            >
+              <CameraIcon size={20} className="text-gray-700" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 顶部封面区域 */}
-      <div className="relative h-80 bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden">
+      {/* 可滚动区域（包含封面 + 动态列表） */}
+      <div className="flex-1 overflow-y-auto">
+        {/* 顶部封面区域 */}
+        <div className="relative h-80 bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden">
         {/* 封面背景 */}
         <div 
           className="absolute inset-0 bg-gray-300 cursor-pointer group"
@@ -257,10 +280,10 @@ const Moments = () => {
             {currentUser && getAvatarDisplay(currentUser.avatar, 'large')}
           </div>
         </div>
-      </div>
+        </div>
 
-      {/* 朋友圈动态列表 */}
-      <div className="bg-white pb-20">
+        {/* 朋友圈动态列表 */}
+        <div className="bg-white pb-20">
         {moments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
             <p className="text-sm">暂无动态</p>
@@ -448,6 +471,7 @@ const Moments = () => {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* 图片查看器 */}

@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
-import { BackIcon, ImageIcon } from '../components/Icons'
+import { ImageIcon } from '../components/Icons'
 import { useCharacter } from '../context/CharacterContext'
 import { toPinyin } from '../utils/pinyin'
 
@@ -14,6 +14,7 @@ const EditCharacter = () => {
 
   const [formData, setFormData] = useState({
     name: character?.name || '',
+    nickname: character?.nickname || '',
     username: character?.username || '',
     avatar: character?.avatar || '',
     signature: character?.signature || '',
@@ -27,6 +28,7 @@ const EditCharacter = () => {
     if (character) {
       setFormData({
         name: character.name,
+        nickname: character.nickname || '',
         username: character.username,
         avatar: character.avatar,
         signature: character.signature,
@@ -62,10 +64,42 @@ const EditCharacter = () => {
     setIsUploading(true)
 
     const reader = new FileReader()
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64String = reader.result as string
       setAvatarPreview(base64String)
       setFormData({ ...formData, avatar: base64String })
+      
+      // 🔍 触发AI头像识图并立即保存
+      if (character?.id) {
+        try {
+          console.log('👁️ 开始识别AI角色头像...')
+          const visionResponse = await fetch('/.netlify/functions/vision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: base64String,
+              prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+            })
+          })
+          
+          if (visionResponse.ok) {
+            const visionData = await visionResponse.json()
+            const avatarDescription = visionData.description || visionData.result
+            
+            // 直接保存识图结果（编辑时角色ID已存在）
+            localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
+            localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+            // 🔑 保存头像指纹（前200字符），用于检测头像是否变化
+            localStorage.setItem(`character_avatar_fingerprint_${character.id}`, base64String.substring(0, 200))
+            console.log('✅ AI角色头像识别完成:', avatarDescription)
+          } else {
+            console.warn('⚠️ 头像识别失败')
+          }
+        } catch (error) {
+          console.error('❌ 头像识别异常:', error)
+        }
+      }
+      
       setIsUploading(false)
     }
     reader.onerror = () => {
@@ -195,12 +229,27 @@ const EditCharacter = () => {
           </div>
           <div className="glass-card rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-100">
-              <label className="block text-xs text-gray-500 mb-1">角色名字 *</label>
+              <label className="block text-xs text-gray-500 mb-1">真实名字 *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="请输入角色名字"
+                placeholder="请输入角色真实名字"
+                maxLength={20}
+                className="w-full bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+              />
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-500 mb-1">
+                网名
+                <span className="text-gray-400 ml-2">（留空则显示真实名字，AI可修改）</span>
+              </label>
+              <input
+                type="text"
+                value={formData.nickname}
+                onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
+                placeholder="角色的网名"
                 maxLength={20}
                 className="w-full bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
               />

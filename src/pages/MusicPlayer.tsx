@@ -35,17 +35,75 @@ const MusicPlayer = () => {
   const [currentLyricIndex, setCurrentLyricIndex] = useState(0)
   const [customBackground, setCustomBackground] = useState<string>('')
   const [backgroundType, setBackgroundType] = useState<'image' | 'video'>('image')
+  const [listeningStartTime, setListeningStartTime] = useState<number | null>(null)
+  const [listeningDuration, setListeningDuration] = useState(0)
   
   // 使用用户创建的角色作为可邀请列表
   const onlineListeners = characters
   
-  // 邀请角色听歌
+  // 邀请角色听歌 - 发送邀请卡片到聊天
   const inviteCharacter = (character: any) => {
-    if (!invitedCharacters.find(c => c.id === character.id)) {
-      setInvitedCharacters([...invitedCharacters, character])
+    if (!currentSong || currentSong.id === 0) {
+      alert('请先播放一首歌曲')
+      return
     }
+    
+    // 构建邀请卡片消息
+    const inviteMessage = {
+      id: Date.now(),
+      type: 'sent' as const,
+      messageType: 'musicInvite' as const,
+      content: `[一起听邀请]我想和你一起听《${currentSong.title}》`,
+      musicInvite: {
+        songTitle: currentSong.title,
+        songArtist: currentSong.artist,
+        songCover: currentSong.cover,
+        inviterName: currentUser?.username || '我',
+        status: 'pending' as const
+      },
+      timestamp: Date.now()
+    }
+    
+    // 保存到该角色的聊天记录
+    const storageKey = `chat_${character.id}`
+    const existingMessages = JSON.parse(localStorage.getItem(storageKey) || '[]')
+    localStorage.setItem(storageKey, JSON.stringify([...existingMessages, inviteMessage]))
+    
     setShowInviteModal(false)
+    
+    // 跳转到聊天页面
+    navigate(`/chat/${character.id}`)
   }
+
+  // 格式化时长显示
+  const formatDuration = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    
+    if (hours > 0) {
+      return `${hours}小时${minutes}分钟`
+    } else if (minutes > 0) {
+      return `${minutes}分${secs}秒`
+    } else {
+      return `${secs}秒`
+    }
+  }
+  
+  // 更新一起听的时长
+  useEffect(() => {
+    if (listeningStartTime && invitedCharacters.length > 0) {
+      const timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - listeningStartTime) / 1000)
+        setListeningDuration(elapsed)
+      }, 1000)
+      
+      return () => clearInterval(timer)
+    } else {
+      setListeningDuration(0)
+      setListeningStartTime(null)
+    }
+  }, [listeningStartTime, invitedCharacters.length])
 
   // 处理背景上传
   const handleBackgroundUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,72 +135,8 @@ const MusicPlayer = () => {
     }
   }, [])
 
-  // 统一的音乐封面 - 使用音乐图标
-  const musicCover = new URL('../assets/music-icon.webp', import.meta.url).href
-
-  // 默认示例歌曲列表（带歌词文件路径）
-  const defaultSongs: Song[] = [
-    {
-      id: 1,
-      title: '罗生门（Follow）',
-      artist: '梨冻紧, Wiz_H张子豪',
-      album: '罗生门',
-      duration: 245,
-      cover: musicCover,
-      audioUrl: '/songs/罗生门（Follow） - 梨冻紧,Wiz_H张子豪.mp3',
-      lyricsUrl: '/songs/罗生门（Follow） - 梨冻紧,Wiz_H张子豪.lrc'
-    },
-    {
-      id: 2,
-      title: '浴室',
-      artist: 'deca joins',
-      album: '浴室',
-      duration: 220,
-      cover: musicCover,
-      audioUrl: '/songs/浴室 - deca joins.mp3',
-      lyricsUrl: '/songs/浴室.lrc'
-    },
-    {
-      id: 3,
-      title: '特别的人',
-      artist: '方大同',
-      album: '特别的人',
-      duration: 258,
-      cover: musicCover,
-      audioUrl: '/songs/特别的人 - 方大同.mp3',
-      lyricsUrl: '/songs/特别的人 - 方大同.lrc'
-    },
-    {
-      id: 4,
-      title: '情人',
-      artist: '蔡徐坤',
-      album: '情人',
-      duration: 186,
-      cover: musicCover,
-      audioUrl: '/songs/情人.mp3',
-      lyricsUrl: '/songs/情人-蔡徐坤.lrc'
-    },
-    {
-      id: 5,
-      title: '舍得',
-      artist: '王唯旖',
-      album: '舍得',
-      duration: 241,
-      cover: musicCover,
-      audioUrl: '/songs/舍得-王唯旖.mp3',
-      lyricsUrl: '/songs/舍得-王唯旖.lrc'
-    },
-    {
-      id: 6,
-      title: '如果爱忘了 (live)',
-      artist: '单依纯, 汪苏泷',
-      album: '如果爱忘了',
-      duration: 245,
-      cover: musicCover,
-      audioUrl: '/songs/如果爱忘了 (live).mp3',
-      lyricsUrl: '/songs/如果爱忘了 (live)_原文歌词.lrc'
-    }
-  ]
+  // 默认示例歌曲列表（已清空，用户可自行上传）
+  const defaultSongs: Song[] = []
 
   // 从localStorage加载自定义歌曲
   const customSongs = JSON.parse(localStorage.getItem('customSongs') || '[]')
@@ -201,11 +195,11 @@ const MusicPlayer = () => {
   const duration = musicPlayer.duration
   const currentSongIndex = musicPlayer.currentIndex
 
-  // 解析LRC格式歌词，保留时间信息
-  const parseLyricsWithTime = (lyricsText?: string): Array<{ time: number; text: string }> => {
+  // 解析LRC格式歌词，保留时间信息和元数据
+  const parseLyricsWithTime = (lyricsText?: string): Array<{ time: number; text: string; isMetadata: boolean }> => {
     if (!lyricsText) return []
     
-    return lyricsText
+    const parsed = lyricsText
       .split('\n')
       .map(line => {
         // 匹配 [mm:ss.xx] 格式
@@ -217,28 +211,25 @@ const MusicPlayer = () => {
           const text = match[4].trim()
           const time = minutes * 60 + seconds + milliseconds / 1000
           
-          return { time, text }
+          // 标记元数据（但不过滤）
+          const isMetadata = text.includes('作词') || text.includes('作曲') ||
+                            text.includes('编曲') || text.includes('制作') ||
+                            text.includes('混音') || text.includes('录音') ||
+                            text.includes('母带') || text.includes('监制') ||
+                            text.includes('发行') || text.includes('企划') ||
+                            text.includes('封面') || text.includes('钢琴') ||
+                            text.includes('吉他') || text.includes('贝斯') ||
+                            text.includes('鼓') || text.includes('弦乐')
+          
+          return { time, text, isMetadata }
         }
         return null
       })
-      .filter((item): item is { time: number; text: string } => {
-        if (!item || !item.text) return false
-        const text = item.text
-        // 过滤元数据
-        if (text.includes('作词') || text.includes('作曲')) return false
-        if (text.includes('编曲') || text.includes('制作')) return false
-        if (text.includes('混音') || text.includes('录音')) return false
-        if (text.includes('母带') || text.includes('监制')) return false
-        if (text.includes('发行') || text.includes('企划')) return false
-        if (text.includes('封面') || text.includes('钢琴')) return false
-        if (text.includes('吉他') || text.includes('贝斯')) return false
-        if (text.includes('鼓') || text.includes('弦乐')) return false
-        if (text.includes('No Label Crew')) return false
-        if (text.includes('本歌曲来自') || text.includes('营销推广')) return false
-        if (text.includes('青云') || text.includes('LAB')) return false
-        return true
+      .filter((item): item is { time: number; text: string; isMetadata: boolean } => {
+        return item !== null && item.text.trim() !== ''
       })
-      .sort((a, b) => a.time - b.time)
+    
+    return parsed.sort((a, b) => a.time - b.time)
   }
 
   // 获取解析后的歌词（带时间）
@@ -360,6 +351,15 @@ const MusicPlayer = () => {
         </button>
         <h1 className="text-sm font-medium text-gray-700">正在播放</h1>
         <div className="flex items-center gap-2">
+          {/* 搜索按钮 */}
+          <button
+            onClick={() => navigate('/music-search')}
+            className="w-10 h-10 flex items-center justify-center ios-button"
+          >
+            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
           {/* 上传背景按钮 */}
           <label className="w-10 h-10 flex items-center justify-center ios-button cursor-pointer">
             <input
@@ -472,7 +472,7 @@ const MusicPlayer = () => {
           </div>
           <p className="text-sm text-gray-600 font-medium">
             {invitedCharacters.length > 0 
-              ? `与 ${invitedCharacters.map(c => c.name).join('、')} 一起听歌` 
+              ? `与 ${invitedCharacters.map(c => c.name).join('、')} 一起听了 ${formatDuration(listeningDuration)}` 
               : '点击邀请按钮邀请好友一起听歌'}
           </p>
         </div>
@@ -599,6 +599,17 @@ const MusicPlayer = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               <span className="text-sm font-medium">邀请</span>
+            </button>
+            
+            {/* 一起听聊天按钮 */}
+            <button
+              onClick={() => navigate('/music-together-chat')}
+              className="w-9 h-9 flex items-center justify-center bg-white/90 backdrop-blur-sm text-red-500 rounded-full ios-button shadow-md hover:shadow-lg transition-all"
+              title="一起听聊天"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
             </button>
           </div>
         </div>

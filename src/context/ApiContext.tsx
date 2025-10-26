@@ -28,10 +28,23 @@ interface ApiContextType {
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined)
 
+// 内置API配置 - HiAPI（主力）
+const hiApiConfig: ApiConfig = {
+  id: 'default-hiapi',
+  name: 'Gemini 2.5 Pro（推荐）',
+  baseUrl: 'https://hiapi.online/v1',
+  apiKey: 'sk-D3TeNLaMBIYW9QN4AguxWucHo4zTWRhcr4V1EZ3OaVTPSjSB',
+  model: 'gemini-2.5-pro',
+  provider: 'google',
+  temperature: 0.7,
+  maxTokens: 2000,
+  createdAt: new Date().toISOString()
+}
+
 // 内置API配置 - Gemini 反代（你的专属 - Netlify）
 const geminiProxyConfig: ApiConfig = {
   id: 'default-gemini-proxy',
-  name: 'Gemini 反代（免费）',
+  name: 'Gemini 反代（备用）',
   baseUrl: 'https://zhizhi-ai.netlify.app/.netlify/functions/gemini-proxy',
   apiKey: 'not-needed', // Gemini 反代不需要 API Key
   model: 'gemini-2.5-pro',
@@ -61,17 +74,17 @@ export const ApiProvider = ({ children }: { children: ReactNode }) => {
       const configs = JSON.parse(saved)
       // 过滤掉内置配置，然后添加最新的内置配置
       const otherConfigs = configs.filter((c: ApiConfig) => 
-        c.id !== 'default-siliconflow' && c.id !== 'default-gemini-proxy'
+        c.id !== 'default-siliconflow' && c.id !== 'default-gemini-proxy' && c.id !== 'default-hiapi'
       )
-      return [geminiProxyConfig, defaultApiConfig, ...otherConfigs]
+      return [hiApiConfig, geminiProxyConfig, defaultApiConfig, ...otherConfigs]
     }
-    return [geminiProxyConfig, defaultApiConfig]
+    return [hiApiConfig, geminiProxyConfig, defaultApiConfig]
   })
 
   const [currentApiId, setCurrentApiId] = useState<string | null>(() => {
     const saved = localStorage.getItem('currentApiId')
-    // 默认使用 Gemini 反代
-    return saved || 'default-gemini-proxy'
+    // 默认使用 HiAPI
+    return saved || 'default-hiapi'
   })
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, CoupleSpaceIcon } from './Icons'
+import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, CoupleSpaceIcon, RefreshIcon, XiaohongshuIcon } from './Icons'
 
 interface ChatMenuProps {
   onClose: () => void
@@ -13,6 +13,8 @@ interface ChatMenuProps {
   onSelectVoiceMessage: () => void
   onSelectVoiceCall: () => void
   onSelectVideoCall: () => void
+  onSelectXiaohongshu: () => void
+  onRegenerateAI: () => void
   hasCoupleSpace?: boolean
 }
 
@@ -29,6 +31,8 @@ const ChatMenu = ({
   onSelectVoiceMessage,
   onSelectVoiceCall,
   onSelectVideoCall,
+  onSelectXiaohongshu,
+  onRegenerateAI,
   hasCoupleSpace
 }: ChatMenuProps) => {
   console.log('📱 ChatMenu 渲染', { hasCoupleSpace })
@@ -36,6 +40,7 @@ const ChatMenu = ({
   const menuItems = [
     { id: 'image', label: '相册', Icon: ImageIcon, onClick: onSelectImage },
     { id: 'camera', label: '拍摄', Icon: CameraIcon, onClick: onSelectCamera },
+    { id: 'xiaohongshu', label: '小红书', Icon: XiaohongshuIcon, onClick: onSelectXiaohongshu },
     { id: 'redpacket', label: '红包', Icon: RedPacketIcon, onClick: onSelectRedPacket },
     { id: 'transfer', label: '转账', Icon: TransferIcon, onClick: onSelectTransfer },
     { id: 'intimate-pay', label: '亲密付', Icon: IntimatePayIcon, onClick: onSelectIntimatePay },
@@ -58,6 +63,7 @@ const ChatMenu = ({
     { id: 'voice', label: '语音通话', Icon: PhoneIcon, onClick: onSelectVoiceCall },
     { id: 'video', label: '视频通话', Icon: VideoIcon, onClick: onSelectVideoCall },
     { id: 'location', label: '位置', Icon: LocationIcon, onClick: onSelectLocation },
+    { id: 'regenerate', label: '重回', Icon: RefreshIcon, onClick: onRegenerateAI },
   ]
 
   return (
