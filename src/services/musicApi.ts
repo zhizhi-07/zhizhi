@@ -38,29 +38,14 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
   try {
     console.log('🔍 尝试使用网易云API搜索:', keyword)
     
-    // 根据环境选择API URL
-    const isDev = import.meta.env.DEV
-    let apiUrl: string
-    let params: URLSearchParams
-    
-    if (isDev) {
-      // 开发环境：使用Vite代理
-      apiUrl = `/api/netease/search/get/web`
-      params = new URLSearchParams({
-        s: keyword,
-        type: '1',
-        offset: '0',
-        limit: limit.toString()
-      })
-    } else {
-      // 生产环境：使用Vercel API
-      apiUrl = `/api/music-api`
-      params = new URLSearchParams({
-        action: 'search',
-        keyword: keyword,
-        limit: limit.toString()
-      })
-    }
+    // 使用公共API（支持CORS，无需后端代理）
+    const apiUrl = 'https://api.injahow.cn/meting/'
+    const params = new URLSearchParams({
+      server: 'netease',
+      type: 'search',
+      id: keyword,
+      r: Math.random().toString()
+    })
 
     const response = await fetch(`${apiUrl}?${params}`, {
       method: 'GET'
@@ -72,20 +57,21 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
 
     const data = await response.json()
     
-    if (data.result && data.result.songs) {
-      console.log('✅ 网易云搜索成功，找到', data.result.songs.length, '首')
-      return data.result.songs.map((song: NetEaseSong) => ({
-        id: song.id,
-        name: song.name,
-        artists: song.artists.map((a: any) => a.name).join(' / '),
-        album: song.album.name,
-        duration: Math.floor(song.duration / 1000),
-        cover: song.album.picUrl,
-        fee: song.fee
+    // 公共API直接返回数组
+    if (Array.isArray(data) && data.length > 0) {
+      console.log('✅ 音乐搜索成功，找到', data.length, '首')
+      return data.slice(0, limit).map((song: any) => ({
+        id: parseInt(song.id) || 0,
+        name: song.name || song.title || '未知歌曲',
+        artists: song.artist || song.artists || '未知歌手',
+        album: song.album || '未知专辑',
+        duration: parseInt(song.duration) || 0,
+        cover: song.pic || song.cover || '',
+        fee: 0
       }))
     }
 
-    throw new Error('网易云API返回空结果')
+    throw new Error('音乐API返回空结果')
   } catch (error) {
     console.log('⚠️ 网易云API失败，切换到QQ音乐:', error)
     
@@ -109,26 +95,14 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
  */
 export async function getSongUrl(id: number): Promise<string | null> {
   try {
-    const isDev = import.meta.env.DEV
-    let apiUrl: string
-    let params: URLSearchParams
-    
-    if (isDev) {
-      // 开发环境：使用Vite代理
-      apiUrl = `/api/netease/song/enhance/player/url`
-      params = new URLSearchParams({
-        id: id.toString(),
-        ids: `[${id}]`,
-        br: '320000'
-      })
-    } else {
-      // 生产环境：使用Vercel API
-      apiUrl = `/api/music-api`
-      params = new URLSearchParams({
-        action: 'url',
-        id: id.toString()
-      })
-    }
+    // 使用公共API获取播放链接
+    const apiUrl = 'https://api.injahow.cn/meting/'
+    const params = new URLSearchParams({
+      server: 'netease',
+      type: 'url',
+      id: id.toString(),
+      r: Math.random().toString()
+    })
 
     const response = await fetch(`${apiUrl}?${params}`, {
       method: 'GET'
@@ -140,8 +114,9 @@ export async function getSongUrl(id: number): Promise<string | null> {
 
     const data = await response.json()
     
-    if (data.data && data.data.length > 0 && data.data[0].url) {
-      return data.data[0].url
+    // 公共API返回数组，第一项包含URL
+    if (Array.isArray(data) && data.length > 0 && data[0].url) {
+      return data[0].url
     }
 
     return null
@@ -156,26 +131,14 @@ export async function getSongUrl(id: number): Promise<string | null> {
  */
 export async function getLyric(id: number): Promise<string | null> {
   try {
-    const isDev = import.meta.env.DEV
-    let apiUrl: string
-    let params: URLSearchParams
-    
-    if (isDev) {
-      // 开发环境：使用Vite代理
-      apiUrl = `/api/netease/song/lyric`
-      params = new URLSearchParams({
-        id: id.toString(),
-        lv: '-1',
-        tv: '-1'
-      })
-    } else {
-      // 生产环境：使用Vercel API
-      apiUrl = `/api/music-api`
-      params = new URLSearchParams({
-        action: 'lyric',
-        id: id.toString()
-      })
-    }
+    // 使用公共API获取歌词
+    const apiUrl = 'https://api.injahow.cn/meting/'
+    const params = new URLSearchParams({
+      server: 'netease',
+      type: 'lrc',
+      id: id.toString(),
+      r: Math.random().toString()
+    })
 
     const response = await fetch(`${apiUrl}?${params}`, {
       method: 'GET'
@@ -187,8 +150,9 @@ export async function getLyric(id: number): Promise<string | null> {
 
     const data = await response.json()
     
-    if (data.lrc && data.lrc.lyric) {
-      return data.lrc.lyric
+    // 公共API返回数组，第一项包含歌词
+    if (Array.isArray(data) && data.length > 0 && data[0].lrc) {
+      return data[0].lrc
     }
 
     return null
