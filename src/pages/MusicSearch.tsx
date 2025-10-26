@@ -212,10 +212,10 @@ const MusicSearch = () => {
       
       {/* 顶部导航栏 */}
       <div className="bg-white px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-nowrap">
           <button
             onClick={() => navigate(-1)}
-            className="w-10 h-10 flex items-center justify-center ios-button"
+            className="w-10 h-10 flex items-center justify-center ios-button flex-shrink-0"
           >
             <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -223,8 +223,8 @@ const MusicSearch = () => {
           </button>
           
           {/* 搜索框 */}
-          <div className="flex-1 flex items-center bg-gray-100 rounded-lg px-3 py-2">
-            <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-1 min-w-0 flex items-center bg-gray-100 rounded-lg px-3 py-2">
+            <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -233,7 +233,7 @@ const MusicSearch = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="搜索歌曲、歌手"
-              className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-400"
+              className="flex-1 min-w-0 bg-transparent outline-none text-gray-900 placeholder-gray-400"
               autoFocus
             />
             {searchQuery && (
@@ -244,7 +244,7 @@ const MusicSearch = () => {
                   setOnlineResults([])
                   setShowHistory(true)
                 }}
-                className="ml-2"
+                className="ml-2 flex-shrink-0"
               >
                 <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -255,7 +255,7 @@ const MusicSearch = () => {
           
           <button
             onClick={handleSearch}
-            className="text-red-500 font-medium px-3 py-2"
+            className="text-red-500 font-medium px-2 py-2 flex-shrink-0 whitespace-nowrap"
           >
             搜索
           </button>

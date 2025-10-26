@@ -440,6 +440,7 @@ const ChatDetail = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef(0)
   const isFirstLoadRef = useRef(true)
+  const prevMessageCountRef = useRef(0) // 记录上一次的消息数量
   
   // 监听小红书手动输入事件
   useEffect(() => {
@@ -563,6 +564,7 @@ const ChatDetail = () => {
   useEffect(() => {
     setDisplayCount(30)
     isFirstLoadRef.current = true
+    prevMessageCountRef.current = 0 // 重置消息数量记录
     
     // 清除未读消息
     if (id) {
@@ -654,10 +656,23 @@ const ChatDetail = () => {
     })()
   }, [character?.id, character?.avatar])
   
-  // 滚动到底部的统一逻辑
+  // 新消息自动滚动到底部（优化后的滚动逻辑）
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
+    
+    // 🔧 修复：只在消息增加时才扩展displayCount（防止切换聊天时懒加载失效）
+    const prevCount = prevMessageCountRef.current
+    const currentCount = messages.length
+    
+    // 如果消息数量增加（新消息），且超过了displayCount，则扩展显示范围
+    if (currentCount > prevCount && currentCount > displayCount) {
+      console.log(`📈 消息增加: ${prevCount} → ${currentCount}，扩展displayCount`)
+      setDisplayCount(currentCount)
+    }
+    
+    // 更新记录的消息数量
+    prevMessageCountRef.current = currentCount
     
     // 首次加载时强制滚动到底部
     if (isFirstLoadRef.current && messages.length > 0) {
@@ -680,7 +695,7 @@ const ChatDetail = () => {
         container.scrollTop = container.scrollHeight
       })
     }
-  }, [messages.length])
+  }, [messages.length, displayCount])
   
   // 获取当前用户头像
   const userAvatar = currentUser?.avatar || 'default'
@@ -3006,23 +3021,29 @@ ${emojiInstructions}
               
               console.log('🔍 AI最后回复位置:', lastAIIndex)
               
-              // 只筛选AI最后回复之后用户发的图片（当前轮次）
-              // 保持正序：01=第一张，02=第二张，03=第三张（符合人类习惯）
-              const recentMessages = lastAIIndex >= 0 
-                ? currentMessages.slice(lastAIIndex + 1) // AI回复之后的消息
-                : currentMessages // 如果没有AI回复，就用全部
+              // 🔧 修复：先筛选所有用户图片，再取最后10张（保证顺序正确）
+              console.log('📊 开始筛选用户图片')
               
-              console.log('📊 当前轮次消息数:', recentMessages.length)
-              
-              const userPhotos = recentMessages
+              // 从所有消息中筛选用户发的图片
+              const allUserPhotos = currentMessages
                 .filter(msg => {
                   if (msg.type !== 'sent') return false
+                  // 只要是image类型且有imageUrl就行
+                  if (msg.messageType === 'image' && msg.imageUrl) {
+                    return true
+                  }
                   // photo类型（拍摄）需要有描述
-                  if (msg.messageType === 'photo' && msg.photoDescription) return true
-                  // image类型（相册）需要有图片URL
-                  if (msg.messageType === 'image' && msg.imageUrl) return true
+                  if (msg.messageType === 'photo' && msg.photoDescription) {
+                    return true
+                  }
                   return false
                 })
+              
+              // 取最后10张图片（最近的）
+              const userPhotos = allUserPhotos.slice(-10)
+              
+              console.log('📸 找到的所有图片数:', allUserPhotos.length)
+              console.log('✅ 取最近10张:', userPhotos.length)
               
               console.log('✅ 最终筛选出的图片数:', userPhotos.length)
               
@@ -5267,7 +5288,7 @@ ${emojiInstructions}
                       </div>
                     </div>
                    ) : message.messageType === 'emoji' && message.emojiUrl ? (
-                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[200px]">
+                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[120px]">
                       <img 
                         src={message.emojiUrl} 
                         alt={message.emojiDescription || '表情包'} 
@@ -5283,7 +5304,7 @@ ${emojiInstructions}
                       }}
                     />
                   ) : message.messageType === 'image' && message.imageUrl ? (
-                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[300px]">
+                    <div className="rounded-2xl overflow-hidden shadow-lg max-w-[180px]">
                       <img 
                         src={message.imageUrl} 
                         alt="上传的图片" 
