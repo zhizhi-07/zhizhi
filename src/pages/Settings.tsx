@@ -365,7 +365,10 @@ const Settings = () => {
         <div className="mb-3">
           <div className="glass-card rounded-2xl overflow-hidden">
             {/* 账号与安全 */}
-            <div className="flex items-center justify-between px-4 py-4 ios-button cursor-pointer border-b border-gray-100">
+            <div 
+              onClick={() => navigate('/users')}
+              className="flex items-center justify-between px-4 py-4 ios-button cursor-pointer border-b border-gray-100"
+            >
               <span className="text-gray-900 font-medium">账号与安全</span>
               <span className="text-gray-400 text-xl">›</span>
             </div>

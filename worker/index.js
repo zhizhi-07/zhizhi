@@ -42,7 +42,7 @@ export default {
     }
     
     try {
-      // 1. 音乐搜索API代理 - 直接代理网易云官方API
+      // 1. 音乐搜索API代理 - 使用QQ音乐API（更稳定）
       if (url.pathname.startsWith('/api/music/search')) {
         const keyword = url.searchParams.get('keyword');
         if (!keyword) {
@@ -53,17 +53,39 @@ export default {
         }
         
         try {
-          const searchUrl = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(keyword)}&type=1&offset=0&limit=30`;
+          // 使用公开的QQ音乐搜索API
+          const qqMusicUrl = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w=${encodeURIComponent(keyword)}&format=json&p=1&n=30`;
           
-          const musicResponse = await fetch(searchUrl, {
+          const response = await fetch(qqMusicUrl, {
             headers: {
-              'Referer': 'https://music.163.com',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Referer': 'https://y.qq.com',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
           });
           
-          const data = await musicResponse.json();
-          return new Response(JSON.stringify(data), {
+          const qqData = await response.json();
+          
+          // 转换为网易云格式（保持前端兼容）
+          const songs = (qqData.data?.song?.list || []).map(song => ({
+            id: song.songmid,
+            name: song.songname,
+            artists: [{ name: song.singer.map(s => s.name).join('/') }],
+            album: {
+              name: song.albumname,
+              picUrl: `https://y.gtimg.cn/music/photo_new/T002R300x300M000${song.albummid}.jpg`
+            },
+            duration: song.interval * 1000
+          }));
+          
+          const result = {
+            result: {
+              songs: songs,
+              songCount: songs.length
+            },
+            code: 200
+          };
+          
+          return new Response(JSON.stringify(result), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         } catch (error) {
