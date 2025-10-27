@@ -2,10 +2,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs18.x"
-    }
+  "env": {
+    "VITE_WORKER_URL": "https://zhizhi-api.2373922440jhj.workers.dev"
   },
   "rewrites": [
     {
