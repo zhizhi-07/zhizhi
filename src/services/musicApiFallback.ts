@@ -53,12 +53,32 @@ async function searchQQMusic(keyword: string, limit: number = 30): Promise<Onlin
         needNewCode: '0'
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/music-api`
+      // 生产环境：直接使用QQ音乐API（跨域可能受限，但可以尝试）
+      apiUrl = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp`
       params = new URLSearchParams({
-        action: 'search-qq',
-        keyword: keyword,
-        limit: limit.toString()
+        ct: '24',
+        qqmusic_ver: '1298',
+        new_json: '1',
+        remoteplace: 'txt.yqq.song',
+        searchid: Math.random().toString(),
+        t: '0',
+        aggr: '1',
+        cr: '1',
+        catZhida: '1',
+        lossless: '0',
+        flag_qc: '0',
+        p: '1',
+        n: limit.toString(),
+        w: keyword,
+        g_tk: '5381',
+        loginUin: '0',
+        hostUin: '0',
+        format: 'json',
+        inCharset: 'utf8',
+        outCharset: 'utf-8',
+        notice: '0',
+        platform: 'yqq.json',
+        needNewCode: '0'
       })
     }
 

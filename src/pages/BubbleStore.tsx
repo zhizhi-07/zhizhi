@@ -652,6 +652,444 @@ const BubbleStore = () => {
           lineHeight: '1.6'
         }
       }
+    },
+    {
+      id: 'minimal-line',
+      name: '极简线条',
+      description: '高级感 · 细线边框 呼吸感',
+      userCSS: `.message-container.sent .message-bubble {
+  background: #FFFFFF !important;
+  border: 1px solid #E5E5E5 !important;
+  border-radius: 12px !important;
+  padding: 14px 18px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  letter-spacing: 0.3px !important;
+  line-height: 1.6 !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: #FAFAFA !important;
+  border: 1px solid #E0E0E0 !important;
+  border-radius: 12px !important;
+  padding: 14px 18px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  letter-spacing: 0.3px !important;
+  line-height: 1.6 !important;
+}`,
+      preview: {
+        user: {
+          background: '#FFFFFF',
+          border: '1px solid #E5E5E5',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+          borderRadius: '12px',
+          padding: '14px 18px'
+        },
+        ai: {
+          background: '#FAFAFA',
+          border: '1px solid #E0E0E0',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+          borderRadius: '12px',
+          padding: '14px 18px'
+        }
+      }
+    },
+    {
+      id: 'architect',
+      name: '建筑师',
+      description: '高级感 · 几何美学 极致克制',
+      userCSS: `.message-container.sent .message-bubble {
+  background: #F8F8F8 !important;
+  border-left: 3px solid #2C2C2C !important;
+  border-radius: 0 8px 8px 0 !important;
+  padding: 12px 16px 12px 14px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: #FFFFFF !important;
+  border-right: 3px solid #666666 !important;
+  border-radius: 8px 0 0 8px !important;
+  padding: 12px 14px 12px 16px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+}`,
+      preview: {
+        user: {
+          background: '#F8F8F8',
+          borderLeft: '3px solid #2C2C2C',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          borderRadius: '0 8px 8px 0',
+          padding: '12px 16px 12px 14px'
+        },
+        ai: {
+          background: '#FFFFFF',
+          borderRight: '3px solid #666666',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)',
+          borderRadius: '8px 0 0 8px',
+          padding: '12px 14px 12px 16px'
+        }
+      }
+    },
+    {
+      id: 'vaporwave',
+      name: '蒸汽波',
+      description: '复古感 · 赛博粉紫 霓虹质感',
+      userCSS: `.message-container.sent .message-bubble {
+  background: linear-gradient(135deg, #FF6EC7 0%, #FF61E6 50%, #BF5AF2 100%) !important;
+  border: 2px solid #FF00FF !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  color: #FFFFFF !important;
+  box-shadow: 
+    0 0 20px rgba(255, 110, 199, 0.5),
+    0 4px 12px rgba(191, 90, 242, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: linear-gradient(135deg, #00F5FF 0%, #00D4FF 50%, #0099FF 100%) !important;
+  border: 2px solid #00FFFF !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  color: #FFFFFF !important;
+  box-shadow: 
+    0 0 20px rgba(0, 245, 255, 0.5),
+    0 4px 12px rgba(0, 153, 255, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
+}`,
+      preview: {
+        user: {
+          background: 'linear-gradient(135deg, #FF6EC7 0%, #FF61E6 50%, #BF5AF2 100%)',
+          border: '2px solid #FF00FF',
+          boxShadow: '0 0 20px rgba(255, 110, 199, 0.5), 0 4px 12px rgba(191, 90, 242, 0.3)',
+          borderRadius: '16px',
+          padding: '12px 16px',
+          color: '#FFFFFF'
+        },
+        ai: {
+          background: 'linear-gradient(135deg, #00F5FF 0%, #00D4FF 50%, #0099FF 100%)',
+          border: '2px solid #00FFFF',
+          boxShadow: '0 0 20px rgba(0, 245, 255, 0.5), 0 4px 12px rgba(0, 153, 255, 0.3)',
+          borderRadius: '16px',
+          padding: '12px 16px',
+          color: '#FFFFFF'
+        }
+      }
+    },
+    {
+      id: 'retro-90s',
+      name: '90年代',
+      description: '复古感 · 怀旧橙绿 像素风情',
+      userCSS: `.message-container.sent .message-bubble {
+  background: #FFD93D !important;
+  border: 2px solid #6BCB77 !important;
+  border-radius: 4px !important;
+  padding: 10px 14px !important;
+  box-shadow: 
+    3px 3px 0 #6BCB77,
+    6px 6px 0 rgba(107, 203, 119, 0.3) !important;
+  font-family: 'Courier New', monospace !important;
+  font-weight: 600 !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: #FFFFFF !important;
+  border: 2px solid #4D96FF !important;
+  border-radius: 4px !important;
+  padding: 10px 14px !important;
+  box-shadow: 
+    -3px 3px 0 #4D96FF,
+    -6px 6px 0 rgba(77, 150, 255, 0.3) !important;
+  font-family: 'Courier New', monospace !important;
+  font-weight: 600 !important;
+}`,
+      preview: {
+        user: {
+          background: '#FFD93D',
+          border: '2px solid #6BCB77',
+          boxShadow: '3px 3px 0 #6BCB77, 6px 6px 0 rgba(107, 203, 119, 0.3)',
+          borderRadius: '4px',
+          padding: '10px 14px',
+          fontWeight: '600'
+        },
+        ai: {
+          background: '#FFFFFF',
+          border: '2px solid #4D96FF',
+          boxShadow: '-3px 3px 0 #4D96FF, -6px 6px 0 rgba(77, 150, 255, 0.3)',
+          borderRadius: '4px',
+          padding: '10px 14px',
+          fontWeight: '600'
+        }
+      }
+    },
+    {
+      id: 'morandi-pink',
+      name: '莫兰迪粉',
+      description: '治愈系 · 高级灰粉 温柔细腻',
+      userCSS: `.message-container.sent .message-bubble {
+  background: linear-gradient(135deg, #E8D5D5 0%, #DCC6C6 100%) !important;
+  border: none !important;
+  border-radius: 18px !important;
+  padding: 13px 17px !important;
+  box-shadow: 
+    0 4px 12px rgba(220, 198, 198, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.5) !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: linear-gradient(135deg, #D5D8E8 0%, #C6CAE0 100%) !important;
+  border: none !important;
+  border-radius: 18px !important;
+  padding: 13px 17px !important;
+  box-shadow: 
+    0 4px 12px rgba(198, 202, 224, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.5) !important;
+}`,
+      preview: {
+        user: {
+          background: 'linear-gradient(135deg, #E8D5D5 0%, #DCC6C6 100%)',
+          boxShadow: '0 4px 12px rgba(220, 198, 198, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.5)',
+          borderRadius: '18px',
+          padding: '13px 17px'
+        },
+        ai: {
+          background: 'linear-gradient(135deg, #D5D8E8 0%, #C6CAE0 100%)',
+          boxShadow: '0 4px 12px rgba(198, 202, 224, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.5)',
+          borderRadius: '18px',
+          padding: '13px 17px'
+        }
+      }
+    },
+    {
+      id: 'cream-dream',
+      name: '奶油梦境',
+      description: '治愈系 · 奶油质感 柔软舒适',
+      userCSS: `.message-container.sent .message-bubble {
+  background: 
+    linear-gradient(135deg, #FFF8E7 0%, #FFEFD5 100%) !important;
+  border: 1px solid #F5DEB3 !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 3px 10px rgba(245, 222, 179, 0.2),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8) !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: 
+    linear-gradient(135deg, #F0F8FF 0%, #E6F3FF 100%) !important;
+  border: 1px solid #B3D9F5 !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 3px 10px rgba(179, 217, 245, 0.2),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8) !important;
+}`,
+      preview: {
+        user: {
+          background: 'linear-gradient(135deg, #FFF8E7 0%, #FFEFD5 100%)',
+          border: '1px solid #F5DEB3',
+          boxShadow: '0 3px 10px rgba(245, 222, 179, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.8)',
+          borderRadius: '20px',
+          padding: '12px 16px'
+        },
+        ai: {
+          background: 'linear-gradient(135deg, #F0F8FF 0%, #E6F3FF 100%)',
+          border: '1px solid #B3D9F5',
+          boxShadow: '0 3px 10px rgba(179, 217, 245, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.8)',
+          borderRadius: '20px',
+          padding: '12px 16px'
+        }
+      }
+    },
+    {
+      id: 'monochrome',
+      name: '黑白极简',
+      description: '极简主义 · 纯粹黑白 现代冷峻',
+      userCSS: `.message-container.sent .message-bubble {
+  background: #1A1A1A !important;
+  border: 1px solid #333333 !important;
+  border-radius: 14px !important;
+  padding: 12px 16px !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  letter-spacing: 0.5px !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: #FFFFFF !important;
+  border: 1px solid #CCCCCC !important;
+  border-radius: 14px !important;
+  padding: 12px 16px !important;
+  color: #1A1A1A !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  letter-spacing: 0.5px !important;
+}`,
+      preview: {
+        user: {
+          background: '#1A1A1A',
+          border: '1px solid #333333',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+          borderRadius: '14px',
+          padding: '12px 16px',
+          color: '#FFFFFF'
+        },
+        ai: {
+          background: '#FFFFFF',
+          border: '1px solid #CCCCCC',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          borderRadius: '14px',
+          padding: '12px 16px',
+          color: '#1A1A1A'
+        }
+      }
+    },
+    {
+      id: 'brutalist',
+      name: '野性主义',
+      description: '极简主义 · 粗犷有力 反叛精神',
+      userCSS: `.message-container.sent .message-bubble {
+  background: #000000 !important;
+  border: 4px solid #000000 !important;
+  border-radius: 0 !important;
+  padding: 14px 18px !important;
+  color: #FFFFFF !important;
+  box-shadow: 6px 6px 0 #FF0000 !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: #FFFFFF !important;
+  border: 4px solid #000000 !important;
+  border-radius: 0 !important;
+  padding: 14px 18px !important;
+  color: #000000 !important;
+  box-shadow: -6px 6px 0 #0000FF !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+}`,
+      preview: {
+        user: {
+          background: '#000000',
+          border: '4px solid #000000',
+          boxShadow: '6px 6px 0 #FF0000',
+          borderRadius: '0',
+          padding: '14px 18px',
+          color: '#FFFFFF',
+          fontWeight: '700'
+        },
+        ai: {
+          background: '#FFFFFF',
+          border: '4px solid #000000',
+          boxShadow: '-6px 6px 0 #0000FF',
+          borderRadius: '0',
+          padding: '14px 18px',
+          color: '#000000',
+          fontWeight: '700'
+        }
+      }
+    },
+    {
+      id: 'elegant-pink',
+      name: '优雅粉调',
+      description: '少女感 · 高级粉调 精致优雅',
+      userCSS: `.message-container.sent .message-bubble {
+  background: 
+    linear-gradient(135deg, #FFE8F5 0%, #FFD6EC 100%) !important;
+  border: 1px solid rgba(255, 182, 217, 0.4) !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 4px 12px rgba(255, 182, 217, 0.15),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+  position: relative !important;
+}
+.message-container.sent .message-bubble::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 40% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, transparent 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
+  pointer-events: none !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: 
+    linear-gradient(135deg, #F5F5F5 0%, #ECECEC 100%) !important;
+  border: 1px solid rgba(200, 200, 200, 0.4) !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    inset 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+  position: relative !important;
+}
+.message-container.received .message-bubble::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 40% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 100%) !important;
+  border-radius: 16px 16px 0 0 !important;
+  pointer-events: none !important;
+}`,
+      preview: {
+        user: {
+          background: 'linear-gradient(135deg, #FFE8F5 0%, #FFD6EC 100%)',
+          border: '1px solid rgba(255, 182, 217, 0.4)',
+          boxShadow: '0 4px 12px rgba(255, 182, 217, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.8)',
+          borderRadius: '16px',
+          padding: '12px 16px'
+        },
+        ai: {
+          background: 'linear-gradient(135deg, #F5F5F5 0%, #ECECEC 100%)',
+          border: '1px solid rgba(200, 200, 200, 0.4)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08), inset 0 1px 2px rgba(255, 255, 255, 0.8)',
+          borderRadius: '16px',
+          padding: '12px 16px'
+        }
+      }
+    },
+    {
+      id: 'peach-blossom',
+      name: '桃花少女',
+      description: '少女感 · 桃粉渐变 甜美可人',
+      userCSS: `.message-container.sent .message-bubble {
+  background: 
+    linear-gradient(135deg, #FFDEE9 0%, #FFB7CE 50%, #FFA8C5 100%) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 4px 15px rgba(255, 168, 197, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px rgba(255, 150, 180, 0.2) !important;
+}`,
+      aiCSS: `.message-container.received .message-bubble {
+  background: 
+    linear-gradient(135deg, #E0F4FF 0%, #C0E7FF 50%, #B0DDFF 100%) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  padding: 12px 16px !important;
+  box-shadow: 
+    0 4px 15px rgba(176, 221, 255, 0.3),
+    inset 0 2px 4px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px rgba(160, 200, 240, 0.2) !important;
+}`,
+      preview: {
+        user: {
+          background: 'linear-gradient(135deg, #FFDEE9 0%, #FFB7CE 50%, #FFA8C5 100%)',
+          boxShadow: '0 4px 15px rgba(255, 168, 197, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.5)',
+          borderRadius: '20px',
+          padding: '12px 16px'
+        },
+        ai: {
+          background: 'linear-gradient(135deg, #E0F4FF 0%, #C0E7FF 50%, #B0DDFF 100%)',
+          boxShadow: '0 4px 15px rgba(176, 221, 255, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.5)',
+          borderRadius: '20px',
+          padding: '12px 16px'
+        }
+      }
     }
   ]
 

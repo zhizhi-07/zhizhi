@@ -32,13 +32,13 @@ const MusicInviteCard = ({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden max-w-[280px] border border-gray-100">
-      {/* 卡片头部 */}
-      <div className="bg-gradient-to-r from-red-400 to-pink-500 px-4 py-3 flex items-center gap-2">
-        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+    <div className="bg-white/90 backdrop-blur-xl rounded-xl shadow-lg overflow-hidden max-w-[280px] border border-white/20">
+      {/* 卡片头部 - 液态玻璃效果 */}
+      <div className="bg-white/60 backdrop-blur-md px-4 py-3 flex items-center gap-2 border-b border-gray-100/50">
+        <svg className="w-5 h-5 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
         </svg>
-        <span className="text-white font-medium text-sm">一起听邀请</span>
+        <span className="text-gray-800 font-medium text-sm">一起听邀请</span>
       </div>
 
       {/* 卡片内容 */}
@@ -49,13 +49,13 @@ const MusicInviteCard = ({
         </div>
 
         {/* 歌曲信息 */}
-        <div className="flex items-center gap-3 mb-4 bg-gray-50 rounded-lg p-3">
+        <div className="flex items-center gap-3 mb-4 bg-white/50 backdrop-blur-sm rounded-lg p-3 border border-gray-100/50">
           {/* 封面 */}
-          <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-red-200 to-pink-200 flex items-center justify-center">
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
             {songCover ? (
               <img src={songCover} alt={songTitle} className="w-full h-full object-cover" />
             ) : (
-              <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
               </svg>
             )}
@@ -69,10 +69,10 @@ const MusicInviteCard = ({
 
           {/* 音乐波纹动画 */}
           <div className="flex items-center gap-0.5">
-            <span className="w-0.5 h-3 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-            <span className="w-0.5 h-4 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-            <span className="w-0.5 h-2 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-            <span className="w-0.5 h-5 bg-red-400 rounded-full animate-pulse" style={{ animationDelay: '450ms' }} />
+            <span className="w-0.5 h-3 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+            <span className="w-0.5 h-4 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+            <span className="w-0.5 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+            <span className="w-0.5 h-5 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '450ms' }} />
           </div>
         </div>
 
@@ -81,13 +81,13 @@ const MusicInviteCard = ({
           <div className="flex gap-2">
             <button
               onClick={handleReject}
-              className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium ios-button hover:bg-gray-200 transition-colors"
+              className="flex-1 px-4 py-2 bg-white/50 backdrop-blur-sm text-gray-700 rounded-full text-sm font-medium ios-button hover:bg-white/70 transition-all border border-gray-200/50"
             >
               拒绝
             </button>
             <button
               onClick={handleAccept}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-red-400 to-pink-500 text-white rounded-full text-sm font-medium ios-button shadow-md hover:shadow-lg transition-all"
+              className="flex-1 px-4 py-2 bg-white backdrop-blur-xl text-gray-900 rounded-full text-sm font-medium ios-button shadow-md hover:shadow-lg transition-all border border-gray-300/50"
             >
               接受
             </button>
