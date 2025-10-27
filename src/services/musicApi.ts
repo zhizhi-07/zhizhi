@@ -31,7 +31,7 @@ interface NetEaseSong {
 
 /**
  * 搜索歌曲（网易云音乐）
- * 开发环境使用Vite代理，生产环境使用Netlify Function
+ * 开发环境使用Vite代理，生产环境使用Cloudflare Worker
  * 失败时自动切换到备用API（QQ音乐）
  */
 export async function searchOnlineMusic(keyword: string, limit: number = 30): Promise<OnlineSong[]> {
@@ -40,6 +40,7 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
     
     // 根据环境选择API URL
     const isDev = import.meta.env.DEV
+    const workerUrl = import.meta.env.VITE_WORKER_URL
     let apiUrl: string
     let params: URLSearchParams
     
@@ -52,8 +53,15 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
         offset: '0',
         limit: limit.toString()
       })
+    } else if (workerUrl) {
+      // 生产环境：优先使用Cloudflare Worker
+      console.log('🌐 使用Cloudflare Worker:', workerUrl)
+      apiUrl = `${workerUrl}/api/music/search`
+      params = new URLSearchParams({
+        keyword: keyword
+      })
     } else {
-      // 生产环境：使用Netlify Function
+      // 备用：使用Netlify Function
       apiUrl = `/.netlify/functions/music-api`
       params = new URLSearchParams({
         action: 'search',
@@ -110,6 +118,7 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
 export async function getSongUrl(id: number): Promise<string | null> {
   try {
     const isDev = import.meta.env.DEV
+    const workerUrl = import.meta.env.VITE_WORKER_URL
     let apiUrl: string
     let params: URLSearchParams
     
@@ -121,8 +130,14 @@ export async function getSongUrl(id: number): Promise<string | null> {
         ids: `[${id}]`,
         br: '320000'
       })
+    } else if (workerUrl) {
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `${workerUrl}/api/music/url`
+      params = new URLSearchParams({
+        id: id.toString()
+      })
     } else {
-      // 生产环境：使用Netlify Function
+      // 备用：使用Netlify Function
       apiUrl = `/.netlify/functions/music-api`
       params = new URLSearchParams({
         action: 'url',
@@ -157,6 +172,7 @@ export async function getSongUrl(id: number): Promise<string | null> {
 export async function getLyric(id: number): Promise<string | null> {
   try {
     const isDev = import.meta.env.DEV
+    const workerUrl = import.meta.env.VITE_WORKER_URL
     let apiUrl: string
     let params: URLSearchParams
     
@@ -168,8 +184,14 @@ export async function getLyric(id: number): Promise<string | null> {
         lv: '-1',
         tv: '-1'
       })
+    } else if (workerUrl) {
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `${workerUrl}/api/music/lyric`
+      params = new URLSearchParams({
+        id: id.toString()
+      })
     } else {
-      // 生产环境：使用Netlify Function
+      // 备用：使用Netlify Function
       apiUrl = `/.netlify/functions/music-api`
       params = new URLSearchParams({
         action: 'lyric',
