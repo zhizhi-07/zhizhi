@@ -133,13 +133,25 @@ export async function searchOnlineMusicFallback(keyword: string, limit: number =
 }
 
 /**
- * 获取播放URL（备用方案）
+ * 获取播放URL（备用方案 - QQ音乐）
  */
-export async function getSongUrlFallback(_id: number | string): Promise<string | null> {
-  // 注意：这些公开API可能无法直接获取播放链接
-  // 建议用户自行上传歌曲或使用付费服务
-  console.log('⚠️ 备用API暂不支持获取播放链接，建议将歌曲添加到本地')
-  return null
+export async function getSongUrlFallback(id: number | string): Promise<string | null> {
+  try {
+    console.log('🎵 尝试获取QQ音乐播放链接:', id)
+    
+    // QQ音乐播放链接格式（试用链接，可能有时效限制）
+    const songmid = typeof id === 'string' ? id : id.toString()
+    
+    // 方案1：直接构造播放链接（试听链接）
+    const playUrl = `https://ws.stream.qqmusic.qq.com/C400${songmid}.m4a?guid=0&vkey=&uin=0&fromtag=120032`
+    
+    console.log('✅ 使用QQ音乐试听链接')
+    return playUrl
+    
+  } catch (error) {
+    console.error('❌ 获取QQ音乐播放链接失败:', error)
+    return null
+  }
 }
 
 /**

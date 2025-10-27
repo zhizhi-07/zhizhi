@@ -4,7 +4,7 @@
  * 自动切换到备用API（QQ音乐、酷狗音乐）
  */
 
-import { searchOnlineMusicFallback } from './musicApiFallback'
+import { searchOnlineMusicFallback, getSongUrlFallback } from './musicApiFallback'
 
 export interface OnlineSong {
   id: number
@@ -118,9 +118,9 @@ export async function getSongUrl(id: number): Promise<string | null> {
         br: '320000'
       })
     } else {
-      // 生产环境：暂不支持（需要部署Worker）
-      console.warn('生产环境暂不支持获取播放链接')
-      return null
+      // 生产环境：使用QQ音乐备用方案
+      console.log('🌐 生产环境使用QQ音乐播放')
+      return getSongUrlFallback(id)
     }
 
     const response = await fetch(`${apiUrl}?${params}`, {
@@ -139,8 +139,9 @@ export async function getSongUrl(id: number): Promise<string | null> {
 
     return null
   } catch (error) {
-    console.error('获取播放链接失败:', error)
-    return null
+    console.error('获取播放链接失败，尝试使用备用方案:', error)
+    // 网易云失败，尝试QQ音乐
+    return getSongUrlFallback(id)
   }
 }
 
