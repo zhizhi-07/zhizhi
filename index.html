@@ -50,7 +50,9 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+          const basePath = document.querySelector('base')?.href || window.location.origin + '/zhizhi/';
+          const swPath = new URL('sw.js', basePath).pathname;
+          navigator.serviceWorker.register(swPath)
             .then((registration) => {
               console.log('SW registered:', registration)
             })
