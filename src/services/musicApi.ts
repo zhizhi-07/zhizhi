@@ -53,11 +53,10 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
         limit: limit.toString()
       })
     } else {
-      // 生产环境：使用Netlify Function代理（更稳定）
-      console.log('🌐 使用Netlify Function代理')
-      apiUrl = `/.netlify/functions/netease-proxy`
+      // 生产环境：使用Cloudflare Worker
+      console.log('🌐 使用Cloudflare Worker')
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/search`
       params = new URLSearchParams({
-        action: 'search',
         keyword: keyword
       })
     }
@@ -122,10 +121,9 @@ export async function getSongUrl(id: number): Promise<string | null> {
         br: '320000'
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/netease-proxy`
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/url`
       params = new URLSearchParams({
-        action: 'url',
         id: id.toString()
       })
     }
@@ -169,10 +167,9 @@ export async function getLyric(id: number): Promise<string | null> {
         tv: '-1'
       })
     } else {
-      // 生产环境：使用Netlify Function
-      apiUrl = `/.netlify/functions/netease-proxy`
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/lyric`
       params = new URLSearchParams({
-        action: 'lyric',
         id: id.toString()
       })
     }

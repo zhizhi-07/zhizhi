@@ -38,13 +38,20 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         };
       }
 
-      const searchUrl = `https://music.163.com/api/search/get/web?s=${encodeURIComponent(keyword)}&type=1&offset=0&limit=30`;
+      // 直接代理网易云官方API
+      const searchUrl = `https://music.163.com/api/search/get/web`;
+      const params = new URLSearchParams({
+        s: keyword,
+        type: '1',
+        offset: '0',
+        limit: '30'
+      });
       
-      const response = await fetch(searchUrl, {
+      const response = await fetch(`${searchUrl}?${params}`, {
         headers: {
           'Referer': 'https://music.163.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Cookie': 'NMTID=00OHkINpdBxUwN-jEXxxxxxx', // 可选：添加Cookie提高成功率
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Cookie': '_ntes_nnid=; _ntes_nuid=',
         },
       });
 
@@ -68,9 +75,14 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         };
       }
 
-      const urlApi = `https://music.163.com/api/song/enhance/player/url?id=${id}&ids=[${id}]&br=320000`;
+      const urlApi = `https://music.163.com/api/song/enhance/player/url`;
+      const params = new URLSearchParams({
+        id: id,
+        ids: `[${id}]`,
+        br: '320000'
+      });
       
-      const response = await fetch(urlApi, {
+      const response = await fetch(`${urlApi}?${params}`, {
         headers: {
           'Referer': 'https://music.163.com',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -97,9 +109,14 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
         };
       }
 
-      const lyricUrl = `https://music.163.com/api/song/lyric?id=${id}&lv=-1&tv=-1`;
+      const lyricUrl = `https://music.163.com/api/song/lyric`;
+      const params = new URLSearchParams({
+        id: id,
+        lv: '-1',
+        tv: '-1'
+      });
       
-      const response = await fetch(lyricUrl, {
+      const response = await fetch(`${lyricUrl}?${params}`, {
         headers: {
           'Referer': 'https://music.163.com',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
