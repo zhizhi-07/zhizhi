@@ -53,9 +53,33 @@ async function searchQQMusic(keyword: string, limit: number = 30): Promise<Onlin
         needNewCode: '0'
       })
     } else {
-      // 生产环境：不使用备用API（主API已经是Cloudflare Worker）
-      console.log('⚠️ 生产环境不使用QQ备用API')
-      return []
+      // 生产环境：直接尝试调用QQ音乐API（GitHub Pages可能不受CORS限制）
+      apiUrl = `https://c.y.qq.com/soso/fcgi-bin/client_search_cp`
+      params = new URLSearchParams({
+        ct: '24',
+        qqmusic_ver: '1298',
+        new_json: '1',
+        remoteplace: 'txt.yqq.song',
+        searchid: Math.random().toString(),
+        t: '0',
+        aggr: '1',
+        cr: '1',
+        catZhida: '1',
+        lossless: '0',
+        flag_qc: '0',
+        p: '1',
+        n: limit.toString(),
+        w: keyword,
+        g_tk: '5381',
+        loginUin: '0',
+        hostUin: '0',
+        format: 'json',
+        inCharset: 'utf8',
+        outCharset: 'utf-8',
+        notice: '0',
+        platform: 'yqq.json',
+        needNewCode: '0'
+      })
     }
 
     const response = await fetch(`${apiUrl}?${params}`, {
