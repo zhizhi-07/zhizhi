@@ -42,7 +42,7 @@ export default {
     }
     
     try {
-      // 1. 音乐搜索API代理
+      // 1. 音乐搜索API代理 - 使用网易云音乐官方API
       if (url.pathname.startsWith('/api/music/search')) {
         const keyword = url.searchParams.get('keyword');
         if (!keyword) {
@@ -52,25 +52,76 @@ export default {
           });
         }
         
-        // 代理到网易云音乐API
-        const musicUrl = `https://music-api.hf.space/search?keywords=${encodeURIComponent(keyword)}&limit=20`;
-        const musicResponse = await fetch(musicUrl);
+        // 使用网易云音乐官方API（与本地开发环境一致）
+        const params = new URLSearchParams({
+          s: keyword,
+          type: '1',
+          offset: '0',
+          limit: '30'
+        });
+        
+        const musicUrl = `https://music.163.com/api/search/get/web?${params}`;
+        const musicResponse = await fetch(musicUrl, {
+          headers: {
+            'Referer': 'https://music.163.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
         return addCorsHeaders(musicResponse);
       }
       
-      // 2. 音乐详情API
-      if (url.pathname.startsWith('/api/music/detail')) {
-        const id = url.searchParams.get('id');
-        const musicUrl = `https://music-api.hf.space/song/detail?ids=${id}`;
-        const musicResponse = await fetch(musicUrl);
-        return addCorsHeaders(musicResponse);
-      }
-      
-      // 3. 音乐播放URL
+      // 2. 音乐播放URL - 使用网易云音乐官方API
       if (url.pathname.startsWith('/api/music/url')) {
         const id = url.searchParams.get('id');
-        const musicUrl = `https://music-api.hf.space/song/url?id=${id}`;
-        const musicResponse = await fetch(musicUrl);
+        if (!id) {
+          return new Response(JSON.stringify({ error: '缺少歌曲ID' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const params = new URLSearchParams({
+          id: id,
+          ids: `[${id}]`,
+          br: '320000'
+        });
+        
+        const musicUrl = `https://music.163.com/api/song/enhance/player/url?${params}`;
+        const musicResponse = await fetch(musicUrl, {
+          headers: {
+            'Referer': 'https://music.163.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        return addCorsHeaders(musicResponse);
+      }
+      
+      // 3. 音乐歌词 - 使用网易云音乐官方API
+      if (url.pathname.startsWith('/api/music/lyric')) {
+        const id = url.searchParams.get('id');
+        if (!id) {
+          return new Response(JSON.stringify({ error: '缺少歌曲ID' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        const params = new URLSearchParams({
+          id: id,
+          lv: '-1',
+          tv: '-1'
+        });
+        
+        const musicUrl = `https://music.163.com/api/song/lyric?${params}`;
+        const musicResponse = await fetch(musicUrl, {
+          headers: {
+            'Referer': 'https://music.163.com',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
         return addCorsHeaders(musicResponse);
       }
       
