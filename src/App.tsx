@@ -275,7 +275,7 @@ function App() {
                         <GroupProvider>
                           <GroupRedEnvelopeProvider>
                             <MusicPlayerProvider>
-                              <Router>
+                              <Router basename={import.meta.env.PROD ? '/zhizhi' : ''}>
                                 <OfflineIndicator />
                                 <DynamicIslandWrapper />
                                 <MomentsSocialManager>
