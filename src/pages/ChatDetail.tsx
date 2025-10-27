@@ -3053,16 +3053,18 @@ ${emojiInstructions}
                 return
               }
               
-              const index = parseInt(seqMatch[1]) - 1
-              const selectedPhoto = userPhotos[index]
+              // 🔧 修复：01=最新的图，02=第二新的图（从后往前数）
+              const seqNum = parseInt(seqMatch[1])
+              const index = userPhotos.length - seqNum
               
-              if (!selectedPhoto) {
+              if (index < 0 || index >= userPhotos.length) {
                 console.warn(`⚠️ 序号${seqMatch[1]}超出范围，只有${userPhotos.length}张图片`)
                 alert(`只有${userPhotos.length}张图片哦~`)
                 return
               }
               
-              console.log(`📸 选择序号${seqMatch[1]}的图片`)
+              const selectedPhoto = userPhotos[index]
+              console.log(`📸 选择序号${seqMatch[1]}的图片（倒数第${seqNum}张，数组索引${index}）`)
               
               // 直接使用用户发的图片作为AI头像
               if (selectedPhoto.imageUrl) {
