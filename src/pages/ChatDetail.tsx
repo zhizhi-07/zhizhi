@@ -626,34 +626,42 @@ const ChatDetail = () => {
     }
     
     // 首次识别或头像已变化，重新识图
-    ;(async () => {
-      try {
-        console.log('👁️ 首次进入聊天，开始识别AI头像...')
-        const visionResponse = await fetch('/.netlify/functions/vision', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: character.avatar,
-            prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+    // 只在生产环境（Netlify）中启用头像识别
+    const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    
+    if (isProduction) {
+      ;(async () => {
+        try {
+          console.log('👁️ 首次进入聊天，开始识别AI头像...')
+          const visionResponse = await fetch('/.netlify/functions/vision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image: character.avatar,
+              prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+            })
           })
-        })
-        
-        if (visionResponse.ok) {
-          const visionData = await visionResponse.json()
-          const avatarDescription = visionData.description || visionData.result
           
-          // 保存识图结果和头像指纹
-          localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
-          localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
-          localStorage.setItem(`character_avatar_fingerprint_${character.id}`, character.avatar.substring(0, 200))
-          console.log('✅ AI头像识别完成:', avatarDescription)
-        } else {
-          console.warn('⚠️ AI头像识别失败')
+          if (visionResponse.ok) {
+            const visionData = await visionResponse.json()
+            const avatarDescription = visionData.description || visionData.result
+            
+            // 保存识图结果和头像指纹
+            localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
+            localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+            localStorage.setItem(`character_avatar_fingerprint_${character.id}`, character.avatar.substring(0, 200))
+            console.log('✅ AI头像识别完成:', avatarDescription)
+          } else {
+            console.warn('⚠️ AI头像识别失败（API返回错误）')
+          }
+        } catch (error) {
+          // 静默失败，不在控制台显示错误
+          console.log('💡 AI头像识别跳过（本地环境或网络错误）')
         }
-      } catch (error) {
-        console.error('❌ AI头像识别异常:', error)
-      }
-    })()
+      })()
+    } else {
+      console.log('💡 本地开发环境，跳过AI头像识别')
+    }
   }, [character?.id, character?.avatar])
   
   // 新消息自动滚动到底部（优化后的滚动逻辑）
@@ -930,7 +938,32 @@ ${character.description || ''}
               blocked: isBlocked // 标记拉黑状态
             }
             
-            setMessages(prev => [...prev, aiMessage])
+            // 立即更新消息列表
+            setMessages(prev => {
+              const newMessages = [...prev, aiMessage]
+              
+              // 立即保存到 localStorage（不使用防抖）
+              safeSetItem(`chat_messages_${id}`, newMessages)
+              
+              // 立即更新聊天列表
+              const chatList = localStorage.getItem('chatList')
+              if (chatList) {
+                const chats = JSON.parse(chatList)
+                const chatIndex = chats.findIndex((chat: any) => chat.id === id)
+                
+                if (chatIndex !== -1) {
+                  chats[chatIndex] = {
+                    ...chats[chatIndex],
+                    lastMessage: aiMessage.content || '',
+                    time: aiMessage.time
+                  }
+                  localStorage.setItem('chatList', JSON.stringify(chats))
+                  console.log(`📝 聊天列表已更新: ${aiMessage.content.substring(0, 20)}...`)
+                }
+              }
+              
+              return newMessages
+            })
             
             // 记录主动发消息时间
             localStorage.setItem(`last_proactive_time_${id}`, String(Date.now()))
@@ -2926,7 +2959,8 @@ ${emojiInstructions}
       // 检查AI是否对红包做出决定
       let redEnvelopeAction: 'claim' | null = null
       
-      // 检查AI是否要修改网名
+      // 检查AI是否要修改网名（先记录，稍后添加到newMessages）
+      let nicknameSystemMessage: Message | null = null
       const nicknameMatch = aiResponse.match(/\[网名:(.+?)\]/)
       if (nicknameMatch && character) {
         const newNickname = nicknameMatch[1].trim()
@@ -2934,8 +2968,8 @@ ${emojiInstructions}
         console.log(`✏️ AI修改网名: ${oldNickname} → ${newNickname}`)
         updateCharacter(character.id, { nickname: newNickname })
         
-        // 添加系统提示消息
-        const systemMessage: Message = {
+        // 创建系统提示消息（稍后添加）
+        nicknameSystemMessage = {
           id: Date.now(),
           type: 'system',
           content: `${oldNickname} 更改了网名`,
@@ -2946,18 +2980,19 @@ ${emojiInstructions}
           timestamp: Date.now(),
           messageType: 'system'
         }
-        setMessages(prev => [...prev, systemMessage])
+        console.log('📣 准备添加网名系统提示:', nicknameSystemMessage.content)
       }
       
-      // 检查AI是否要修改个性签名
+      // 检查AI是否要修改个性签名（先记录，稍后添加到newMessages）
+      let signatureSystemMessage: Message | null = null
       const signatureMatch = aiResponse.match(/\[个性签名:(.+?)\]/)
       if (signatureMatch && character) {
         const newSignature = signatureMatch[1].trim()
         console.log(`✏️ AI修改个性签名: ${newSignature}`)
         updateCharacter(character.id, { signature: newSignature })
         
-        // 添加系统提示消息
-        const systemMessage: Message = {
+        // 创建系统提示消息（稍后添加）
+        signatureSystemMessage = {
           id: Date.now() + 1, // 避免ID冲突
           type: 'system',
           content: `${character.nickname || character.name} 更改了个性签名`,
@@ -2968,7 +3003,7 @@ ${emojiInstructions}
           timestamp: Date.now(),
           messageType: 'system'
         }
-        setMessages(prev => [...prev, systemMessage])
+        console.log('📣 准备添加签名系统提示:', signatureSystemMessage.content)
       }
       
       // 检查AI是否要换头像
@@ -3204,6 +3239,36 @@ ${emojiInstructions}
               // 更新角色头像
               updateCharacter(character.id, { avatar: newAvatar })
               console.log(`✅ 头像更换成功`)
+              
+              // 🔍 立即识别新头像，让AI知道自己头像长什么样
+              ;(async () => {
+                try {
+                  console.log('👁️ 开始识别AI新头像...')
+                  const visionResponse = await fetch('/.netlify/functions/vision', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      image: newAvatar,
+                      prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
+                    })
+                  })
+                  
+                  if (visionResponse.ok) {
+                    const visionData = await visionResponse.json()
+                    const avatarDescription = visionData.description || visionData.result
+                    
+                    // 保存识图结果和头像指纹
+                    localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
+                    localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+                    localStorage.setItem(`character_avatar_fingerprint_${character.id}`, newAvatar.substring(0, 200))
+                    console.log('✅ AI新头像识别完成:', avatarDescription)
+                  } else {
+                    console.warn('⚠️ AI新头像识别失败')
+                  }
+                } catch (error) {
+                  console.error('❌ AI新头像识别异常:', error)
+                }
+              })()
               
               // 添加系统提示（使用回调确保获取最新状态）
               const systemMessage: Message = {
@@ -3911,6 +3976,16 @@ ${emojiInstructions}
             content: aiMessage.content?.substring(0, 20)
           })
           
+          // 添加网名和签名的系统提示
+          if (nicknameSystemMessage) {
+            newMessages.push(nicknameSystemMessage)
+            console.log('✅ 添加网名系统提示到消息列表')
+          }
+          if (signatureSystemMessage) {
+            newMessages.push(signatureSystemMessage)
+            console.log('✅ 添加签名系统提示到消息列表')
+          }
+          
           newMessages.push(aiMessage)
           safeSetMessages(newMessages)
           
@@ -3918,6 +3993,16 @@ ${emojiInstructions}
           aiRepliedCountRef.current++
           }
         } else {
+          // 多行回复前，先添加网名和签名的系统提示
+          if (nicknameSystemMessage) {
+            newMessages.push(nicknameSystemMessage)
+            console.log('✅ 添加网名系统提示到消息列表（多行回复）')
+          }
+          if (signatureSystemMessage) {
+            newMessages.push(signatureSystemMessage)
+            console.log('✅ 添加签名系统提示到消息列表（多行回复）')
+          }
+          
           // 多行回复，分多条消息逐个显示，模拟真人打字
           for (let i = 0; i < responseLines.length; i++) {
             await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500)) // 随机延迟
@@ -4507,10 +4592,23 @@ ${emojiInstructions}
             const recentAiMessages = newMessages.filter(m => m.type === 'received').slice(-summaryInterval)
             
             if (recentUserMessages.length > 0 && recentAiMessages.length > 0) {
-              // 合并最近的对话内容
-              const userContent = recentUserMessages.map(m => 
-                m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
-              ).join('\n')
+              // 合并最近的对话内容（包含图片识别结果）
+              const userContent = recentUserMessages.map(m => {
+                // 如果是图片消息，查找对应的AI回复来获取图片内容
+                if (m.messageType === 'image' && m.imageUrl) {
+                  // 找到这条图片消息后AI的第一个回复
+                  const messageIndex = currentMessages.findIndex(msg => msg.id === m.id)
+                  if (messageIndex !== -1 && messageIndex + 1 < currentMessages.length) {
+                    const aiReplyAfterImage = currentMessages[messageIndex + 1]
+                    if (aiReplyAfterImage && aiReplyAfterImage.type === 'received') {
+                      // AI的回复中应该包含了对图片的描述
+                      return `用户发送了图片，图片相关内容：${aiReplyAfterImage.content}`
+                    }
+                  }
+                  return '用户发送了图片'
+                }
+                return m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
+              }).join('\n')
               
               const aiContent = recentAiMessages.map(m => 
                 m.content || m.emojiDescription || m.photoDescription || m.voiceText || ''
@@ -6303,10 +6401,11 @@ ${callDetails}
             setMessages(prev => [...prev, rejectedCallMsg])
             
             // 添加一条隐藏消息（让AI知道被拒绝了）
+            const userName = currentUser?.nickname || currentUser?.name || '用户'
             const aiNoticeMsg: Message = {
               id: Date.now() + 1,
               type: 'system',
-              content: `用户拒绝了你的${isVideoCall ? '视频' : '语音'}通话请求。`,
+              content: `${userName}拒绝了你的${isVideoCall ? '视频' : '语音'}通话请求。`,
               time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
               timestamp: Date.now(),
               isHidden: true // 隐藏显示，但AI能看到

@@ -4,6 +4,7 @@ import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
+import { useUser } from '../context/UserContext'
 import { 
   getCoupleSpaceRelation, 
   createCoupleSpaceInvite, 
@@ -18,6 +19,7 @@ const CoupleSpace = () => {
   const { background, getBackgroundStyle } = useBackground()
   const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
+  const { currentUser } = useUser()
   const [relation, setRelation] = useState<CoupleSpaceRelation | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [privacyMode, setPrivacyMode] = useState<'public' | 'private'>('public')
@@ -214,9 +216,13 @@ const CoupleSpace = () => {
                   <div className="relative z-10">
                     <div className="w-28 h-28 rounded-full glass-card p-1.5 shadow-2xl border border-white/40">
                       <div className="w-full h-full rounded-full overflow-hidden bg-gray-100">
-                        <div className="w-full h-full flex items-center justify-center text-gray-700 text-3xl font-bold">
-                          我
-                        </div>
+                        {currentUser?.avatar ? (
+                          <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-700 text-3xl font-bold">
+                            {currentUser?.name?.[0] || '我'}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -249,7 +255,7 @@ const CoupleSpace = () => {
                 {/* 名字 */}
                 <div className="text-center mb-4">
                   <h2 className="text-2xl font-bold text-gray-900">
-                    我 & {relation.characterName}
+                    {currentUser?.name || '我'} & {relation.characterName}
                   </h2>
                 </div>
 

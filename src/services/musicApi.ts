@@ -53,9 +53,12 @@ export async function searchOnlineMusic(keyword: string, limit: number = 30): Pr
         limit: limit.toString()
       })
     } else {
-      // 生产环境：直接使用备用API（QQ音乐）
-      console.log('🌐 使用QQ音乐API')
-      throw new Error('跳过网易云，直接用QQ音乐')
+      // 生产环境：使用Cloudflare Worker
+      console.log('🌐 使用Cloudflare Worker')
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/search`
+      params = new URLSearchParams({
+        keyword: keyword
+      })
     }
 
     const response = await fetch(`${apiUrl}?${params}`, {
@@ -118,9 +121,11 @@ export async function getSongUrl(id: number): Promise<string | null> {
         br: '320000'
       })
     } else {
-      // 生产环境：使用QQ音乐备用方案
-      console.log('🌐 生产环境使用QQ音乐播放')
-      return getSongUrlFallback(id)
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/url`
+      params = new URLSearchParams({
+        id: id.toString()
+      })
     }
 
     const response = await fetch(`${apiUrl}?${params}`, {
@@ -163,9 +168,11 @@ export async function getLyric(id: number): Promise<string | null> {
         tv: '-1'
       })
     } else {
-      // 生产环境：暂不支持（需要部署Worker）
-      console.warn('生产环境暂不支持获取歌词')
-      return null
+      // 生产环境：使用Cloudflare Worker
+      apiUrl = `https://zhizhi-api.2373922440jhj.workers.dev/api/music/lyric`
+      params = new URLSearchParams({
+        id: id.toString()
+      })
     }
 
     const response = await fetch(`${apiUrl}?${params}`, {

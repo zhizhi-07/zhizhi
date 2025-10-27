@@ -242,44 +242,44 @@ const Moments = () => {
       {/* 可滚动区域（包含封面 + 动态列表） */}
       <div className="flex-1 overflow-y-auto">
         {/* 顶部封面区域 */}
-        <div className="relative h-80 bg-gradient-to-br from-blue-400 to-purple-500 overflow-hidden">
-        {/* 封面背景 */}
-        <div 
-          className="absolute inset-0 bg-gray-300 cursor-pointer group"
-          onClick={handleCoverUpload}
-        >
-          {coverImage ? (
-            <img 
-              src={coverImage} 
-              alt="朋友圈封面" 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-              <div className="text-white text-sm opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg">
-                点击上传封面图片
+        <div className="relative h-80 bg-white overflow-hidden">
+          {/* 封面背景 */}
+          <div 
+            className="absolute inset-0 bg-white cursor-pointer group"
+            onClick={handleCoverUpload}
+          >
+            {coverImage ? (
+              <img 
+                src={coverImage} 
+                alt="封面" 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-white flex items-center justify-center">
+                <div className="text-gray-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                  点击上传封面图片
+                </div>
               </div>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/5 group-hover:bg-black/10 transition-colors" />
-        </div>
-
-        {/* 用户信息 */}
-         <div className="absolute bottom-6 right-4 flex items-center gap-3 z-10">
-           <div className="text-right max-w-[200px]">
-             <h2 className="text-white font-semibold text-lg drop-shadow-lg mb-1">
-               {currentUser?.name || '微信用户'}
-             </h2>
-             {currentUser?.signature && (
-               <p className="text-white/90 text-xs drop-shadow-lg line-clamp-2">
-                 {currentUser.signature}
-               </p>
-             )}
-           </div>
-          <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-2xl overflow-hidden border-4 border-white/50">
-            {currentUser && getAvatarDisplay(currentUser.avatar, 'large')}
+            )}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors" />
           </div>
-        </div>
+
+          {/* 用户信息 */}
+          <div className="absolute bottom-6 left-4 right-4 flex items-end justify-between">
+            <div className="flex-1 mr-4">
+              <h2 className="text-white font-semibold text-lg drop-shadow-lg mb-1">
+                {currentUser?.name || '微信用户'}
+              </h2>
+              {currentUser?.signature && (
+                <p className="text-white/90 text-xs drop-shadow-lg line-clamp-2">
+                  {currentUser.signature}
+                </p>
+              )}
+            </div>
+            <div className="w-20 h-20 rounded-2xl bg-white flex items-center justify-center shadow-2xl overflow-hidden border-4 border-white/50">
+              {currentUser && getAvatarDisplay(currentUser.avatar, 'large')}
+            </div>
+          </div>
         </div>
 
         {/* 朋友圈动态列表 */}
