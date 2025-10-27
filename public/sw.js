@@ -1,7 +1,7 @@
 // Service Worker for PWA - 优化版
-const CACHE_NAME = 'zhizhi-v2'
-const RUNTIME_CACHE = 'zhizhi-runtime-v2'
-const IMAGE_CACHE = 'zhizhi-images-v2'
+const CACHE_NAME = 'zhizhi-v10'
+const RUNTIME_CACHE = 'zhizhi-runtime-v10'
+const IMAGE_CACHE = 'zhizhi-images-v10'
 
 // 静态资源缓存列表
 const STATIC_ASSETS = [
