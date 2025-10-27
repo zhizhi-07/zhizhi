@@ -4,6 +4,7 @@ export interface User {
   id: string
   name: string  // 真实名字
   nickname?: string  // 网名
+  remark?: string  // AI给用户设置的备注（默认是nickname或name）
   username: string
   avatar: string
   signature: string  // 个性签名，显示在用户界面
@@ -42,7 +43,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         ...user,
         avatar: user.avatar || 'default',
         description: user.description || user.signature || '这个人很懒，什么都没留下',
-        signature: user.signature || user.description || '这个人很懒，什么都没留下'
+        signature: user.signature || user.description || '这个人很懒，什么都没留下',
+        remark: user.remark || user.nickname || user.name  // 初始备注为网名或名字
       }))
     }
     return [defaultUser]

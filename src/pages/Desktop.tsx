@@ -6,7 +6,7 @@ import CalendarWidget from '../components/CalendarWidget'
 import { 
   MusicIcon, HeartIcon, PauseIcon, SkipForwardIcon, PlayIcon,
   ChatIcon, SettingsIcon, FileIcon, ImageIcon,
-  CameraIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon
+  FootprintIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon
 } from '../components/Icons'
 
 // 应用数据类型
@@ -84,7 +84,7 @@ const Desktop = () => {
 
   // 第二页应用
   const page2Apps: AppItem[] = [
-    { id: 'camera', name: '相机', icon: CameraIcon, color: 'glass-card', route: '/camera' },
+    { id: 'footprint', name: '足迹', icon: FootprintIcon, color: 'glass-card', route: '/ai-footprint' },
     { id: 'photos', name: '相册', icon: ImageIcon, color: 'glass-card', route: '/photos' },
     { id: 'calculator', name: '计算器', icon: CalculatorIcon, color: 'glass-card', route: '/calculator' },
     { id: 'calendar', name: '日历', icon: CalendarIcon, color: 'glass-card', route: '/calendar' },

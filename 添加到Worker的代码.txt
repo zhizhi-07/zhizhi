@@ -1,0 +1,110 @@
+// ==================== 在您现有Worker代码最前面添加这些函数 ====================
+
+// 音乐API处理函数
+async function handleMusicAPI(url) {
+  const pathname = url.pathname;
+  
+  // 搜索歌曲
+  if (pathname === '/api/music/search') {
+    const keyword = url.searchParams.get('keyword');
+    if (!keyword) {
+      return jsonResponse({ error: '缺少关键词' }, 400);
+    }
+
+    try {
+      const apiUrl = 'https://music.163.com/api/search/get/web';
+      const params = new URLSearchParams({
+        s: keyword,
+        type: '1',
+        offset: '0',
+        limit: '30'
+      });
+
+      const response = await fetch(`${apiUrl}?${params}`, {
+        headers: {
+          'Referer': 'https://music.163.com',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      const data = await response.json();
+      return jsonResponse(data);
+    } catch (error) {
+      return jsonResponse({ error: '搜索失败' }, 500);
+    }
+  }
+  
+  // 获取播放链接
+  if (pathname === '/api/music/url') {
+    const id = url.searchParams.get('id');
+    if (!id) {
+      return jsonResponse({ error: '缺少ID' }, 400);
+    }
+
+    try {
+      const apiUrl = 'https://music.163.com/api/song/enhance/player/url';
+      const params = new URLSearchParams({
+        id: id,
+        ids: `[${id}]`,
+        br: '320000'
+      });
+
+      const response = await fetch(`${apiUrl}?${params}`, {
+        headers: {
+          'Referer': 'https://music.163.com',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      const data = await response.json();
+      return jsonResponse(data);
+    } catch (error) {
+      return jsonResponse({ error: '获取失败' }, 500);
+    }
+  }
+  
+  // 获取歌词
+  if (pathname === '/api/music/lyric') {
+    const id = url.searchParams.get('id');
+    if (!id) {
+      return jsonResponse({ error: '缺少ID' }, 400);
+    }
+
+    try {
+      const apiUrl = 'https://music.163.com/api/song/lyric';
+      const params = new URLSearchParams({
+        id: id,
+        lv: '-1',
+        tv: '-1'
+      });
+
+      const response = await fetch(`${apiUrl}?${params}`, {
+        headers: {
+          'Referer': 'https://music.163.com',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+
+      const data = await response.json();
+      return jsonResponse(data);
+    } catch (error) {
+      return jsonResponse({ error: '获取失败' }, 500);
+    }
+  }
+  
+  return null;
+}
+
+// ==================== 在 export default { async fetch(request, env, ctx) { 里面添加 ====================
+// 找到这一行：const url = new URL(request.url);
+// 在它下面添加：
+
+    // 处理音乐API
+    if (url.pathname.startsWith('/api/music/')) {
+      const result = await handleMusicAPI(url);
+      if (result) return result;
+    }
+
+// ==================== 完成！ ====================
+
+

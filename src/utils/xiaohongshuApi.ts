@@ -286,9 +286,11 @@ export const getXiaohongshuNoteById = async (id: string): Promise<XiaohongshuNot
 }
 
 /**
- * 从AI生成的内容创建小红书笔记
+ * 从 AI生成的内容创建小红书笔记（异步，因为需要生成封面）
+ * @param content 小红书内容
+ * @param isOwnPost 是否是AI自己发的帖子（true=AI自己发，false=分享别人的）
  */
-export const createNoteFromAIContent = (content: string): XiaohongshuNote => {
+export const createNoteFromAIContent = async (content: string, isOwnPost: boolean = false): Promise<XiaohongshuNote> => {
   // 生成随机统计数据
   const randomLikes = Math.floor(Math.random() * 50000) + 1000
   const randomComments = Math.floor(Math.random() * 3000) + 100
@@ -320,17 +322,93 @@ export const createNoteFromAIContent = (content: string): XiaohongshuNote => {
   // 生成标题（取前30个字符）
   const title = content.length > 30 ? content.substring(0, 30) + '...' : content
   
+  // 🎨 使用AI生成封面图
+  let coverImage = `https://picsum.photos/300/400?random=${Date.now()}` // 默认随机图片
+  
+  try {
+    console.log('🎨 开始为小红书生成AI封面...')
+    
+    // 🔑 根据内容和标签生成图片提示词
+    let imagePrompt = ''
+    
+    if (tags.includes('美食')) {
+      imagePrompt = `delicious food photography, ${content.substring(0, 50)}, appetizing, professional food styling, warm lighting, mouth-watering`
+    } else if (tags.includes('穿搭')) {
+      imagePrompt = `fashion outfit photography, ${content.substring(0, 50)}, stylish, trendy, clean background, fashion magazine style`
+    } else if (tags.includes('探店') || tags.includes('咖啡')) {
+      imagePrompt = `cozy cafe interior, aesthetic coffee shop, ${content.substring(0, 50)}, warm atmosphere, instagram-worthy`
+    } else if (tags.includes('美妆')) {
+      imagePrompt = `beauty product photography, ${content.substring(0, 50)}, clean aesthetic, soft lighting, makeup flatlay`
+    } else if (tags.includes('旅行')) {
+      imagePrompt = `travel photography, scenic landscape, ${content.substring(0, 50)}, beautiful destination, vibrant colors`
+    } else {
+      // 生活/分享类
+      imagePrompt = `lifestyle photography, ${content.substring(0, 50)}, aesthetic, natural lighting, Instagram style`
+    }
+    
+    console.log('📝 生成的图片提示词:', imagePrompt)
+    
+    // 调用图片生成API（通过Netlify Functions）
+    const response = await fetch('/.netlify/functions/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: imagePrompt })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      if (data.image) {
+        coverImage = data.image
+        console.log('✅ 小红书封面生成成功')
+      } else {
+        console.warn('⚠️ API返回数据格式错误，使用默认图片')
+      }
+    } else {
+      console.warn('⚠️ 图片生成API返回错误，使用默认图片')
+    }
+  } catch (error) {
+    console.error('❌ 小红书封面生成失败，使用默认图片:', error)
+  }
+  
+  // 🎭 根据是否为AI自己发的帖子，生成不同的作者信息
+  let author
+  if (isOwnPost) {
+    // AI自己发的，使用AI自己作为作者（需要从 localStorage 中读取角色信息）
+    // 注：这里暂时使用默认值，实际调用时需要传入角色信息
+    author = {
+      id: 'ai_self',
+      nickname: 'AI分享', // 这里应该使用AI的真实昵称
+      avatar: 'https://i.pravatar.cc/150?img=8' // 这里应该使用AI的真实头像
+    }
+  } else {
+    // 分享别人的，生成随机作者
+    const randomNicknames = [
+      '小红书用户_' + Math.floor(Math.random() * 10000),
+      '生活分享家',
+      '美食探店员',
+      '穿搭博主',
+      '旅行者',
+      '美妆小达人',
+      '日常记录者',
+      '好物推荐官'
+    ]
+    const randomIdx = Math.floor(Math.random() * randomNicknames.length)
+    const avatarId = Math.floor(Math.random() * 70) + 1 // 1-70 的随机头像
+    
+    author = {
+      id: `user_${Date.now()}_${Math.random()}`,
+      nickname: randomNicknames[randomIdx],
+      avatar: `https://i.pravatar.cc/150?img=${avatarId}`
+    }
+  }
+  
   return {
     id: `ai_generated_${Date.now()}`,
     title: title,
     description: content,
-    coverImage: `https://picsum.photos/300/400?random=${Date.now()}`, // 随机图片
-    images: [`https://picsum.photos/300/400?random=${Date.now()}`],
-    author: {
-      id: 'ai_author',
-      nickname: 'AI分享',
-      avatar: 'https://i.pravatar.cc/150?img=8'
-    },
+    coverImage: coverImage, // 使用AI生成的封面
+    images: [coverImage],
+    author: author,
     stats: {
       likes: randomLikes,
       comments: randomComments,
@@ -352,15 +430,22 @@ export const getXiaohongshuForAI = async (keywords: string[]): Promise<Xiaohongs
   const keyword = keywords.join(' ')
   console.log('🤖 AI小红书内容:', keyword)
   
+  // 🔍 检测是否以@开头（表示分享别人的）
+  const isSharing = keyword.startsWith('@')
+  const cleanedKeyword = isSharing ? keyword.substring(1).trim() : keyword
+  
+  console.log('🎭 小红书类型:', isSharing ? '分享别人的' : 'AI自己发的')
+  
   // 如果内容比较长（超过10个字），认为是AI生成的内容
-  if (keyword.length > 10) {
+  if (cleanedKeyword.length > 10) {
     console.log('✨ AI生成小红书笔记内容')
-    return createNoteFromAIContent(keyword)
+    // 传入isOwnPost参数：如果不是分享类型，就是AI自己发的
+    return createNoteFromAIContent(cleanedKeyword, !isSharing)
   }
   
   // 否则搜索相关笔记
-  console.log('🔍 搜索相关笔记，关键词:', keyword)
-  const result = await searchXiaohongshuNotes(keyword, 5)
+  console.log('🔍 搜索相关笔记，关键词:', cleanedKeyword)
+  const result = await searchXiaohongshuNotes(cleanedKeyword, 5)
   
   console.log('📊 搜索结果数:', result.notes.length)
   

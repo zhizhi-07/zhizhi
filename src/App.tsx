@@ -27,6 +27,7 @@ import { AccountingProvider } from './context/AccountingContext'
 import { GroupProvider } from './context/GroupContext'
 import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
 import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
+import { AILifeProvider } from './context/AILifeContext'
 import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
@@ -133,6 +134,7 @@ const CoupleAlbum = lazy(() => import('./pages/CoupleAlbum'))
 const CoupleAnniversary = lazy(() => import('./pages/CoupleAnniversary'))
 const CoupleMessageBoard = lazy(() => import('./pages/CoupleMessageBoard'))
 const CalendarView = lazy(() => import('./pages/CalendarView'))
+const AIFootprint = lazy(() => import('./pages/AIFootprint'))
 
 // 表情包和自定义
 const MemesLibrary = lazy(() => import('./pages/MemesLibrary'))
@@ -266,8 +268,9 @@ function App() {
             <ApiProvider>
               <UserProvider>
                 <CharacterProvider>
-                  <MomentsProvider>
-                    <RedEnvelopeProvider>
+                  <AILifeProvider>
+                    <MomentsProvider>
+                      <RedEnvelopeProvider>
                       <AccountingProvider>
                         <GroupProvider>
                           <GroupRedEnvelopeProvider>
@@ -340,6 +343,8 @@ function App() {
                                   <Route path="/couple-anniversary" element={<PageWrapper><CoupleAnniversary /></PageWrapper>} />
                                   <Route path="/couple-message-board" element={<PageWrapper><CoupleMessageBoard /></PageWrapper>} />
                                   <Route path="/calendar" element={<PageWrapper><CalendarView /></PageWrapper>} />
+                                  <Route path="/ai-footprint" element={<PageWrapper><AIFootprint /></PageWrapper>} />
+                                  <Route path="/ai-footprint/:characterId" element={<PageWrapper><AIFootprint /></PageWrapper>} />
                                   <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
                                   <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
                                   <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />
@@ -371,8 +376,9 @@ function App() {
                           </GroupRedEnvelopeProvider>
                         </GroupProvider>
                       </AccountingProvider>
-                    </RedEnvelopeProvider>
-                  </MomentsProvider>
+                      </RedEnvelopeProvider>
+                    </MomentsProvider>
+                  </AILifeProvider>
                 </CharacterProvider>
               </UserProvider>
             </ApiProvider>

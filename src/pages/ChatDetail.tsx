@@ -105,7 +105,7 @@ const ChatDetail = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { id } = useParams()
-  const { currentUser } = useUser()
+  const { currentUser, updateUser } = useUser()
   
   // 记忆系统
   const memorySystem = useMemory(id || '')
@@ -367,6 +367,7 @@ const ChatDetail = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasProcessedTransferRef = useRef(false)
   const hasProcessedIntimatePayRef = useRef(false)
+  const hasProcessedCoupleSpaceInviteRef = useRef(false)
   const shouldSmoothScrollRef = useRef(true)
 
   // 判断是否需要显示时间分隔线（间隔超过5分钟）
@@ -630,35 +631,35 @@ const ChatDetail = () => {
     const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
     
     if (isProduction) {
-      ;(async () => {
-        try {
-          console.log('👁️ 首次进入聊天，开始识别AI头像...')
-          const visionResponse = await fetch('/.netlify/functions/vision', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: character.avatar,
-              prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
-            })
+    ;(async () => {
+      try {
+        console.log('👁️ 首次进入聊天，开始识别AI头像...')
+        const visionResponse = await fetch('/.netlify/functions/vision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: character.avatar,
+            prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
           })
+        })
+        
+        if (visionResponse.ok) {
+          const visionData = await visionResponse.json()
+          const avatarDescription = visionData.description || visionData.result
           
-          if (visionResponse.ok) {
-            const visionData = await visionResponse.json()
-            const avatarDescription = visionData.description || visionData.result
-            
-            // 保存识图结果和头像指纹
-            localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
-            localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
-            localStorage.setItem(`character_avatar_fingerprint_${character.id}`, character.avatar.substring(0, 200))
-            console.log('✅ AI头像识别完成:', avatarDescription)
-          } else {
+          // 保存识图结果和头像指纹
+          localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
+          localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+          localStorage.setItem(`character_avatar_fingerprint_${character.id}`, character.avatar.substring(0, 200))
+          console.log('✅ AI头像识别完成:', avatarDescription)
+        } else {
             console.warn('⚠️ AI头像识别失败（API返回错误）')
-          }
-        } catch (error) {
+        }
+      } catch (error) {
           // 静默失败，不在控制台显示错误
           console.log('💡 AI头像识别跳过（本地环境或网络错误）')
-        }
-      })()
+      }
+    })()
     } else {
       console.log('💡 本地开发环境，跳过AI头像识别')
     }
@@ -1082,6 +1083,49 @@ ${character.description || ''}
       }, 1000)
     }
   }, [location.state?.sendIntimatePay, location.state?.monthlyLimit, id, character])
+
+  // 处理从情侣空间页面跳转过来的邀请 - 使用ref防止重复
+  useEffect(() => {
+    const shouldSendInvite = location.state?.sendCoupleSpaceInvite
+    if (shouldSendInvite && !hasProcessedCoupleSpaceInviteRef.current && id && character && currentUser) {
+      console.log('💑 自动发送情侣空间邀请卡片')
+      
+      hasProcessedCoupleSpaceInviteRef.current = true
+      
+      const now = Date.now()
+      const coupleSpaceMsg: Message = {
+        id: now,
+        type: 'sent',
+        content: '',
+        time: new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        timestamp: now,
+        messageType: 'couple_space_invite',
+        coupleSpaceInvite: {
+          characterId: character.id,
+          characterName: character.name,
+          characterAvatar: character.avatar,
+          status: 'pending'
+        }
+      }
+      
+      // 禁用平滑滚动
+      shouldSmoothScrollRef.current = false
+      
+      setMessages(prev => [...prev, coupleSpaceMsg])
+      
+      // 清除location.state
+      window.history.replaceState({}, document.title)
+      
+      // 延迟重置标记
+      setTimeout(() => {
+        hasProcessedCoupleSpaceInviteRef.current = false
+        console.log('🔄 情侣空间邀请标记已重置')
+      }, 1000)
+    }
+  }, [location.state?.sendCoupleSpaceInvite, id, character, currentUser])
 
   const handleSend = async () => {
     if (inputValue.trim() && !isAiTyping) {
@@ -1866,10 +1910,12 @@ ${character.description || ''}
     }
   }
 
-  // 删除消息
+  // 删除消息（真正删除，保存到localStorage）
   const handleDeleteMessage = () => {
     if (longPressedMessage) {
-      setMessages(prev => prev.filter(msg => msg.id !== longPressedMessage.id))
+      const newMessages = messages.filter(msg => msg.id !== longPressedMessage.id)
+      safeSetMessages(newMessages) // 使用safeSetMessages确保保存到localStorage
+      console.log('🗑️ 消息已删除并保存到localStorage')
       setShowMessageMenu(false)
       setLongPressedMessage(null)
     }
@@ -2078,10 +2124,10 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
     setMessages(newMessages)
     console.log('✅ 消息已设置到state')
     
-    // 如果组件已卸载，额外保存到 localStorage
-    if (!isMountedRef.current && id) {
-      console.log('📦 组件已卸载，同时保存到 localStorage')
-      localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+    // 🔧 始终立即保存到 localStorage（防止用户快速退出聊天窗口时消息丢失）
+    if (id) {
+      safeSetItem(`chat_messages_${id}`, newMessages)
+      console.log('💾 消息已立即保存到 localStorage')
     }
   }, [id])
 
@@ -3006,6 +3052,30 @@ ${emojiInstructions}
         console.log('📣 准备添加签名系统提示:', signatureSystemMessage.content)
       }
       
+      // 检查AI是否要修改用户备注（先记录，稍后添加到newMessages）
+      let remarkSystemMessage: Message | null = null
+      const remarkMatch = aiResponse.match(/\[备注:(.+?)\]/)
+      if (remarkMatch && character && currentUser) {
+        const newRemark = remarkMatch[1].trim()
+        const oldRemark = currentUser.remark || currentUser.nickname || currentUser.name
+        console.log(`📝 AI修改用户备注: ${oldRemark} → ${newRemark}`)
+        updateUser(currentUser.id, { remark: newRemark })
+        
+        // 创建系统提示消息（稍后添加）
+        remarkSystemMessage = {
+          id: Date.now() + 2, // 避免ID冲突
+          type: 'system',
+          content: `${character.nickname || character.name} 修改了备注为："${newRemark}"`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system'
+        }
+        console.log('📣 准备添加备注系统提示:', remarkSystemMessage.content)
+      }
+      
       // 检查AI是否要换头像
       const avatarMatch = aiResponse.match(/\[换头像:(.+?)\]/)
       if (avatarMatch && character) {
@@ -3410,13 +3480,13 @@ ${emojiInstructions}
         console.log('📍 AI发送位置:', aiLocationData)
       }
       
-      // 检查AI是否要分享小红书
-      const xiaohongshuMatch = aiResponse.match(/\[小红书:(.+?)\]/)
+      // 检查AI是否要分享小红书（支持中英文冒号）
+      const xiaohongshuMatch = aiResponse.match(/\[小红书[：:](.+?)\]/)
       let aiXiaohongshuKeyword: string | null = null
       
       if (xiaohongshuMatch) {
         aiXiaohongshuKeyword = xiaohongshuMatch[1].trim()
-        cleanedResponse = cleanedResponse.replace(/\[小红书:.+?\]/g, '').trim()
+        cleanedResponse = cleanedResponse.replace(/\[小红书[：:].+?\]/g, '').trim()
         console.log('📕 AI分享小红书，关键词:', aiXiaohongshuKeyword)
       }
       
@@ -3983,7 +4053,7 @@ ${emojiInstructions}
             content: aiMessage.content?.substring(0, 20)
           })
           
-          // 添加网名和签名的系统提示
+          // 添加网名、签名和备注的系统提示
           if (nicknameSystemMessage) {
             newMessages.push(nicknameSystemMessage)
             console.log('✅ 添加网名系统提示到消息列表')
@@ -3991,6 +4061,10 @@ ${emojiInstructions}
           if (signatureSystemMessage) {
             newMessages.push(signatureSystemMessage)
             console.log('✅ 添加签名系统提示到消息列表')
+          }
+          if (remarkSystemMessage) {
+            newMessages.push(remarkSystemMessage)
+            console.log('✅ 添加备注系统提示到消息列表')
           }
           
           newMessages.push(aiMessage)
@@ -4000,7 +4074,7 @@ ${emojiInstructions}
           aiRepliedCountRef.current++
           }
         } else {
-          // 多行回复前，先添加网名和签名的系统提示
+          // 多行回复前，先添加网名、签名和备注的系统提示
           if (nicknameSystemMessage) {
             newMessages.push(nicknameSystemMessage)
             console.log('✅ 添加网名系统提示到消息列表（多行回复）')
@@ -4008,6 +4082,10 @@ ${emojiInstructions}
           if (signatureSystemMessage) {
             newMessages.push(signatureSystemMessage)
             console.log('✅ 添加签名系统提示到消息列表（多行回复）')
+          }
+          if (remarkSystemMessage) {
+            newMessages.push(remarkSystemMessage)
+            console.log('✅ 添加备注系统提示到消息列表（多行回复）')
           }
           
           // 多行回复，分多条消息逐个显示，模拟真人打字
