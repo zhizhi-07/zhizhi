@@ -289,7 +289,7 @@ const Profile = () => {
         {/* 切换账号 */}
         <div className="mb-6">
           <button
-            onClick={() => navigate('/user-list')}
+            onClick={() => navigate('/users')}
             className="w-full glass-card rounded-2xl px-4 py-4 text-primary font-medium ios-button"
           >
             切换账号

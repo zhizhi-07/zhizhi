@@ -3289,6 +3289,13 @@ ${emojiInstructions}
                 console.log('📝 添加系统消息前的消息数:', prev.length)
                 const updated = [...prev, systemMessage]
                 console.log('📝 添加系统消息后的消息数:', updated.length)
+                
+                // 🔧 立即保存到 localStorage（防止用户退出聊天窗口时丢失）
+                if (id) {
+                  safeSetItem(`chat_messages_${id}`, updated)
+                  console.log('💾 换头像系统消息已立即保存到 localStorage')
+                }
+                
                 return updated
               })
             } else {
