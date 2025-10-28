@@ -180,7 +180,8 @@ export default {
           const res = await fetch(`https://api.vkeys.cn/v2/music/tencent?id=${id}`, {signal: AbortSignal.timeout(5000)})
           const data = await res.json()
           if (data.code === 200 && data.data && data.data.url) {
-            return data.data.url
+            // 强制转换为HTTPS，避免混合内容警告
+            return data.data.url.replace('http://', 'https://')
           }
           return null
         },
@@ -188,7 +189,8 @@ export default {
           const res = await fetch(`https://api.apiopen.top/musicDetails?id=${id}`, {signal: AbortSignal.timeout(5000)})
           const data = await res.json()
           if (data.code === 200 && data.result && data.result.url) {
-            return data.result.url
+            // 强制转换为HTTPS
+            return data.result.url.replace('http://', 'https://')
           }
           return null
         },
@@ -200,14 +202,12 @@ export default {
       
       for (const source of playSources) {
         try {
-          let playUrl = await source()
+          const playUrl = await source()
           if (playUrl) {
-            // 🔒 强制转换为 HTTPS（GitHub Pages 部署需要）
-            playUrl = playUrl.replace('http://', 'https://')
             return new Response(JSON.stringify({data: [{url: playUrl}]}), {headers})
           }
         } catch (e) {
-          console.log('播放源失败:', e.message)
+          // 静默失败，不输出日志
         }
       }
       
