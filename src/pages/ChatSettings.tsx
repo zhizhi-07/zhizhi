@@ -1026,6 +1026,28 @@ const ChatSettings = () => {
             <p className="text-xs text-gray-400 mt-1">拉黑后，对方的消息会显示警告图标，AI会意识到被拉黑</p>
           </div>
           <div className="glass-card rounded-2xl overflow-hidden">
+            {/* 测试：模拟AI拉黑我 */}
+            <button
+              onClick={() => {
+                if (!id || !character) return
+                blacklistManager.blockUser(id, 'user')
+                alert(`🧪 测试功能：已模拟 ${character.name} 拉黑你\n\n现在发消息会显示红色感叹号⚠️`)
+                // 刷新页面状态
+                window.location.reload()
+              }}
+              className="w-full px-4 py-3 flex items-center justify-between ios-button text-left border-b border-gray-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 flex items-center justify-center">
+                  <span className="text-2xl">🧪</span>
+                </div>
+                <div className="text-left">
+                  <div className="font-medium text-gray-900">模拟AI拉黑我</div>
+                  <div className="text-xs text-gray-500 mt-0.5">测试被拉黑后的效果</div>
+                </div>
+              </div>
+            </button>
+            
             <button
               onClick={handleToggleBlacklist}
               className="w-full px-4 py-4 flex items-center justify-between ios-button"

@@ -164,7 +164,13 @@ export function saveDiary(characterId: string, diary: Diary): void {
     }
     
     localStorage.setItem(key, JSON.stringify(diaries))
-    console.log('💾 日记已保存')
+    console.log('💾 日记已保存到localStorage，key:', key)
+    console.log('📊 当前日记总数:', diaries.length)
+    
+    // 触发自定义事件，通知日记页面刷新
+    window.dispatchEvent(new CustomEvent('diaryUpdated', { 
+      detail: { characterId, diaryId: diary.id } 
+    }))
   } catch (error) {
     console.error('❌ 保存日记失败:', error)
   }

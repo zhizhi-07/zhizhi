@@ -184,6 +184,10 @@ const ChatDetail = () => {
   const [isAiTyping, setIsAiTyping] = useState(false)
   const saveTimeoutRef = useRef<number>() // 防抖保存定时器
   const [showMenu, setShowMenu] = useState(false)
+  
+  // 音乐详情弹窗状态
+  const [showMusicDetail, setShowMusicDetail] = useState(false)
+  const [selectedMusic, setSelectedMusic] = useState<{ songTitle: string; songArtist: string; songCover?: string } | null>(null)
   const isPageVisibleRef = useRef(true) // 跟踪页面是否可见（用于后台AI回复）
   const aiRepliedCountRef = useRef(0) // 记录AI回复的消息数（用于计算未读）
   const isMountedRef = useRef(true) // 追踪组件是否已挂载（用于切换聊天时继续AI回复）
@@ -3029,15 +3033,16 @@ ${emojiInstructions}
         updateCharacter(character.id, { nickname: newNickname })
         
         // 创建系统提示消息（稍后添加）
+        const now = Date.now()
         nicknameSystemMessage = {
-          id: Date.now(),
+          id: now,
           type: 'system',
           content: `${oldNickname} 更改了网名`,
           time: new Date().toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          timestamp: Date.now(),
+          timestamp: now,
           messageType: 'system'
         }
         console.log('📣 准备添加网名系统提示:', nicknameSystemMessage.content)
@@ -3052,15 +3057,16 @@ ${emojiInstructions}
         updateCharacter(character.id, { signature: newSignature })
         
         // 创建系统提示消息（稍后添加）
+        const now = Date.now() + 1 // 确保ID唯一且递增
         signatureSystemMessage = {
-          id: Date.now() + 1, // 避免ID冲突
+          id: now,
           type: 'system',
           content: `${character.nickname || character.name} 更改了个性签名`,
           time: new Date().toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          timestamp: Date.now(),
+          timestamp: now, // 使用唯一的时间戳
           messageType: 'system'
         }
         console.log('📣 准备添加签名系统提示:', signatureSystemMessage.content)
@@ -3076,15 +3082,16 @@ ${emojiInstructions}
         updateUser(currentUser.id, { remark: newRemark })
         
         // 创建系统提示消息（稍后添加）
+        const now = Date.now() + 2 // 确保ID唯一且递增
         remarkSystemMessage = {
-          id: Date.now() + 2, // 避免ID冲突
+          id: now,
           type: 'system',
           content: `${character.nickname || character.name} 修改了备注为："${newRemark}"`,
           time: new Date().toLocaleTimeString('zh-CN', {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          timestamp: Date.now(),
+          timestamp: now, // 使用唯一的时间戳
           messageType: 'system'
         }
         console.log('📣 准备添加备注系统提示:', remarkSystemMessage.content)
@@ -5592,9 +5599,13 @@ ${emojiInstructions}
                         songArtist={message.musicShare.songArtist}
                         songCover={message.musicShare.songCover}
                         onClick={() => {
-                          // 点击卡片可以跳转到音乐播放器（可选）
-                          console.log('点击了音乐分享:', message.musicShare)
-                          // navigate('/music-player')
+                          // 打开音乐详情弹窗
+                          setSelectedMusic({
+                            songTitle: message.musicShare!.songTitle,
+                            songArtist: message.musicShare!.songArtist,
+                            songCover: message.musicShare!.songCover
+                          })
+                          setShowMusicDetail(true)
                         }}
                       />
                     </div>
@@ -6877,6 +6888,20 @@ ${callDetails}
             )}
           </div>
         </div>
+      )}
+
+      {/* 音乐详情弹窗 */}
+      {selectedMusic && (
+        <MusicDetailModal
+          songTitle={selectedMusic.songTitle}
+          songArtist={selectedMusic.songArtist}
+          songCover={selectedMusic.songCover}
+          isOpen={showMusicDetail}
+          onClose={() => {
+            setShowMusicDetail(false)
+            setSelectedMusic(null)
+          }}
+        />
       )}
       </div>
     </div>

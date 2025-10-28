@@ -30,6 +30,44 @@ const DiaryPage = () => {
     }
   }, [id])
   
+  // 监听localStorage变化，实时更新日记列表
+  useEffect(() => {
+    if (!id) return
+    
+    const handleStorageChange = () => {
+      const loaded = getDiaries(id)
+      setDiaries(loaded)
+      console.log('📔 日记列表已刷新，当前有', loaded.length, '篇日记')
+    }
+    
+    const handleDiaryUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent
+      if (customEvent.detail?.characterId === id) {
+        console.log('🔔 收到日记更新通知，立即刷新')
+        handleStorageChange()
+        // 自动展开最新的日记
+        if (customEvent.detail?.diaryId) {
+          setExpandedId(customEvent.detail.diaryId)
+        }
+      }
+    }
+    
+    // 监听自定义事件（同标签页内，立即响应）
+    window.addEventListener('diaryUpdated', handleDiaryUpdated)
+    
+    // 监听storage事件（跨标签页）
+    window.addEventListener('storage', handleStorageChange)
+    
+    // 使用定时器定期检查（兜底方案）
+    const interval = setInterval(handleStorageChange, 2000)
+    
+    return () => {
+      window.removeEventListener('diaryUpdated', handleDiaryUpdated)
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [id])
+  
   // 生成新日记
   const handleGenerateDiary = async () => {
     if (!id || !character) return
