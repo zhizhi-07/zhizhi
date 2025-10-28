@@ -5092,6 +5092,25 @@ ${emojiInstructions}
               <path d="M12 6v6l4 2" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
+          {/* 切换到线下模式按钮 */}
+          <button 
+            onClick={() => {
+              // 保存当前对话历史并跳转到线下模式
+              localStorage.setItem('offline_chat_inherit', JSON.stringify({
+                characterId: id,
+                messages: messages,
+                timestamp: Date.now()
+              }))
+              navigate(`/offline-chat?character=${id}&inherit=true`)
+            }}
+            className="ios-button p-1 hover:opacity-70 transition-all"
+            title="切换到线下模式"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-gray-700">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeWidth="2"/>
+              <path d="M9 22V12h6v10" strokeWidth="2"/>
+            </svg>
+          </button>
           <button 
             onClick={() => navigate(`/chat-settings/${id}`)}
             className="ios-button text-gray-700 hover:text-gray-900"
@@ -5102,20 +5121,20 @@ ${emojiInstructions}
           </div>
         </div>
         
-        {/* Token 详情面板 */}
-        {showTokenDetail && tokenStats.total > 0 && (
-          <div className="glass-card mx-4 mt-2 p-3 rounded-xl transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-gray-700">本次请求统计</span>
-              <button 
-                onClick={() => setShowTokenDetail(false)}
-                className="text-gray-400 hover:text-gray-600 ios-button"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
+      {/* Token 详情面板 */}
+      {showTokenDetail && tokenStats.total > 0 && (
+        <div className="glass-card mx-4 mt-2 p-3 rounded-xl transition-all">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-gray-700">本次请求统计</span>
+            <button 
+              onClick={() => setShowTokenDetail(false)}
+              className="text-gray-400 hover:text-gray-600 ios-button"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
             <div className="space-y-2 text-xs">
               {/* 响应时间 */}
               {responseTime > 0 && (

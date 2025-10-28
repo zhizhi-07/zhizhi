@@ -312,6 +312,7 @@ export function convertCharacterCardToInternal(
   alternateGreetings?: string[]
   tags?: string[]
   creator?: string
+  offlineGreetings?: string[]  // 新增：线下开场白
 } {
   // 检测是否为 V2/V3 格式（都有 spec 和 data 字段）
   const isV2OrV3 = 'spec' in card && 'data' in card && (card.spec === 'chara_card_v2' || card.spec === 'chara_card_v3')
@@ -369,6 +370,16 @@ export function convertCharacterCardToInternal(
     }
   }
   
+  // 收集所有开场白（用于线下应用）
+  const offlineGreetings: string[] = []
+  if (data.first_mes) {
+    offlineGreetings.push(data.first_mes)
+  }
+  if ('alternate_greetings' in data && Array.isArray(data.alternate_greetings)) {
+    offlineGreetings.push(...data.alternate_greetings.filter(g => g && g.trim()))
+  }
+  console.log('📝 导入了', offlineGreetings.length, '个线下开场白')
+  
   const result = {
     name: data.name.trim(),
     username: `wxid_${Date.now().toString().slice(-8)}`, // 自动生成
@@ -385,6 +396,8 @@ export function convertCharacterCardToInternal(
     alternateGreetings: 'alternate_greetings' in data ? data.alternate_greetings : undefined,
     tags: 'tags' in data ? data.tags : undefined,
     creator: 'creator' in data ? data.creator : undefined,
+    // 新增：线下开场白（从ST导入）
+    offlineGreetings: offlineGreetings.length > 0 ? offlineGreetings : undefined,
   }
   
   console.log('🎯 最终返回的 characterBook:', result.characterBook)

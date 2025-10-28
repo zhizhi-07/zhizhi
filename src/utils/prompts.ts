@@ -1,8 +1,22 @@
-// 模板变量替换函数（轻量级实现）
-function replaceVars(text: string, char: string, user: string): string {
+// ST标准模板变量替换函数
+export function replaceVars(
+  text: string, 
+  character: Character, 
+  user: User
+): string {
+  const charName = character.name
+  const userName = user.name || user.nickname || 'User'
+  
   return text
-    .replace(/\{\{char\}\}/gi, char)
-    .replace(/\{\{user\}\}/gi, user)
+    // 基础变量
+    .replace(/\{\{char\}\}/gi, charName)
+    .replace(/\{\{user\}\}/gi, userName)
+    // 角色相关变量
+    .replace(/\{\{personality\}\}/gi, character.personality || character.description || '')
+    .replace(/\{\{scenario\}\}/gi, character.scenario || '')
+    .replace(/\{\{description\}\}/gi, character.description || '')
+    // 用户相关变量
+    .replace(/\{\{user_description\}\}/gi, character.userInfo || '')
 }
 
 export interface Character {
@@ -25,6 +39,7 @@ export interface User {
   name: string  // 真实名字
   nickname?: string  // 网名
   signature?: string  // 个性签名
+  remark?: string  // 备注
 }
 
 export interface BlacklistStatus {
@@ -114,16 +129,16 @@ ${retrievedMemes.map(meme => `"${meme.梗}" - ${meme.含义}`).join('\n')}
   
   // 构建角色信息部分（替换{{char}}和{{user}}变量）
   const roleInfo = useSTFormat
-    ? `${character.systemPrompt ? replaceVars(character.systemPrompt, character.name, user.name) : `你是 ${character.name}，正在用手机和 ${user.name} 聊天。`}
+    ? `${character.systemPrompt ? replaceVars(character.systemPrompt, character, user) : `你是 ${character.name}，正在用手机和 ${user.name} 聊天。`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ## 【角色信息】
-${character.description ? replaceVars(character.description, character.name, user.name) : ''}
-${character.personality ? `\n### 性格\n${replaceVars(character.personality, character.name, user.name)}` : ''}
-${character.scenario ? `\n### 场景设定\n${replaceVars(character.scenario, character.name, user.name)}` : ''}
+${character.description ? replaceVars(character.description, character, user) : ''}
+${character.personality ? `\n### 性格\n${replaceVars(character.personality, character, user)}` : ''}
+${character.scenario ? `\n### 场景设定\n${replaceVars(character.scenario, character, user)}` : ''}
 
-${character.userInfo ? `## 【关于 ${user.name}】\n${replaceVars(character.userInfo, character.name, user.name)}\n\n💡 这些是已知信息，你都知道。\n` : ''}
-${character.exampleMessages ? `\n## 【对话示例】\n${replaceVars(character.exampleMessages, character.name, user.name)}\n\n💡 参考这种说话风格。\n` : ''}
+${character.userInfo ? `## 【关于 ${user.name}】\n${replaceVars(character.userInfo, character, user)}\n\n💡 这些是已知信息，你都知道。\n` : ''}
+${character.exampleMessages ? `\n## 【对话示例】\n${replaceVars(character.exampleMessages, character, user)}\n\n💡 参考这种说话风格。\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
     : `你是 ${character.name}，正在用手机和 ${user.name} 聊天。
 

@@ -18,11 +18,14 @@ const EditCharacter = () => {
     username: character?.username || '',
     avatar: character?.avatar || '',
     signature: character?.signature || '',
-    description: character?.description || ''
+    description: character?.description || '',
+    onlineGreeting: character?.onlineGreeting || '',
+    offlineGreetings: character?.offlineGreetings || []
   })
 
   const [avatarPreview, setAvatarPreview] = useState(character?.avatar || '')
   const [isUploading, setIsUploading] = useState(false)
+  const [newOfflineGreeting, setNewOfflineGreeting] = useState('')
 
   useEffect(() => {
     if (character) {
@@ -32,7 +35,9 @@ const EditCharacter = () => {
         username: character.username,
         avatar: character.avatar,
         signature: character.signature,
-        description: character.description
+        description: character.description,
+        onlineGreeting: character.onlineGreeting || '',
+        offlineGreetings: character.offlineGreetings || []
       })
       setAvatarPreview(character.avatar)
     }
@@ -281,6 +286,99 @@ const EditCharacter = () => {
               <div className="text-right text-xs text-gray-400 mt-1">
                 {(formData.signature || '').length}/100
               </div>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-500 mb-1">线上开场白 💬</label>
+              <textarea
+                value={formData.onlineGreeting}
+                onChange={(e) => setFormData({ ...formData, onlineGreeting: e.target.value })}
+                placeholder="AI在线上聊天时的第一句话（可选，不填则AI自由发挥）"
+                maxLength={500}
+                className="w-full h-20 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400 resize-none"
+              />
+              <div className="text-right text-xs text-gray-400 mt-1">
+                {(formData.onlineGreeting || '').length}/500
+              </div>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-100">
+              <label className="block text-xs text-gray-500 mb-1">
+                线下开场白 🎭 
+                {formData.offlineGreetings.length > 0 && (
+                  <span className="text-gray-600 ml-2">
+                    ({formData.offlineGreetings.length} 个)
+                  </span>
+                )}
+              </label>
+              <div className="text-xs text-gray-400 mb-2">
+                用于线下见面应用的开场白（可手动添加，或从ST角色卡导入）
+              </div>
+              
+              {/* 添加新开场白 */}
+              <div className="mb-3">
+                <textarea
+                  value={newOfflineGreeting}
+                  onChange={(e) => setNewOfflineGreeting(e.target.value)}
+                  placeholder="输入一个新的线下开场白（支持HTML）..."
+                  maxLength={50000}
+                  className="w-full h-32 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-gray-400">{newOfflineGreeting.length}/50000</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newOfflineGreeting.trim()) {
+                        setFormData({
+                          ...formData,
+                          offlineGreetings: [...formData.offlineGreetings, newOfflineGreeting.trim()]
+                        })
+                        setNewOfflineGreeting('')
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                      newOfflineGreeting.trim().length > 0
+                        ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                    disabled={newOfflineGreeting.trim().length === 0}
+                  >
+                    + 添加开场白
+                  </button>
+                </div>
+              </div>
+              
+              {/* 已有的开场白列表 */}
+              {formData.offlineGreetings.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {formData.offlineGreetings.map((greeting, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-3 relative">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="text-xs text-gray-500">开场白 {index + 1}</div>
+                        <div className="text-xs text-gray-400">{greeting.length} 字符</div>
+                      </div>
+                      <div className="text-sm text-gray-700 pr-8 whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                        {greeting}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newGreetings = formData.offlineGreetings.filter((_, i) => i !== index)
+                          setFormData({ ...formData, offlineGreetings: newGreetings })
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs hover:bg-red-600 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400 italic text-center py-2">
+                  暂无线下开场白
+                </div>
+              )}
             </div>
 
             <div className="px-4 py-3">

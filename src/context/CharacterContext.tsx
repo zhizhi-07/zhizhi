@@ -27,6 +27,10 @@ export interface Character {
   tags?: string[]                   // 标签
   creator?: string                  // 创建者
   characterVersion?: string         // 角色版本
+  
+  // 开场白（新增）
+  onlineGreeting?: string           // 线上开场白（用户自己输入，用于在线聊天）
+  offlineGreetings?: string[]       // 线下开场白（从ST角色卡导入，将来用于线下应用）
 }
 
 interface CharacterContextType {
