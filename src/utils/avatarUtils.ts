@@ -5,12 +5,27 @@
  * @returns 头像URL或空字符串
  */
 export const getAvatarUrl = (avatar: string | undefined, isAi: boolean = false): string => {
-  // 如果有头像且不为空，返回头像
-  // 支持 base64 图片 (data:image) 和普通 URL
-  if (avatar && avatar.trim() !== '' && (avatar.startsWith('data:image') || avatar.startsWith('http') || avatar.startsWith('/'))) {
-    return avatar
+  // 如果没有头像或为空，返回空字符串
+  if (!avatar || avatar.trim() === '') {
+    return ''
   }
-  // 否则返回空字符串（不使用默认头像）
+  
+  // 过滤掉特殊值（emoji、default等）
+  const trimmedAvatar = avatar.trim()
+  if (trimmedAvatar === 'default' || trimmedAvatar.length <= 2) {
+    // 单个emoji通常1-2个字符，不是有效URL
+    return ''
+  }
+  
+  // 只返回有效的图片URL
+  // 支持 base64 图片 (data:image) 和普通 URL (http/https//)
+  if (trimmedAvatar.startsWith('data:image') || 
+      trimmedAvatar.startsWith('http') || 
+      trimmedAvatar.startsWith('/')) {
+    return trimmedAvatar
+  }
+  
+  // 其他情况（包括emoji）返回空字符串
   return ''
 }
 

@@ -281,7 +281,7 @@ function App() {
                         <GroupProvider>
                           <GroupRedEnvelopeProvider>
                             <MusicPlayerProvider>
-                              <Router basename="/zhizhi">
+                              <Router>
                                 <OfflineIndicator />
                                 <DynamicIslandWrapper />
                                 <MomentsSocialManager>
