@@ -1030,10 +1030,26 @@ const ChatSettings = () => {
             <button
               onClick={() => {
                 if (!id || !character) return
+                
+                // 拉黑用户
                 blacklistManager.blockUser(id, 'user')
-                alert(`🧪 测试功能：已模拟 ${character.name} 拉黑你\n\n现在发消息会显示红色感叹号⚠️`)
-                // 刷新页面状态
-                window.location.reload()
+                
+                // 添加系统消息
+                const messages = JSON.parse(localStorage.getItem(`chat_messages_${id}`) || '[]')
+                const systemMessage = {
+                  id: Date.now(),
+                  type: 'system',
+                  content: `${character.name} 已将你加入黑名单`,
+                  time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+                  timestamp: Date.now()
+                }
+                messages.push(systemMessage)
+                localStorage.setItem(`chat_messages_${id}`, JSON.stringify(messages))
+                
+                alert(`🧪 测试功能：已模拟 ${character.name} 拉黑你\n\n✅ 拉黑时间戳：${Date.now()}\n✅ 已添加系统消息\n\n现在返回聊天发消息会显示红色感叹号⚠️`)
+                
+                // 返回聊天
+                navigate(`/chat/${id}`)
               }}
               className="w-full px-4 py-3 flex items-center justify-between ios-button text-left border-b border-gray-100"
             >
