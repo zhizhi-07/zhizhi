@@ -54,6 +54,10 @@ const MusicPlayer = () => {
       type: 'sent' as const,
       messageType: 'musicInvite' as const,
       content: `[一起听邀请]我想和你一起听《${currentSong.title}》`,
+      time: new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
       musicInvite: {
         songTitle: currentSong.title,
         songArtist: currentSong.artist,

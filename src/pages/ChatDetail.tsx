@@ -3440,7 +3440,7 @@ ${emojiInstructions}
         blacklistManager.blockUser(id, 'user')
         cleanedResponse = cleanedResponse.replace(/\[拉黑用户\]/g, '').trim()
         
-        // 添加系统提示
+        // 添加系统提示并立即保存到localStorage
         const systemMessage: Message = {
           id: Date.now() + 9999,
           type: 'system',
@@ -3448,16 +3448,25 @@ ${emojiInstructions}
           time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
           timestamp: Date.now()
         }
-        setMessages(prev => [...prev, systemMessage])
+        
+        // 立即保存系统消息
+        safeSetMessages(prev => {
+          const updated = [...prev, systemMessage]
+          if (id) {
+            safeSetItem(`chat_messages_${id}`, updated)
+            console.log('💾 系统消息已立即保存到 localStorage')
+          }
+          return updated
+        })
       }
-      
-      // 清理网名、个性签名和头像标记（使用[\s\S]匹配包括换行在内的所有字符）
+
       cleanedResponse = cleanedResponse.replace(/\[网名:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[个性签名:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[换头像:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[一起听:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[正在与[\s\S]+?一起听[\s\S]+?\]/g, '').trim()
-      
+
+// ...
       // 清理系统警告标记
       cleanedResponse = cleanedResponse.replace(/\[系统警告[：:][^\]]*\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/【系统警告[：:][^】]*】/g, '').trim()
@@ -5835,18 +5844,27 @@ ${emojiInstructions}
                  </div>
                  
                  {/* 拉黑警告图标 - 与气泡垂直居中 */}
-                {message.type === 'received' && message.blocked && (
-                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                  </svg>
-                )}
-                
-                   {/* 用户被AI拉黑时显示警告图标 */}
-                   {message.type === 'sent' && message.blocked && (
-                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                  </svg>
-                )}
+                {(() => {
+                  if (!id) return null
+                  const blockStatus = blacklistManager.getBlockStatus(id, 'user')
+                  // AI消息：检查用户是否拉黑了AI
+                  if (message.type === 'received' && blockStatus.blockedByMe) {
+                    return (
+                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                    )
+                  }
+                  // 用户消息：检查AI是否拉黑了用户
+                  if (message.type === 'sent' && blockStatus.blockedByTarget) {
+                    return (
+                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                    )
+                  }
+                  return null
+                })()}
                  </div>
                    {/* 自己消息：气泡在左，头像在右 */}
                   {message.type === 'sent' && (
