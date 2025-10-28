@@ -80,7 +80,7 @@ export default {
         {
           name: 'netease-direct',
           fetch: async () => {
-            const res = await fetch(`http://music.163.com/api/search/get/web?s=${encodeURIComponent(keyword)}&type=1&limit=50`, {signal: AbortSignal.timeout(5000)})
+            const res = await fetch(`https://music.163.com/api/search/get/web?s=${encodeURIComponent(keyword)}&type=1&limit=50`, {signal: AbortSignal.timeout(5000)})
             const data = await res.json()
             if (data.result && data.result.songs) {
               return data.result.songs.map(s => ({
@@ -88,7 +88,7 @@ export default {
                 mid: s.id,
                 name: s.name,
                 artists: s.artists.map(a => ({name: a.name})),
-                album: {name: s.album.name, picUrl: s.album.picUrl || ''},
+                album: {name: s.album.name, picUrl: s.album.picUrl ? s.album.picUrl.replace('http://', 'https://') : ''},
                 duration: s.duration,
                 fee: s.fee || 0,
                 source: 'netease'
@@ -153,13 +153,12 @@ export default {
         return b.popularity - a.popularity
       })
       
-      // 返回20-30首（随机数量，确保比330的10首多）
-      // 如果聚合的歌曲少于20首，就返回全部，否则随机截取20-30首
+      // 返回40-50首歌曲（增加数量）
       let finalSongs
-      if (sortedSongs.length < 20) {
+      if (sortedSongs.length < 40) {
         finalSongs = sortedSongs
       } else {
-        const randomLimit = Math.floor(Math.random() * 11) + 20
+        const randomLimit = Math.floor(Math.random() * 11) + 40 // 40-50首
         finalSongs = sortedSongs.slice(0, Math.min(randomLimit, sortedSongs.length))
       }
       
@@ -201,8 +200,10 @@ export default {
       
       for (const source of playSources) {
         try {
-          const playUrl = await source()
+          let playUrl = await source()
           if (playUrl) {
+            // 🔒 强制转换为 HTTPS（GitHub Pages 部署需要）
+            playUrl = playUrl.replace('http://', 'https://')
             return new Response(JSON.stringify({data: [{url: playUrl}]}), {headers})
           }
         } catch (e) {
@@ -231,7 +232,7 @@ export default {
         },
         async () => {
           // 网易云API（也需要数字ID）
-          const res = await fetch(`http://music.163.com/api/song/lyric?id=${id}&lv=-1&tv=-1`, {signal: AbortSignal.timeout(5000)})
+          const res = await fetch(`https://music.163.com/api/song/lyric?id=${id}&lv=-1&tv=-1`, {signal: AbortSignal.timeout(5000)})
           const data = await res.json()
           if (data.lrc && data.lrc.lyric) {
             return data.lrc.lyric

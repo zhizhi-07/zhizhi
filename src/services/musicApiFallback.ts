@@ -18,7 +18,7 @@ export interface OnlineSong {
  * 使用QQ音乐API搜索（备用方案1）
  * 开发环境使用Vite代理，生产环境使用Netlify Function
  */
-async function searchQQMusic(keyword: string, limit: number = 30): Promise<OnlineSong[]> {
+async function searchQQMusic(keyword: string, limit: number = 50): Promise<OnlineSong[]> {
   try {
     const isDev = import.meta.env.DEV
     let apiUrl: string
@@ -115,7 +115,7 @@ async function searchQQMusic(keyword: string, limit: number = 30): Promise<Onlin
  * 酷狗音乐也需要后端代理
  * 暂时不使用，等待后续完善
  */
-async function searchKugouMusic(_keyword: string, _limit: number = 30): Promise<OnlineSong[]> {
+async function searchKugouMusic(_keyword: string, _limit: number = 50): Promise<OnlineSong[]> {
   console.log('⚠️ 酷狗音乐需要Netlify代理，暂未实现')
   return []
 }
@@ -123,7 +123,7 @@ async function searchKugouMusic(_keyword: string, _limit: number = 30): Promise<
 /**
  * 混合搜索 - 尝试多个API
  */
-export async function searchOnlineMusicFallback(keyword: string, limit: number = 30): Promise<OnlineSong[]> {
+export async function searchOnlineMusicFallback(keyword: string, limit: number = 50): Promise<OnlineSong[]> {
   console.log('🔍 使用备用API搜索:', keyword)
   
   // 尝试QQ音乐

@@ -34,7 +34,7 @@ interface NetEaseSong {
  * 开发环境使用Vite代理，生产环境使用Cloudflare Worker
  * 失败时自动切换到备用API（QQ音乐）
  */
-export async function searchOnlineMusic(keyword: string, limit: number = 30): Promise<OnlineSong[]> {
+export async function searchOnlineMusic(keyword: string, limit: number = 50): Promise<OnlineSong[]> {
   try {
     console.log('🔍 尝试使用网易云API搜索:', keyword)
     
