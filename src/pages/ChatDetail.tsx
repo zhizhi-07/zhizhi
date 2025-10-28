@@ -5843,25 +5843,35 @@ ${emojiInstructions}
                    )}
                  </div>
                  
-                 {/* 拉黑警告图标 - 与气泡垂直居中 */}
+                 {/* 拉黑警告图标 - 只显示拉黑之后发送的消息 */}
                 {(() => {
-                  if (!id) return null
+                  if (!id || !message.timestamp) return null
                   const blockStatus = blacklistManager.getBlockStatus(id, 'user')
+                  
                   // AI消息：检查用户是否拉黑了AI
                   if (message.type === 'received' && blockStatus.blockedByMe) {
-                    return (
-                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                      </svg>
-                    )
+                    const blockTime = blacklistManager.getBlockTimestamp('user', id)
+                    // 只有消息时间晚于拉黑时间才显示
+                    if (blockTime && message.timestamp > blockTime) {
+                      return (
+                        <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                        </svg>
+                      )
+                    }
                   }
+                  
                   // 用户消息：检查AI是否拉黑了用户
                   if (message.type === 'sent' && blockStatus.blockedByTarget) {
-                    return (
-                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                      </svg>
-                    )
+                    const blockTime = blacklistManager.getBlockTimestamp(id, 'user')
+                    // 只有消息时间晚于拉黑时间才显示
+                    if (blockTime && message.timestamp > blockTime) {
+                      return (
+                        <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                        </svg>
+                      )
+                    }
                   }
                   return null
                 })()}

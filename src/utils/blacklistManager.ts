@@ -10,6 +10,7 @@ export interface BlockStatus {
 
 class BlacklistManager {
   private storageKey = 'blacklist_user'
+  private timestampKey = 'blacklist_timestamp'
 
   /**
    * 获取用户的拉黑列表
@@ -37,6 +38,18 @@ class BlacklistManager {
   }
 
   /**
+   * 获取拉黑时间戳
+   */
+  getBlockTimestamp(userId: string, targetId: string): number | null {
+    try {
+      const data = localStorage.getItem(`${this.timestampKey}_${userId}_${targetId}`)
+      return data ? parseInt(data) : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
    * 拉黑用户
    * @param userId 当前用户ID
    * @param targetId 要拉黑的目标ID（使用characterId）
@@ -46,6 +59,8 @@ class BlacklistManager {
     if (!blacklist.includes(targetId)) {
       blacklist.push(targetId)
       this.saveBlacklist(userId, blacklist)
+      // 记录拉黑时间戳
+      localStorage.setItem(`${this.timestampKey}_${userId}_${targetId}`, Date.now().toString())
       console.log('✅ 已拉黑，characterId:', targetId)
     }
   }
@@ -59,6 +74,8 @@ class BlacklistManager {
     const blacklist = this.getBlacklist(userId)
     const newBlacklist = blacklist.filter(id => id !== targetId)
     this.saveBlacklist(userId, newBlacklist)
+    // 清除拉黑时间戳
+    localStorage.removeItem(`${this.timestampKey}_${userId}_${targetId}`)
     console.log('✅ 已取消拉黑')
   }
 
