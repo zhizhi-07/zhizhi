@@ -66,23 +66,6 @@ const UndercoverGame = () => {
   // 新增：投票动画
   const [showVoteAnimation, setShowVoteAnimation] = useState(false)
   const [revealedVotes, setRevealedVotes] = useState<string[]>([])
-  
-  // 逐个发言动画逻辑
-  useEffect(() => {
-    if (speakingQueue.length === 0) return
-    
-    const [current, ...rest] = speakingQueue
-    setCurrentSpeaker(current.playerId)
-    setSpeakingText(current.text)
-    
-    const timer = setTimeout(() => {
-      setCurrentSpeaker(null)
-      setSpeakingText('')
-      setSpeakingQueue(rest)
-    }, 3000) // 每条发言显示3秒
-    
-    return () => clearTimeout(timer)
-  }, [speakingQueue])
 
   // 选择/取消AI
   const toggleAI = (characterId: string) => {
@@ -257,31 +240,15 @@ ${aiInfo}
         throw parseError
       }
       
-      // 构建发言队列
-      const aiDescriptions = Object.entries(data.descriptions).map(([playerId, text]) => ({
-        playerId,
-        text: text as string
+      setGameState(prev => ({
+        ...prev,
+        status: 'voting',
+        descriptions: {
+          ...prev.descriptions,
+          ...data.descriptions
+        },
+        announcement: data.summary
       }))
-      
-      // 先添加用户的描述到队列
-      setSpeakingQueue([
-        { playerId: 'user', text: gameState.descriptions.user },
-        ...aiDescriptions
-      ])
-      
-      // 等待所有发言完成后再切换到投票阶段
-      const totalDelay = (aiDescriptions.length + 1) * 3000
-      setTimeout(() => {
-        setGameState(prev => ({
-          ...prev,
-          status: 'voting',
-          descriptions: {
-            ...prev.descriptions,
-            ...data.descriptions
-          },
-          announcement: data.summary
-        }))
-      }, totalDelay)
       
       setUserDescription('')
       
@@ -609,79 +576,55 @@ ${aiInfo}
           <div className="space-y-4">
             {/* 圆桌视图 */}
             <div className="glass-card rounded-2xl p-6">
-              <div className="text-center mb-4">
-                <div className="text-lg font-bold text-gray-900">第 {gameState.currentRound} 轮</div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {gameState.status === 'describing' ? '描述阶段' : '投票阶段'}
-                </div>
-              </div>
-              
               <div className="relative w-full aspect-square max-w-sm mx-auto">
-                {/* 圆桌中央 */}
+                {/* 中间的桌子 */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="glass-card rounded-full w-32 h-32 flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 shadow-inner flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-2xl mb-1">🎭</div>
-                      <div className="text-xs text-gray-600">
-                        剩余 {activePlayers.length} 人
-                      </div>
+                      <div className="text-2xl font-bold text-amber-800">第{gameState.currentRound}轮</div>
+                      <div className="text-xs text-amber-600">{activePlayers.length}人在场</div>
                     </div>
                   </div>
                 </div>
                 
-                {/* 玩家围成圆圈 */}
-                {activePlayers.map((player, index) => {
-                  const angle = (index * 360) / activePlayers.length - 90
-                  const radius = 42
+                {/* 玩家围成一圈 */}
+                {gameState.players.map((player, index) => {
+                  const totalPlayers = gameState.players.length
+                  const angle = (index * 360) / totalPlayers - 90 // -90度让第一个玩家在顶部
+                  const radius = 45 // 半径百分比
                   const x = 50 + radius * Math.cos((angle * Math.PI) / 180)
                   const y = 50 + radius * Math.sin((angle * Math.PI) / 180)
-                  const isSpeaking = currentSpeaker === player.id
-                  const hasVoted = revealedVotes.includes(player.id)
                   
                   return (
                     <div
                       key={player.id}
-                      className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ${
-                        isSpeaking ? 'scale-110 z-10' : ''
-                      }`}
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2"
                       style={{
                         left: `${x}%`,
                         top: `${y}%`
                       }}
                     >
                       <div className="relative">
-                        {/* 头像 */}
-                        <div className={`w-16 h-16 rounded-full overflow-hidden border-4 transition-all ${
-                          isSpeaking 
-                            ? 'border-blue-500 shadow-lg shadow-blue-500/50' 
-                            : player.isOut
-                            ? 'border-gray-300 opacity-50'
-                            : 'border-white'
+                        <img
+                          src={player.avatar}
+                          alt={player.name}
+                          className={`w-14 h-14 rounded-full border-4 shadow-lg transition-all ${
+                            player.isOut 
+                              ? 'border-gray-300 opacity-40 grayscale' 
+                              : player.id === 'user'
+                              ? 'border-blue-500'
+                              : 'border-white'
+                          }`}
+                        />
+                        {player.isOut && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-2xl">❌</div>
+                          </div>
+                        )}
+                        <div className={`absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-xs font-medium ${
+                          player.isOut ? 'text-gray-400' : 'text-gray-900'
                         }`}>
-                          <img src={player.avatar} alt={player.name} className="w-full h-full object-cover" />
-                        </div>
-                        
-                        {/* 发言中动画 */}
-                        {isSpeaking && (
-                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center animate-pulse">
-                            <span className="text-white text-xs">💬</span>
-                          </div>
-                        )}
-                        
-                        {/* 已投票标记 */}
-                        {hasVoted && gameState.status === 'voting' && (
-                          <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-xs">✓</span>
-                          </div>
-                        )}
-                        
-                        {/* 名字 */}
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap">
-                          <div className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            isSpeaking ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'
-                          }`}>
-                            {player.name}
-                          </div>
+                          {player.name}
                         </div>
                       </div>
                     </div>
@@ -702,31 +645,6 @@ ${aiInfo}
               {gameState.announcement && (
                 <div className="bg-gray-50 rounded-xl p-3">
                   <div className="text-sm text-gray-700">{gameState.announcement}</div>
-                </div>
-              )}
-              
-              {/* 当前发言气泡 */}
-              {currentSpeaker && speakingText && (
-                <div className="mt-3 animate-slide-up">
-                  <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-4 text-white shadow-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white">
-                        <img 
-                          src={gameState.players.find(p => p.id === currentSpeaker)?.avatar} 
-                          alt="" 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="font-medium">
-                        {gameState.players.find(p => p.id === currentSpeaker)?.name}
-                      </div>
-                      <div className="flex-1"></div>
-                      <div className="animate-pulse">💬</div>
-                    </div>
-                    <div className="text-sm leading-relaxed">
-                      {speakingText}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>

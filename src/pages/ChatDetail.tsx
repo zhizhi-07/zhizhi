@@ -5945,7 +5945,7 @@ ${emojiInstructions}
                              
                              {/* 消息内容 */}
                              <div style={{ position: 'relative', zIndex: 2 }}>
-                               {message.content.includes('<') && message.content.includes('>') ? (
+                               {/<[a-z][\s\S]*>/i.test(message.content) ? (
                                  <HtmlRenderer content={message.content} />
                                ) : (
                                  <span>{message.content}</span>

@@ -15,8 +15,8 @@ const BubbleStore = () => {
   const bubblePresets = [
     {
       id: 'glass',
-      name: '✨ 高级玻璃',
-      description: '毛玻璃+光泽+渐变边框',
+      name: '高级玻璃',
+      description: '毛玻璃效果',
       userCSS: `.message-container.sent .message-bubble {
   background: linear-gradient(135deg, rgba(149, 236, 105, 0.95) 0%, rgba(120, 220, 80, 0.95) 100%) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
@@ -80,8 +80,8 @@ const BubbleStore = () => {
     },
     {
       id: 'clay',
-      name: '🎨 3D粘土',
-      description: '超强立体感+多层阴影',
+      name: '3D粘土',
+      description: '立体效果',
       userCSS: `.message-container.sent .message-bubble {
   background: linear-gradient(145deg, #E8F5E9 0%, #C8E6C9 50%, #F1F8E9 100%) !important;
   border-radius: 22px !important;
@@ -149,8 +149,8 @@ const BubbleStore = () => {
     },
     {
       id: 'feather',
-      name: '🌸 梦幻光晕',
-      description: '多层发光+渐变扩散',
+      name: '梦幻光晕',
+      description: '发光效果',
       userCSS: `.message-container.sent .message-bubble {
   background: 
     radial-gradient(circle at 30% 30%, rgba(255, 240, 248, 1) 0%, transparent 70%),
@@ -216,8 +216,8 @@ const BubbleStore = () => {
     },
     {
       id: 'soft',
-      name: '☁️ 云雾扩散',
-      description: '无边界、模糊扩散（文字清晰）',
+      name: '云雾扩散',
+      description: '软边界效果',
       userCSS: `.message-container.sent .message-bubble {
   position: relative !important;
   border: 0 !important;
@@ -263,8 +263,8 @@ const BubbleStore = () => {
     },
     {
       id: 'water',
-      name: '💧 水滴气泡',
-      description: '晶莹剔透、流动感',
+      name: '水滴气泡',
+      description: '透明效果',
       userCSS: `.message-container.sent .message-bubble {
   background: 
     linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.03) 30%, rgba(149, 236, 105, 0.15) 100%),
@@ -358,8 +358,8 @@ const BubbleStore = () => {
     },
     {
       id: 'glass-dome',
-      name: '🔮 玻璃罩',
-      description: '圆形玻璃罩、高透明',
+      name: '玻璃罩',
+      description: '圆形效果',
       userCSS: `.message-container.sent .message-bubble {
   background: transparent !important;
   border: 2px solid rgba(255, 255, 255, 0.3) !important;
@@ -619,7 +619,7 @@ const BubbleStore = () => {
                     onClick={() => handleEditPreset(preset)}
                     className="px-3 py-2 rounded-xl font-medium text-sm bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all"
                   >
-                    ✏️ 编辑
+                    编辑
                   </button>
                   <button
                     onClick={() => handleApplyBubble(preset)}
@@ -629,7 +629,7 @@ const BubbleStore = () => {
                         : 'bg-blue-500 text-white hover:bg-blue-600'
                     }`}
                   >
-                    {selectedPreset === preset.id ? '✓ 已应用' : '应用'}
+                    {selectedPreset === preset.id ? '已应用' : '应用'}
                   </button>
                 </div>
               </div>
@@ -725,12 +725,6 @@ const BubbleStore = () => {
           ))}
         </div>
 
-        {/* 底部提示 */}
-        <div className="mt-6 glass-card rounded-2xl p-4 text-center">
-          <p className="text-sm text-gray-500">
-            💡 提示：应用后可以在 <span className="font-medium">设置 → 聊天气泡</span> 中进一步自定义
-          </p>
-        </div>
       </div>
     </div>
   )

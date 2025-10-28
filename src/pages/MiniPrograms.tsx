@@ -5,7 +5,6 @@ import sparkIcon from '../assets/spark-icon.webp'
 import memesIcon from '../assets/memes-icon.webp'
 import musicIcon from '../assets/music-icon.webp'
 import bubbleIcon from '../assets/bubble-icon.webp'
-import fontIcon from '../assets/font-icon.webp'
 
 const MiniPrograms = () => {
   const navigate = useNavigate()
@@ -43,14 +42,6 @@ const MiniPrograms = () => {
       icon: bubbleIcon,
       path: '/bubble-store',
       color: 'bg-gradient-to-br from-purple-500 to-pink-500'
-    },
-    {
-      id: 5,
-      name: '字体设置',
-      description: '自定义聊天字体样式',
-      icon: fontIcon,
-      path: '/font-customizer',
-      color: 'bg-gradient-to-br from-blue-500 to-cyan-500'
     }
   ]
 

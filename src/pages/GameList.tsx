@@ -44,7 +44,7 @@ const GameList = () => {
       name: '谁是卧底',
       description: '和AI一起玩语言推理游戏',
       icon: undercoverIcon,
-      path: '/undercover',
+      path: '/game/undercover/solo',
       color: 'bg-purple-500',
       available: true
     },

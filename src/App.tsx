@@ -140,6 +140,9 @@ const AIFootprint = lazy(() => import('./pages/AIFootprint'))
 const MemesLibrary = lazy(() => import('./pages/MemesLibrary'))
 const BubbleStore = lazy(() => import('./pages/BubbleStore'))
 const FontCustomizer = lazy(() => import('./pages/FontCustomizer'))
+const IconCustomizer = lazy(() => import('./pages/IconCustomizer'))
+const BackgroundCustomizer = lazy(() => import('./pages/BackgroundCustomizer'))
+const WeatherDetail = lazy(() => import('./pages/WeatherDetail'))
 
 // 音乐播放器
 const MusicPlayer = lazy(() => import('./pages/MusicPlayer'))
@@ -162,6 +165,8 @@ const EditWorldBook = lazy(() => import('./pages/EditWorldBook'))
 const PresetManager = lazy(() => import('./pages/PresetManager'))
 const OfflineChat = lazy(() => import('./pages/OfflineChat'))
 const Customize = lazy(() => import('./pages/Customize'))
+const StatusBarCustomize = lazy(() => import('./pages/StatusBarCustomize'))
+const LifeSettings = lazy(() => import('./pages/LifeSettings'))
 const StorageMigration = lazy(() => import('./pages/StorageMigration'))
 const MiniPrograms = lazy(() => import('./pages/MiniPrograms'))
 const SettingsNew = lazy(() => import('./pages/SettingsNew'))
@@ -346,11 +351,15 @@ function App() {
                                   <Route path="/calendar" element={<PageWrapper><CalendarView /></PageWrapper>} />
                                   <Route path="/ai-footprint" element={<PageWrapper><AIFootprint /></PageWrapper>} />
                                   <Route path="/ai-footprint/:characterId" element={<PageWrapper><AIFootprint /></PageWrapper>} />
+                                  <Route path="/life-settings/:characterId" element={<PageWrapper><LifeSettings /></PageWrapper>} />
                                   <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
                                   <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
                                   <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />
                                   <Route path="/bubble-store" element={<PageWrapper><BubbleStore /></PageWrapper>} />
                                   <Route path="/font-customizer" element={<PageWrapper><FontCustomizer /></PageWrapper>} />
+                                  <Route path="/icon-customizer" element={<PageWrapper><IconCustomizer /></PageWrapper>} />
+                                  <Route path="/background-customizer" element={<PageWrapper><BackgroundCustomizer /></PageWrapper>} />
+                                  <Route path="/weather-detail" element={<PageWrapper><WeatherDetail /></PageWrapper>} />
                                   <Route path="/music-player" element={<PageWrapper><MusicPlayer /></PageWrapper>} />
                                   <Route path="/upload-song" element={<PageWrapper><UploadSong /></PageWrapper>} />
                                   <Route path="/music-search" element={<PageWrapper><MusicSearch /></PageWrapper>} />
@@ -365,6 +374,7 @@ function App() {
                                   <Route path="/preset" element={<PageWrapper><PresetManager /></PageWrapper>} />
                                   <Route path="/offline-chat" element={<PageWrapper><OfflineChat /></PageWrapper>} />
                                   <Route path="/customize" element={<PageWrapper><Customize /></PageWrapper>} />
+                                  <Route path="/statusbar-customize" element={<PageWrapper><StatusBarCustomize /></PageWrapper>} />
                                   <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />

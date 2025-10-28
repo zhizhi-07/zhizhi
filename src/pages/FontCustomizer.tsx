@@ -86,7 +86,7 @@ const FontCustomizer = () => {
     }
   }
 
-  // 添加自定义字体
+  // 添加自定义字体（支持直接链接，也支持下载转Blob）
   const handleAddFont = async () => {
     if (!fontName.trim() || !fontUrl.trim() || !fontFamily.trim()) {
       alert('请填写完整的字体信息')
@@ -94,18 +94,54 @@ const FontCustomizer = () => {
     }
 
     setIsLoading(true)
+    const originalUrl = fontUrl.trim()
 
     try {
+      console.log('📥 尝试加载字体:', originalUrl)
+      
+      // 方案1: 先尝试直接加载（兼容之前的方式）
+      let fontUrlToUse = originalUrl
+      let needsCleanup = false
+      
       const newFont: CustomFont = {
         id: `custom_${Date.now()}`,
         name: fontName.trim(),
-        url: fontUrl.trim(),
+        url: fontUrlToUse,
         fontFamily: fontFamily.trim(),
         createdAt: Date.now()
       }
 
-      // 尝试加载字体
-      const success = await loadFont(newFont)
+      // 第一次尝试：直接加载
+      console.log('🔄 方案1: 直接加载字体文件')
+      let success = await loadFont(newFont)
+      
+      // 如果直接加载失败，尝试下载为Blob
+      if (!success) {
+        console.log('⚠️ 直接加载失败，尝试下载字体文件...')
+        try {
+          const response = await fetch(originalUrl, {
+            mode: 'cors',
+            credentials: 'omit'
+          })
+          
+          if (response.ok) {
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            console.log('✅ 字体文件下载成功，转换为Blob URL')
+            
+            // 更新字体URL为Blob URL
+            newFont.url = blobUrl
+            fontUrlToUse = blobUrl
+            needsCleanup = true
+            
+            // 第二次尝试：使用Blob URL加载
+            console.log('🔄 方案2: 使用Blob URL加载')
+            success = await loadFont(newFont)
+          }
+        } catch (fetchError) {
+          console.error('下载字体失败:', fetchError)
+        }
+      }
       
       if (success) {
         const updatedFonts = [...customFonts, newFont]
@@ -119,11 +155,25 @@ const FontCustomizer = () => {
         
         alert('字体添加成功！')
       } else {
-        alert('字体加载失败，请检查：\n\n1. 字体链接是否正确\n2. 链接是否支持跨域（CORS）\n3. 网络连接是否正常')
+        // 如果创建了Blob URL但加载失败，需要清理
+        if (needsCleanup) {
+          URL.revokeObjectURL(fontUrlToUse)
+        }
+        alert('字体加载失败，请检查：\n\n1. 字体链接是否正确\n2. 网络连接是否正常\n3. 字体格式是否支持\n4. 服务器是否可访问')
       }
     } catch (error) {
       console.error('添加字体失败:', error)
-      alert('添加字体失败：' + (error instanceof Error ? error.message : '未知错误'))
+      let errorMsg = '添加字体失败：\n\n'
+      
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        errorMsg += '⚠️ 网络连接失败\n\n可能原因：\n• 服务器暂时不可用\n• 网络连接问题\n• 防火墙/代理阻止\n• URL地址错误'
+      } else if (error instanceof Error) {
+        errorMsg += error.message
+      } else {
+        errorMsg += '未知错误'
+      }
+      
+      alert(errorMsg)
     } finally {
       setIsLoading(false)
     }
@@ -184,24 +234,29 @@ const FontCustomizer = () => {
   }, [])
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      {showStatusBar && <StatusBar />}
-      
-      {/* 顶部导航栏 */}
-      <div className="glass-effect px-4 py-3 border-b border-gray-200/50 flex items-center">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-8 h-8 flex items-center justify-center ios-button"
-        >
-          <span className="text-blue-500 text-xl">‹</span>
-        </button>
-        <h1 className="flex-1 text-center text-lg font-semibold text-gray-900">字体设置</h1>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="w-8 h-8 flex items-center justify-center ios-button"
-        >
-          <span className="text-blue-500 text-2xl">{showAddForm ? '×' : '+'}</span>
-        </button>
+    <div className="h-full flex flex-col bg-[#f5f7fa]">
+      {/* 顶部：StatusBar + 导航栏一体化 */}
+      <div className="glass-effect sticky top-0 z-50">
+        {showStatusBar && <StatusBar />}
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
+          >
+            <span className="text-blue-500 text-2xl">‹</span>
+          </button>
+          
+          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+            字体设置
+          </h1>
+          
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="text-blue-500 ios-button"
+          >
+            <span className="text-2xl">{showAddForm ? '×' : '+'}</span>
+          </button>
+        </div>
       </div>
 
       {/* 字体列表 */}
@@ -280,13 +335,21 @@ const FontCustomizer = () => {
             </div>
             
             <div className="mt-4 p-3 bg-blue-50 rounded-xl">
-              <p className="text-xs text-blue-600 mb-2">💡 使用提示：</p>
+              <p className="text-xs text-blue-600 mb-2 font-semibold">💡 使用提示：</p>
               <ul className="text-xs text-blue-600 space-y-1">
                 <li>• 支持 .woff2, .woff, .ttf, .otf 格式</li>
                 <li>• 推荐使用 .woff2 格式，体积小加载快</li>
-                <li>• 字体链接必须支持跨域访问（CORS）</li>
-                <li>• 可以使用 Google Fonts、字体天下等网站</li>
+                <li>• <span className="font-semibold text-red-600">字体链接必须支持CORS跨域</span></li>
               </ul>
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <p className="text-xs text-blue-600 mb-2 font-semibold">✅ 推荐字体源（支持CORS）：</p>
+                <ul className="text-xs text-blue-600 space-y-1">
+                  <li>• Google Fonts CDN: fonts.gstatic.com</li>
+                  <li>• jsDelivr CDN: cdn.jsdelivr.net</li>
+                  <li>• unpkg CDN: unpkg.com</li>
+                </ul>
+                <p className="text-xs text-blue-500 mt-2">示例：https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.woff2</p>
+              </div>
             </div>
           </div>
         )}

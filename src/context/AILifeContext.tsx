@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 // AI状态类型
 export interface AIStatus {
@@ -67,19 +67,34 @@ const defaultSchedule: Schedule[] = [
   { time: '23:30', activity: '睡觉', location: '家' },
 ]
 
+// 获取角色的日程表
+const getCharacterSchedule = (characterId: string): Schedule[] => {
+  const saved = localStorage.getItem(`life_config_${characterId}`)
+  if (saved) {
+    try {
+      const config = JSON.parse(saved)
+      return config.schedule || defaultSchedule
+    } catch (e) {
+      return defaultSchedule
+    }
+  }
+  return defaultSchedule
+}
+
 // 根据时间获取当前应该的状态
-const getCurrentScheduledActivity = (): Schedule => {
+const getCurrentScheduledActivity = (characterId: string): Schedule => {
+  const schedule = getCharacterSchedule(characterId)
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   
   // 找到最近的活动
-  let currentActivity = defaultSchedule[0]
-  for (let i = 0; i < defaultSchedule.length; i++) {
-    const [hours, minutes] = defaultSchedule[i].time.split(':').map(Number)
+  let currentActivity = schedule[0]
+  for (let i = 0; i < schedule.length; i++) {
+    const [hours, minutes] = schedule[i].time.split(':').map(Number)
     const activityMinutes = hours * 60 + minutes
     
     if (currentMinutes >= activityMinutes) {
-      currentActivity = defaultSchedule[i]
+      currentActivity = schedule[i]
     } else {
       break
     }
@@ -89,22 +104,23 @@ const getCurrentScheduledActivity = (): Schedule => {
 }
 
 // 生成今日轨迹
-const generateTodayTrack = (): TrackPoint[] => {
+const generateTodayTrack = (characterId: string): TrackPoint[] => {
+  const schedule = getCharacterSchedule(characterId)
   const now = new Date()
   const currentMinutes = now.getHours() * 60 + now.getMinutes()
   const track: TrackPoint[] = []
   
-  for (let i = 0; i < defaultSchedule.length; i++) {
-    const schedule = defaultSchedule[i]
-    const [hours, minutes] = schedule.time.split(':').map(Number)
+  for (let i = 0; i < schedule.length; i++) {
+    const item = schedule[i]
+    const [hours, minutes] = item.time.split(':').map(Number)
     const activityMinutes = hours * 60 + minutes
     
     // 只添加已经发生的活动
     if (activityMinutes <= currentMinutes) {
       // 计算停留时长
       let duration = 0
-      if (i < defaultSchedule.length - 1) {
-        const [nextHours, nextMinutes] = defaultSchedule[i + 1].time.split(':').map(Number)
+      if (i < schedule.length - 1) {
+        const [nextHours, nextMinutes] = schedule[i + 1].time.split(':').map(Number)
         const nextActivityMinutes = nextHours * 60 + nextMinutes
         duration = Math.min(nextActivityMinutes - activityMinutes, currentMinutes - activityMinutes)
       } else {
@@ -113,10 +129,10 @@ const generateTodayTrack = (): TrackPoint[] => {
       
       track.push({
         id: String(i),
-        time: schedule.time,
-        location: schedule.location,
+        time: item.time,
+        location: item.location,
         duration,
-        activity: schedule.activity
+        activity: item.activity
       })
     }
   }
@@ -182,7 +198,7 @@ export const AILifeProvider = ({ children }: { children: ReactNode }) => {
 
   // 初始化或更新AI状态
   const updateAIStatusForCharacter = (characterId: string) => {
-    const currentActivity = getCurrentScheduledActivity()
+    const currentActivity = getCurrentScheduledActivity(characterId)
     const battery = calculateBattery()
     const steps = calculateSteps()
     const isSleeping = isCurrentlySleeping()
@@ -251,7 +267,7 @@ export const AILifeProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const getTodayTrack = (characterId: string): TrackPoint[] => {
-    return generateTodayTrack()
+    return generateTodayTrack(characterId)
   }
 
   const updateAIStatus = (characterId: string, status: Partial<AIStatus>) => {

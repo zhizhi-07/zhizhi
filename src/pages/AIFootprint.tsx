@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useCharacter } from '../context/CharacterContext'
 import { useAILife } from '../context/AILifeContext'
@@ -16,6 +16,24 @@ const AIFootprint = () => {
   const character = characters.find(c => c.id === characterId) || characters[0]
   const aiStatus = getAIStatus(character?.id || '')
   const todayTrack = getTodayTrack(character?.id || '')
+  
+  // 加载生活配置
+  const [lifeConfig, setLifeConfig] = useState<any>(null)
+  
+  useEffect(() => {
+    const loadConfig = () => {
+      const saved = localStorage.getItem(`life_config_${character?.id}`)
+      if (saved) {
+        setLifeConfig(JSON.parse(saved))
+      }
+    }
+    loadConfig()
+    
+    // 监听配置更新
+    const handleConfigUpdate = () => loadConfig()
+    window.addEventListener('lifeConfigUpdate', handleConfigUpdate)
+    return () => window.removeEventListener('lifeConfigUpdate', handleConfigUpdate)
+  }, [character?.id])
 
   // 格式化时长
   const formatDuration = (minutes: number) => {
@@ -47,7 +65,16 @@ const AIFootprint = () => {
             <div className="flex-1 text-center">
               <h1 className="text-lg font-semibold text-gray-900">{character?.name}的足迹</h1>
             </div>
-            <div className="w-10" />
+            <button 
+              onClick={() => navigate(`/life-settings/${character?.id}`)}
+              className="w-10 h-10 rounded-full glass-card flex items-center justify-center ios-button"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 15l9-9-9-9m0 18l-9-9 9-9" />
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v6m0 6v6m6-6h6m-6 0H6" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -186,15 +213,21 @@ const AIFootprint = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">通常起床时间</div>
-                  <div className="text-base font-semibold text-gray-900">07:30 - 08:00</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lifeConfig?.routineTime?.wakeUp || '07:30'}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-gray-600">通常睡觉时间</div>
-                  <div className="text-base font-semibold text-gray-900">23:00 - 00:00</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lifeConfig?.routineTime?.sleep || '23:00'}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">午休时间</div>
-                  <div className="text-base font-semibold text-gray-900">12:30 - 13:30</div>
+                  <div className="text-sm text-gray-600">午餐时间</div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {lifeConfig?.routineTime?.lunch || '12:00'}
+                  </div>
                 </div>
               </div>
             </div>
@@ -206,12 +239,12 @@ const AIFootprint = () => {
               <h2 className="text-lg font-bold text-gray-900 mb-4">常去地点</h2>
               
               <div className="space-y-3">
-                {[
+                {(lifeConfig?.frequentPlaces || [
                   { name: '家', address: '杨浦区某某路123号', frequency: '每天' },
                   { name: '公司', address: '浦东新区陆家嘴金融中心', frequency: '工作日' },
                   { name: '星巴克', address: '五角场万达广场', frequency: '周2-3次' },
                   { name: '健身房', address: '附近健身中心', frequency: '周2次' },
-                ].map((place, index) => (
+                ]).map((place: any, index: number) => (
                   <div key={index} className="flex items-start gap-3 p-3 rounded-xl bg-white/50">
                     <LocationIcon size={20} className="text-blue-500 mt-1" />
                     <div className="flex-1">

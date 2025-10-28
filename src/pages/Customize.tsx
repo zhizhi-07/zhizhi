@@ -3,7 +3,6 @@
  * 包含字体设置、自定义图标等功能
  */
 
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { BackIcon } from '../components/Icons'
@@ -13,33 +12,35 @@ const Customize = () => {
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
 
-  // 当前选中的设置项
-  const [activeSection, setActiveSection] = useState<string | null>(null)
-
   // 设置项列表
   const settingItems = [
     {
+      id: 'statusbar',
+      name: '状态栏美化',
+      description: '自定义状态栏样式',
+      route: '/statusbar-customize'
+    },
+    {
       id: 'font',
       name: '字体设置',
-      icon: '🔤',
-      description: '自定义字体样式'
+      description: '自定义字体样式',
+      route: '/font-customizer'
     },
     {
       id: 'icon',
       name: '自定义图标',
-      icon: '🎨',
-      description: '更换应用图标'
+      description: '更换应用图标',
+      route: '/icon-customizer'
     },
     {
-      id: 'theme',
-      name: '主题颜色',
-      icon: '🌈',
-      description: '调整界面颜色'
+      id: 'background',
+      name: '背景',
+      description: '桌面背景和音乐背景',
+      route: '/background-customizer'
     },
     {
       id: 'bubble',
       name: '气泡样式',
-      icon: '💬',
       description: '自定义聊天气泡'
     }
   ]
@@ -67,16 +68,20 @@ const Customize = () => {
       {/* 设置列表 */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-3">
-          {settingItems.map((item) => (
+          {settingItems.map((item, index) => (
             <div
               key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className="glass-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-all"
+              onClick={() => {
+                if (item.route) {
+                  navigate(item.route)
+                }
+              }}
+              className="glass-card rounded-2xl p-4 cursor-pointer hover:shadow-lg transition-all backdrop-blur-md bg-white/80 border border-white/50"
             >
               <div className="flex items-center gap-4">
-                {/* 图标 */}
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-2xl">
-                  {item.icon}
+                {/* 序号 */}
+                <div className="w-10 h-10 rounded-full glass-card flex items-center justify-center">
+                  <span className="text-sm font-semibold text-gray-600">{index + 1}</span>
                 </div>
                 
                 {/* 信息 */}
@@ -100,9 +105,9 @@ const Customize = () => {
         </div>
 
         {/* 预留：后续添加的功能区域 */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-2xl">
-          <p className="text-sm text-blue-600 text-center">
-            💡 更多美化功能正在开发中...
+        <div className="mt-6 p-4 glass-card rounded-2xl backdrop-blur-md bg-white/60 border border-white/50">
+          <p className="text-sm text-gray-600 text-center">
+            更多美化功能正在开发中...
           </p>
         </div>
       </div>
