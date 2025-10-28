@@ -1143,7 +1143,7 @@ ${character.description || ''}
       const now = Date.now()
       
       // 检查是否被AI拉黑
-      const blacklistStatus = id ? blacklistManager.getBlockStatus(id, 'user') : { blockedByMe: false, blockedByTarget: false }
+      const blacklistStatus = id ? blacklistManager.getBlockStatus('user', id) : { blockedByMe: false, blockedByTarget: false }
       const isBlockedByAI = blacklistStatus.blockedByTarget
       
       const userMessage: Message = {
