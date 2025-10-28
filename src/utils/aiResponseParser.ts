@@ -11,6 +11,7 @@ export interface ParsedAIResponse {
     photo?: { description: string }
     voice?: { text: string }
     location?: { name: string; address: string }
+    musicShare?: { songTitle: string; songArtist: string }
     musicInvite?: { songTitle: string; songArtist: string }
     recall?: boolean
     quote?: { messageId: string }
@@ -140,7 +141,17 @@ export function parseAIResponse(aiResponse: string): ParsedAIResponse {
     }
   }
 
-  // 11. 一起听邀请识别（标准格式）
+  // 11. 音乐分享识别（标准格式）
+  const standardMusicShare = aiResponse.match(/\[分享音乐:(.+?):(.+?)\]/)
+  if (standardMusicShare) {
+    actions.musicShare = {
+      songTitle: standardMusicShare[1],
+      songArtist: standardMusicShare[2]
+    }
+    cleanText = cleanText.replace(/\[分享音乐:.+?:.+?\]/g, '')
+  }
+
+  // 12. 一起听邀请识别（标准格式）
   const standardMusicInvite = aiResponse.match(/\[一起听:(.+?):(.+?)\]/)
   if (standardMusicInvite) {
     actions.musicInvite = {
@@ -149,7 +160,7 @@ export function parseAIResponse(aiResponse: string): ParsedAIResponse {
     }
     cleanText = cleanText.replace(/\[一起听:.+?:.+?\]/g, '')
   }
-  // 12. 一起听邀请识别（自然语言）
+  // 13. 一起听邀请识别（自然语言）
   else {
     const naturalMusicInvite = aiResponse.match(/(?:一起听|听歌|听听|听首)(?:歌)?[，,]?\s*[《「]?(.+?)[》」]/i)
     if (naturalMusicInvite) {

@@ -8,6 +8,8 @@ import { useUser } from '../context/UserContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
 import MusicInviteCard from '../components/MusicInviteCard'
+import MusicShareCard from '../components/MusicShareCard'
+import MusicDetailModal from '../components/MusicDetailModal'
 // import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
 import { getCoupleSpaceContentSummary } from '../utils/coupleSpaceContentUtils'
@@ -59,7 +61,7 @@ interface Message {
     senderName: string
     type: 'received' | 'sent'
   }
-  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite' | 'xiaohongshu' | 'image' | 'musicInvite'
+  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite' | 'xiaohongshu' | 'image' | 'musicInvite' | 'musicShare'
   transfer?: {
     amount: number
     message: string
@@ -99,6 +101,11 @@ interface Message {
   }
   xiaohongshuNote?: XiaohongshuNote  // 小红书笔记数据
   blocked?: boolean  // 是否被拉黑（AI消息显示警告图标）
+  musicShare?: {
+    songTitle: string
+    songArtist: string
+    songCover?: string
+  }
 }
 
 const ChatDetail = () => {
@@ -3539,6 +3546,19 @@ ${emojiInstructions}
         console.log('🎨 AI要生成图片:', aiGenerateImageData)
       }
       
+      // 检查AI是否要分享音乐
+      let musicShareMatch = aiResponse.match(/\[分享音乐:(.+?):(.+?)\]/)
+      let aiMusicShareData: { songTitle: string; songArtist: string } | null = null
+      
+      if (musicShareMatch) {
+        aiMusicShareData = {
+          songTitle: musicShareMatch[1],
+          songArtist: musicShareMatch[2]
+        }
+        cleanedResponse = cleanedResponse.replace(/\[分享音乐:.+?:.+?\]/g, '').trim()
+        console.log('🎵 AI分享音乐:', aiMusicShareData)
+      }
+      
       // 检查AI是否要发送一起听邀请
       // 支持两种格式：
       // 1. [一起听:歌名:歌手]
@@ -4372,6 +4392,33 @@ ${emojiInstructions}
         } catch (error) {
           console.error('❌ AI生图异常:', error)
         }
+      }
+      
+      // 如果AI分享了音乐
+      if (aiMusicShareData) {
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500))
+        
+        const musicShareMessage: Message = {
+          id: Date.now(),
+          type: 'received',
+          content: '',
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'musicShare',
+          musicShare: {
+            songTitle: aiMusicShareData.songTitle,
+            songArtist: aiMusicShareData.songArtist
+          },
+          blocked: isAiBlocked
+        }
+        
+        newMessages = [...newMessages, musicShareMessage]
+        safeSetMessages(newMessages)
+        aiRepliedCountRef.current++ // 增加AI回复计数
+        console.log('🎵 AI分享了音乐:', aiMusicShareData.songTitle, '-', aiMusicShareData.songArtist)
       }
       
       // 如果AI发送了一起听邀请
@@ -5537,6 +5584,20 @@ ${emojiInstructions}
                         }}
                       />
                     </div>
+                  ) : message.messageType === 'musicShare' && message.musicShare ? (
+                    /* 音乐分享卡片 */
+                    <div style={{ maxWidth: '280px', display: 'inline-block' }}>
+                      <MusicShareCard
+                        songTitle={message.musicShare.songTitle}
+                        songArtist={message.musicShare.songArtist}
+                        songCover={message.musicShare.songCover}
+                        onClick={() => {
+                          // 点击卡片可以跳转到音乐播放器（可选）
+                          console.log('点击了音乐分享:', message.musicShare)
+                          // navigate('/music-player')
+                        }}
+                      />
+                    </div>
                   ) : message.messageType === 'musicInvite' && message.musicInvite ? (
                     /* 一起听邀请卡片 */
                     <div style={{ maxWidth: '280px', display: 'inline-block' }}>
@@ -5851,6 +5912,7 @@ ${emojiInstructions}
                   // AI消息：检查用户是否拉黑了AI
                   if (message.type === 'received' && blockStatus.blockedByMe) {
                     const blockTime = blacklistManager.getBlockTimestamp('user', id)
+                    console.log('🔍 AI消息检查:', { msgTime: message.timestamp, blockTime, show: blockTime && message.timestamp > blockTime })
                     // 只有消息时间晚于拉黑时间才显示
                     if (blockTime && message.timestamp > blockTime) {
                       return (
@@ -5864,6 +5926,7 @@ ${emojiInstructions}
                   // 用户消息：检查AI是否拉黑了用户
                   if (message.type === 'sent' && blockStatus.blockedByTarget) {
                     const blockTime = blacklistManager.getBlockTimestamp(id, 'user')
+                    console.log('🔍 用户消息检查:', { msgTime: message.timestamp, blockTime, show: blockTime && message.timestamp > blockTime })
                     // 只有消息时间晚于拉黑时间才显示
                     if (blockTime && message.timestamp > blockTime) {
                       return (
