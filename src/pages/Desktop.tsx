@@ -95,7 +95,7 @@ const Desktop = () => {
   // Dock 应用
   const dockApps: AppItem[] = [
     { id: 'offline', name: '线下', icon: ChatIcon, color: 'glass-card', route: '/offline-chat' },
-    { id: 'wechat', name: '微信', icon: ChatIcon, color: 'glass-card', route: '/wechat' },
+    { id: 'customize', name: '美化', icon: SettingsIcon, color: 'glass-card', route: '/customize' },
     { id: 'music', name: '音乐', icon: MusicIcon, color: 'glass-card', route: '/music-player' },
     { id: 'browser', name: '浏览器', icon: BrowserIcon, color: 'glass-card', route: '/browser' },
   ]

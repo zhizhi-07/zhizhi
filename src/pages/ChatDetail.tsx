@@ -28,6 +28,7 @@ import IntimatePaySender from '../components/IntimatePaySender'
 import EmojiPanel from '../components/EmojiPanel'
 import FlipPhotoCard from '../components/FlipPhotoCard'
 import { Emoji } from '../utils/emojiStorage'
+import HtmlRenderer from '../components/offline/HtmlRenderer'
 import { useAiMoments } from '../hooks/useAiMoments'
 import { useMoments } from '../context/MomentsContext'
 import { getMomentsContext } from '../utils/momentsContext'
@@ -5424,12 +5425,29 @@ ${emojiInstructions}
                  
                  {/* 消息气泡 */}
                 <div className="flex items-center gap-1">
-                <div 
-                  onTouchStart={(e) => handleLongPressStart(message, e)}
-                   onTouchEnd={handleLongPressEnd}
-                   onMouseDown={(e) => handleLongPressStart(message, e)}
-                   onMouseUp={handleLongPressEnd}
-                   onMouseLeave={handleLongPressEnd}
+                {/* 用户消息的感叹号：在气泡左边 */}
+               {message.type === 'sent' && (() => {
+                 if (!id || !message.timestamp) return null
+                 const blockStatus = blacklistManager.getBlockStatus('user', id)
+                 if (blockStatus.blockedByTarget) {
+                   const blockTime = blacklistManager.getBlockTimestamp(id, 'user')
+                   if (blockTime && message.timestamp > blockTime) {
+                     return (
+                       <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                       </svg>
+                     )
+                   }
+                 }
+                 return null
+               })()}
+               
+               <div 
+                 onTouchStart={(e) => handleLongPressStart(message, e)}
+                  onTouchEnd={handleLongPressEnd}
+                  onMouseDown={(e) => handleLongPressStart(message, e)}
+                  onMouseUp={handleLongPressEnd}
+                  onMouseLeave={handleLongPressEnd}
                 >
                    {message.messageType === 'redenvelope' && message.redEnvelopeId ? (
                      (() => {
@@ -5926,7 +5944,13 @@ ${emojiInstructions}
                              )}
                              
                              {/* 消息内容 */}
-                             <span style={{ position: 'relative', zIndex: 2 }}>{message.content}</span>
+                             <div style={{ position: 'relative', zIndex: 2 }}>
+                               {message.content.includes('<') && message.content.includes('>') ? (
+                                 <HtmlRenderer content={message.content} />
+                               ) : (
+                                 <span>{message.content}</span>
+                               )}
+                             </div>
                            </div>
                          </div>
                        )}
@@ -5934,38 +5958,38 @@ ${emojiInstructions}
                    )}
                  </div>
                  
-                 {/* 拉黑警告图标 - 只显示拉黑之后发送的消息 */}
-                {(() => {
-                  if (!id || !message.timestamp) return null
-                  const blockStatus = blacklistManager.getBlockStatus('user', id)
-                  
-                  // AI消息：检查用户是否拉黑了AI
-                  if (message.type === 'received' && blockStatus.blockedByMe) {
-                    const blockTime = blacklistManager.getBlockTimestamp('user', id)
-                    // 只有消息时间晚于拉黑时间才显示
-                    if (blockTime && message.timestamp > blockTime) {
-                      return (
-                        <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                        </svg>
-                      )
-                    }
-                  }
-                  
-                  // 用户消息：检查AI是否拉黑了用户
-                  if (message.type === 'sent' && blockStatus.blockedByTarget) {
-                    const blockTime = blacklistManager.getBlockTimestamp(id, 'user')
-                    // 只有消息时间晚于拉黑时间才显示
-                    if (blockTime && message.timestamp > blockTime) {
-                      return (
-                        <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                        </svg>
-                      )
-                    }
-                  }
-                  return null
-                })()}
+                 {/* AI消息的感叹号：在气泡右边 */}
+                 {message.type === 'received' && (() => {
+                   if (!id) return null
+                   const blockStatus = blacklistManager.getBlockStatus('user', id)
+                   
+                   // 只显示拉黑后发送的消息
+                   if (blockStatus.blockedByMe) {
+                     const blockTime = blacklistManager.getBlockTimestamp('user', id)
+                     
+                     // 如果有拉黑时间
+                     if (blockTime) {
+                       // 如果消息有时间戳，比较时间
+                       if (message.timestamp) {
+                         if (message.timestamp > blockTime) {
+                           return (
+                             <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                             </svg>
+                           )
+                         }
+                       } else {
+                         // 消息没有时间戳，但当前拉黑了，也显示（保险）
+                         return (
+                           <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                           </svg>
+                         )
+                       }
+                     }
+                   }
+                   return null
+                 })()}
                  </div>
                    {/* 自己消息：气泡在左，头像在右 */}
                   {message.type === 'sent' && (

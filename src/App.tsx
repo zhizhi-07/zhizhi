@@ -161,6 +161,7 @@ const WorldBook = lazy(() => import('./pages/WorldBook'))
 const EditWorldBook = lazy(() => import('./pages/EditWorldBook'))
 const PresetManager = lazy(() => import('./pages/PresetManager'))
 const OfflineChat = lazy(() => import('./pages/OfflineChat'))
+const Customize = lazy(() => import('./pages/Customize'))
 const StorageMigration = lazy(() => import('./pages/StorageMigration'))
 const MiniPrograms = lazy(() => import('./pages/MiniPrograms'))
 const SettingsNew = lazy(() => import('./pages/SettingsNew'))
@@ -363,6 +364,7 @@ function App() {
                                   <Route path="/story-mode/:characterId" element={<PageWrapper><StoryMode /></PageWrapper>} />
                                   <Route path="/preset" element={<PageWrapper><PresetManager /></PageWrapper>} />
                                   <Route path="/offline-chat" element={<PageWrapper><OfflineChat /></PageWrapper>} />
+                                  <Route path="/customize" element={<PageWrapper><Customize /></PageWrapper>} />
                                   <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
