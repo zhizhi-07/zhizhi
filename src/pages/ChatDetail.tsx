@@ -3257,12 +3257,8 @@ ${emojiInstructions}
             }
             // 🎨 普通情况：生成新头像
             else {
-              // 🔧 本地开发Mock：直接使用Pollinations.ai生图
-              const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-              let data: any
-              
-              if (isDev) {
-                console.log('🔧 本地开发模式：使用Mock生图')
+              // 🎨 直接使用Pollinations.ai生图（免费且稳定）
+              console.log('🎨 使用Pollinations.ai生图')
                 
                 // 简单中英翻译（避免中文导致生成错误）
                 const translateMap: Record<string, string> = {
@@ -3300,30 +3296,8 @@ ${emojiInstructions}
                   reader.readAsDataURL(blob)
                 })
                 
-                data = { avatar: base64, method: 'mock_pollinations' }
-                console.log('✅ Mock生图成功')
-              } else {
-              // 生产环境：调用Netlify函数
-              const response = await fetch('/.netlify/functions/change-avatar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                  description,
-                  preferReal: description.includes('真实') || description.includes('照片')
-                })
-              })
-              
-              console.log('📡 API响应状态:', response.status)
-              
-              if (!response.ok) {
-                throw new Error(`API请求失败: ${response.status} ${response.statusText}`)
-              }
-              
-              data = await response.json()
-              }
-              
-              console.log('📦 返回数据:', data)
-              newAvatar = data.avatar
+                newAvatar = base64
+                console.log('✅ 生图成功')
             }
             
             // 统一处理头像更新
@@ -3332,35 +3306,16 @@ ${emojiInstructions}
               updateCharacter(character.id, { avatar: newAvatar })
               console.log(`✅ 头像更换成功`)
               
-              // 🔍 立即识别新头像，让AI知道自己头像长什么样
-              ;(async () => {
-                try {
-                  console.log('👁️ 开始识别AI新头像...')
-                  const visionResponse = await fetch('/.netlify/functions/vision', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      image: newAvatar,
-                      prompt: '详细描述这个头像的内容，包括：角色特征、风格、颜色、表情、氛围等。请用简洁的语言描述。'
-                    })
-                  })
-                  
-                  if (visionResponse.ok) {
-                    const visionData = await visionResponse.json()
-                    const avatarDescription = visionData.description || visionData.result
-                    
-                    // 保存识图结果和头像指纹
-                    localStorage.setItem(`character_avatar_description_${character.id}`, avatarDescription)
-                    localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
-                    localStorage.setItem(`character_avatar_fingerprint_${character.id}`, newAvatar.substring(0, 200))
-                    console.log('✅ AI新头像识别完成:', avatarDescription)
-                  } else {
-                    console.warn('⚠️ AI新头像识别失败')
-                  }
-                } catch (error) {
-                  console.error('❌ AI新头像识别异常:', error)
-                }
-              })()
+              // 🔍 保存头像指纹（用于检测头像变化）
+              // 注意：GitHub Pages不支持vision识别，暂时跳过描述生成
+              console.log('💾 保存AI新头像指纹...')
+              localStorage.setItem(`character_avatar_fingerprint_${character.id}`, newAvatar.substring(0, 200))
+              localStorage.setItem(`character_avatar_recognized_at_${character.id}`, Date.now().toString())
+              // 使用生成时的提示词作为描述
+              if (usedPrompt) {
+                localStorage.setItem(`character_avatar_description_${character.id}`, usedPrompt)
+              }
+              console.log('✅ 头像指纹已保存')
               
               // 添加系统提示（使用回调确保获取最新状态）
               const systemMessage: Message = {

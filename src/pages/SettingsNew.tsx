@@ -58,35 +58,12 @@ const SettingsNew = () => {
       if (currentUser) {
         updateUser(currentUser.id, { avatar: base64 })
         
-        // 🔍 触发AI识图，让AI"看一次"用户头像
-        try {
-          console.log('👁️ 开始识别用户头像...')
-          const visionResponse = await fetch('/.netlify/functions/vision', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: base64,
-              prompt: '详细描述这个人的外貌特征，包括：性别、年龄、发型、发色、脸型、五官特点、穿着风格、整体气质等。请用简洁的语言描述。'
-            })
-          })
-          
-          if (visionResponse.ok) {
-            const visionData = await visionResponse.json()
-            const avatarDescription = visionData.description || visionData.result
-            
-            // 保存识图结果到localStorage，供AI使用
-            localStorage.setItem(`user_avatar_description_${currentUser.id}`, avatarDescription)
-            localStorage.setItem(`user_avatar_recognized_at_${currentUser.id}`, Date.now().toString())
-            // 🔑 保存头像指纹（前200字符），用于检测头像是否变化
-            localStorage.setItem(`user_avatar_fingerprint_${currentUser.id}`, base64.substring(0, 200))
-            
-            console.log('✅ 用户头像识别完成:', avatarDescription)
-          } else {
-            console.warn('⚠️ 头像识别失败，AI暂时看不到你的外貌')
-          }
-        } catch (error) {
-          console.error('❌ 头像识别异常:', error)
-        }
+        // 💾 保存头像指纹（用于检测头像变化）
+        // 注意：GitHub Pages不支持vision识别，暂时跳过描述生成
+        console.log('💾 保存用户头像指纹...')
+        localStorage.setItem(`user_avatar_fingerprint_${currentUser.id}`, base64.substring(0, 200))
+        localStorage.setItem(`user_avatar_recognized_at_${currentUser.id}`, Date.now().toString())
+        console.log('✅ 头像已保存')
       }
     }
     reader.readAsDataURL(file)
