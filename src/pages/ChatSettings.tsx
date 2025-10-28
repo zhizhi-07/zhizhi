@@ -1031,7 +1031,7 @@ const ChatSettings = () => {
               onClick={() => {
                 if (!id || !character) return
                 
-                // 拉黑用户
+                // AI拉黑用户（注意参数顺序：第一个是拉黑者ID，第二个是被拉黑者ID）
                 blacklistManager.blockUser(id, 'user')
                 
                 // 添加系统消息

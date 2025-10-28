@@ -5918,12 +5918,11 @@ ${emojiInstructions}
                  {/* 拉黑警告图标 - 只显示拉黑之后发送的消息 */}
                 {(() => {
                   if (!id || !message.timestamp) return null
-                  const blockStatus = blacklistManager.getBlockStatus(id, 'user')
+                  const blockStatus = blacklistManager.getBlockStatus('user', id)
                   
                   // AI消息：检查用户是否拉黑了AI
                   if (message.type === 'received' && blockStatus.blockedByMe) {
                     const blockTime = blacklistManager.getBlockTimestamp('user', id)
-                    console.log('🔍 AI消息检查:', { msgTime: message.timestamp, blockTime, show: blockTime && message.timestamp > blockTime })
                     // 只有消息时间晚于拉黑时间才显示
                     if (blockTime && message.timestamp > blockTime) {
                       return (
@@ -5937,7 +5936,6 @@ ${emojiInstructions}
                   // 用户消息：检查AI是否拉黑了用户
                   if (message.type === 'sent' && blockStatus.blockedByTarget) {
                     const blockTime = blacklistManager.getBlockTimestamp(id, 'user')
-                    console.log('🔍 用户消息检查:', { msgTime: message.timestamp, blockTime, show: blockTime && message.timestamp > blockTime })
                     // 只有消息时间晚于拉黑时间才显示
                     if (blockTime && message.timestamp > blockTime) {
                       return (
