@@ -3474,14 +3474,41 @@ ${emojiInstructions}
           return updated
         })
       }
-
+      
+      // 检查AI是否要解除拉黑
+      const unblockUserMatch = aiResponse.match(/\[解除拉黑\]/)
+      if (unblockUserMatch && id) {
+        console.log('✅ AI决定解除拉黑')
+        blacklistManager.unblockUser(id, 'user')
+        cleanedResponse = cleanedResponse.replace(/\[解除拉黑\]/g, '').trim()
+        
+        // 添加系统提示
+        const systemMessage: Message = {
+          id: Date.now() + 9999,
+          type: 'system',
+          content: `${character?.name || 'AI'} 已将你移出黑名单`,
+          time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        }
+        
+        safeSetMessages(prev => {
+          const updated = [...prev, systemMessage]
+          if (id) {
+            safeSetItem(`chat_messages_${id}`, updated)
+            console.log('💾 解除拉黑消息已保存')
+          }
+          return updated
+        })
+      }
+      
+      // 清理网名、个性签名、备注和头像标记
       cleanedResponse = cleanedResponse.replace(/\[网名:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[个性签名:[\s\S]+?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/\[备注:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[换头像:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[一起听:[\s\S]+?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[正在与[\s\S]+?一起听[\s\S]+?\]/g, '').trim()
-
-// ...
+      
       // 清理系统警告标记
       cleanedResponse = cleanedResponse.replace(/\[系统警告[：:][^\]]*\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/【系统警告[：:][^】]*】/g, '').trim()
@@ -5122,20 +5149,20 @@ ${emojiInstructions}
           </div>
         </div>
         
-      {/* Token 详情面板 */}
-      {showTokenDetail && tokenStats.total > 0 && (
-        <div className="glass-card mx-4 mt-2 p-3 rounded-xl transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-700">本次请求统计</span>
-            <button 
-              onClick={() => setShowTokenDetail(false)}
-              className="text-gray-400 hover:text-gray-600 ios-button"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          </div>
+        {/* Token 详情面板 */}
+        {showTokenDetail && tokenStats.total > 0 && (
+          <div className="glass-card mx-4 mt-2 p-3 rounded-xl transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-700">本次请求统计</span>
+              <button 
+                onClick={() => setShowTokenDetail(false)}
+                className="text-gray-400 hover:text-gray-600 ios-button"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
             <div className="space-y-2 text-xs">
               {/* 响应时间 */}
               {responseTime > 0 && (
@@ -5442,12 +5469,12 @@ ${emojiInstructions}
                  return null
                })()}
                
-               <div 
-                 onTouchStart={(e) => handleLongPressStart(message, e)}
-                  onTouchEnd={handleLongPressEnd}
-                  onMouseDown={(e) => handleLongPressStart(message, e)}
-                  onMouseUp={handleLongPressEnd}
-                  onMouseLeave={handleLongPressEnd}
+                <div 
+                  onTouchStart={(e) => handleLongPressStart(message, e)}
+                   onTouchEnd={handleLongPressEnd}
+                   onMouseDown={(e) => handleLongPressStart(message, e)}
+                   onMouseUp={handleLongPressEnd}
+                   onMouseLeave={handleLongPressEnd}
                 >
                    {message.messageType === 'redenvelope' && message.redEnvelopeId ? (
                      (() => {
@@ -5973,9 +6000,9 @@ ${emojiInstructions}
                        if (message.timestamp) {
                          if (message.timestamp > blockTime) {
                            return (
-                             <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                             </svg>
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
                            )
                          }
                        } else {

@@ -12,6 +12,29 @@ const About = () => {
   // 更新日志数据（按时间倒序）
   const updateLogs = [
     {
+      version: 'v1.0.8',
+      date: '2025-10-28',
+      summary: '自定义增强与功能优化',
+      changes: [
+        '完善AI拉黑功能：优化拉黑逻辑和提示',
+        '线下聊天大简化：移除复杂功能，回归简单体验',
+        '新增自定义图标功能：可自定义应用图标样式',
+        '新增天气功能：实时天气查看和详情展示',
+        '增加开场白设置：支持自定义聊天开场白',
+        '新增小红书生图功能：自动生成小红书风格图片'
+      ]
+    },
+    {
+      version: 'v1.0.7',
+      date: '2025-10-27',
+      summary: 'Bug修复与功能完善',
+      changes: [
+        '修复AI识图没有记忆的问题',
+        '完善联网搜歌功能',
+        '修复名字和个性签名没有使用系统提示的问题'
+      ]
+    },
+    {
       version: 'v1.0.6',
       date: '2025-10-26',
       summary: 'AI视觉识别与社交增强',
@@ -185,7 +208,7 @@ const About = () => {
           <div className="text-center mb-4">
             <img src={appIcon} alt="汁汁" className="w-24 h-24 mx-auto mb-4 object-contain" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">汁汁</h2>
-            <div className="text-gray-500">v1.0.6</div>
+            <div className="text-gray-500">v1.0.8</div>
           </div>
         </div>
         
