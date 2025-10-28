@@ -1130,6 +1130,11 @@ ${character.description || ''}
   const handleSend = async () => {
     if (inputValue.trim() && !isAiTyping) {
       const now = Date.now()
+      
+      // 检查是否被AI拉黑
+      const blacklistStatus = id ? blacklistManager.getBlockStatus(id, 'user') : { blockedByMe: false, blockedByTarget: false }
+      const isBlockedByAI = blacklistStatus.blockedByTarget
+      
       const userMessage: Message = {
         id: messages.length + 1,
         type: 'sent',
@@ -1139,6 +1144,7 @@ ${character.description || ''}
           minute: '2-digit',
         }),
         timestamp: now,
+        blocked: isBlockedByAI, // 添加被拉黑标记
         // 如果有引用消息，添加到消息中
         quotedMessage: quotedMessage ? {
           id: quotedMessage.id,
@@ -3426,6 +3432,24 @@ ${emojiInstructions}
       
       // 清理通话标记
       cleanedResponse = cleanedResponse.replace(/\[语音通话\]/g, '').replace(/\[视频通话\]/g, '').trim()
+      
+      // 检查AI是否要拉黑用户
+      const blockUserMatch = aiResponse.match(/\[拉黑用户\]/)
+      if (blockUserMatch && id) {
+        console.log('🚫 AI决定拉黑用户')
+        blacklistManager.blockUser(id, 'user')
+        cleanedResponse = cleanedResponse.replace(/\[拉黑用户\]/g, '').trim()
+        
+        // 添加系统提示
+        const systemMessage: Message = {
+          id: Date.now() + 9999,
+          type: 'system',
+          content: `${character?.name || 'AI'} 已将你加入黑名单`,
+          time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now()
+        }
+        setMessages(prev => [...prev, systemMessage])
+      }
       
       // 清理网名、个性签名和头像标记（使用[\s\S]匹配包括换行在内的所有字符）
       cleanedResponse = cleanedResponse.replace(/\[网名:[\s\S]+?\]/g, '').trim()
@@ -5813,6 +5837,13 @@ ${emojiInstructions}
                  {/* 拉黑警告图标 - 与气泡垂直居中 */}
                 {message.type === 'received' && message.blocked && (
                   <svg className="w-5 h-5 text-red-500 flex-shrink-0 ml-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                )}
+                
+                   {/* 用户被AI拉黑时显示警告图标 */}
+                   {message.type === 'sent' && message.blocked && (
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 mr-2" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
                   </svg>
                 )}
