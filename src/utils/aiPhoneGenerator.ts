@@ -21,6 +21,12 @@ export interface AIPhoneContent {
     time: string
     unread: number
     avatar?: string
+    messages: {
+      content: string
+      isSelf: boolean
+      time: string
+      type?: 'text' | 'image' | 'voice'
+    }[]
   }[]
   
   // 浏览器历史
@@ -28,6 +34,7 @@ export interface AIPhoneContent {
     title: string
     url: string
     time: string
+    reason?: string  // 为什么搜索/浏览
   }[]
   
   // 淘宝订单
@@ -35,7 +42,8 @@ export interface AIPhoneContent {
     title: string
     price: string
     status: string
-    image?: string
+    reason?: string  // 为什么买
+    thought?: string  // 购买时的想法
   }[]
   
   // 支付宝账单
@@ -44,6 +52,7 @@ export interface AIPhoneContent {
     amount: string
     type: 'income' | 'expense'
     time: string
+    reason?: string  // 账单原因/备注
   }[]
   
   // 相册照片
@@ -67,11 +76,15 @@ export interface AIPhoneContent {
     mood?: string
   }[]
   
-  // 地图搜索历史
-  mapHistory: {
-    name: string
+  // AI足迹记录（一天的行程）
+  footprints: {
+    location: string
     address: string
     time: string
+    duration: string
+    activity: string
+    mood?: string
+    companion?: string
   }[]
 }
 
@@ -115,11 +128,11 @@ const getCharacterInfo = (characterId: string): string => {
 }
 
 // 生成手机内容的提示词
-const buildPhoneContentPrompt = (characterId: string, characterName: string): string => {
-  const chatHistory = getCharacterChatHistory(characterId)
+const buildPhoneContentPrompt = (characterId: string, characterName: string) => {
   const characterInfo = getCharacterInfo(characterId)
+  const chatHistory = getCharacterChatHistory(characterId)
   
-  return `你是一个AI助手，需要根据角色的性格和聊天记录，生成该角色手机中的真实内容。
+  return `你是一个手机内容生成器。根据角色性格生成手机内容。
 
 角色信息：
 ${characterInfo}
@@ -127,71 +140,99 @@ ${characterInfo}
 最近聊天记录：
 ${chatHistory}
 
-请根据以上信息，生成这个角色手机中的内容。内容要符合角色性格，与聊天记录相关联，并且要真实自然。
+使用文本格式输出，严格按照以下格式，每个分类用===开头，每条记录一行，字段用|||分隔。
 
-请以JSON格式输出，包含以下内容：
+===通讯录
+李华|||138****1234|||大学同学|||喜欢打篮球
+王芳|||139****5678|||同事|||项目组负责人
+张伟|||137****9012|||表哥|||在上海工作
+刘洋|||136****3456|||高中同学|||经常一起吃饭
+陈晨|||135****7890|||发小|||从小玩到大
+赵敏|||134****1234|||房东|||房租每月5号交
+周杰|||133****5678|||健身教练|||周二周四上课
+吴婷|||132****9012|||前同事|||现在在深圳
+郑凯|||131****3456|||朋友|||喜欢旅游
+孙莉|||130****7890|||表姐|||在北京定居
+(继续生成到10-15条)
 
-{
-  "contacts": [
-    {"name": "联系人名字", "phone": "手机号", "relation": "关系", "notes": "备注"}
-  ],
-  "wechatChats": [
-    {"name": "聊天对象", "lastMessage": "最后一条消息", "time": "时间", "unread": 0}
-  ],
-  "browserHistory": [
-    {"title": "网页标题", "url": "网址", "time": "访问时间"}
-  ],
-  "taobaoOrders": [
-    {"title": "商品名称", "price": "价格", "status": "状态"}
-  ],
-  "alipayBills": [
-    {"title": "账单标题", "amount": "金额", "type": "income或expense", "time": "时间"}
-  ],
-  "photos": [
-    {"description": "照片描述", "location": "拍摄地点", "time": "拍摄时间"}
-  ],
-  "notes": [
-    {"title": "标题", "content": "内容", "time": "创建时间"}
-  ],
-  "musicPlaylist": [
-    {"title": "歌曲名", "artist": "歌手", "mood": "适合的心情"}
-  ],
-  "mapHistory": [
-    {"name": "地点名称", "address": "详细地址", "time": "搜索时间"}
-  ]
-}
+===微信聊天
+李华|||周末打球去不？|||2小时前|||0
+对话：other|||在吗？|||14:25
+对话：self|||在的，怎么了？|||14:26
+对话：other|||周末打球去不？|||14:30
+对话：self|||好啊，几点？|||14:32
+对话：other|||下午3点老地方|||14:33
+王芳|||项目报告记得周一交|||昨天|||1
+对话：other|||下周一的会议材料准备好了吗？|||18:30
+对话：self|||还在整理，明天能完成|||18:35
+对话：other|||好的，项目报告记得周一交|||18:45
+对话：self|||收到，我会按时交的|||18:50
+(继续生成8-12个聊天，每个5-10条对话)
 
-要求：
-1. 每个类别至少生成3-8条真实的内容
-2. 内容要与角色性格和聊天记录高度相关
-3. 时间格式要自然（如"2小时前"、"昨天"、"3天前"等）
-4. 内容要有细节，不要太笼统
-5. **必须严格按照JSON格式输出**
-6. **不要有任何markdown标记、代码块符号、额外说明**
-7. **字符串中不要有换行符，用\\n代替**
-8. **所有字段必须用双引号，不要用单引号**
+===浏览器历史
+五一旅游攻略|||https://www.example.com/travel|||2小时前|||计划五一假期去哪里玩
+最新手机评测|||https://www.example.com/phone|||昨天19:45|||想换新手机，看看评测
+Python教程|||https://www.example.com/python|||昨天20:30|||工作需要学习Python
+健身计划制定|||https://www.example.com/fitness|||2天前|||想开始健身，查找方法
+美食推荐|||https://www.example.com/food|||3天前|||周末找个好吃的餐厅
+(继续生成到15-25条)
 
-直接输出纯JSON，示例格式：
-{"contacts":[{"name":"张三","phone":"138****1234","relation":"朋友","notes":"备注"}],...}
+===淘宝订单
+无线蓝牙耳机|||299|||待收货|||旧的坏了|||这款评价不错，希望音质好
+运动鞋|||459|||已发货|||跑步用|||看起来很轻便舒适
+保温杯|||89|||待评价|||冬天需要|||保温效果好，容量够大
+(继续生成8-15条)
 
-现在开始输出JSON：`
+===支付宝账单
+外卖订单|||38|||支出|||12:30|||中午点了个快餐
+地铁充值|||100|||支出|||8:00|||上班通勤
+工资|||8500|||收入|||1号|||这个月工资
+(继续生成20-30条)
+
+===相册
+日落风景|||西湖边|||昨天傍晚
+朋友聚会|||火锅店|||上周六
+家里的猫|||客厅|||今天上午
+(继续生成15-25条)
+
+===备忘录
+周末计划|||买菜、打扫卫生、整理衣柜|||今天
+工作待办|||完成报告、开会、回复邮件|||昨天
+购物清单|||牛奶、面包、水果、洗衣液|||2天前
+(继续生成10-15条)
+
+===音乐播放列表
+晴天|||周杰伦|||放松
+夜曲|||周杰伦|||安静
+告白气球|||周杰伦|||浪漫
+(继续生成20-30首)
+
+===足迹
+星巴克|||国贸店|||09:00|||1小时|||喝咖啡看书|||放松|||独自
+公司|||CBD大厦|||10:30|||6小时|||工作开会|||忙碌|||同事们
+健身房|||社区健身中心|||18:00|||1.5小时|||跑步训练|||充实|||独自
+(继续生成8-12条完整一天的行程)
+
+重要：严格按照上述格式输出，不要添加任何解释文字，直接开始输出数据！
+
+现在开始输出：`
 
 }
 
 // 生成AI手机内容
 export const generateAIPhoneContent = async (
   characterId: string,
-  characterName: string
+  characterName: string,
+  forceNew: boolean = true  // 默认总是生成新的
 ): Promise<AIPhoneContent> => {
   try {
-    // 检查缓存
-    const cacheKey = `ai_phone_${characterId}`
-    const cached = localStorage.getItem(cacheKey)
-    
-    if (cached) {
-      const cachedData = JSON.parse(cached)
-      // 缓存有效期：1小时
-      if (Date.now() - cachedData.generatedAt < 3600000) {
+    // forceNew为false时才使用缓存（查看历史记录时）
+    if (!forceNew) {
+      const cacheKey = `ai_phone_${characterId}`
+      const cached = localStorage.getItem(cacheKey)
+      
+      if (cached) {
+        const cachedData = JSON.parse(cached)
         console.log('使用缓存的手机内容')
         return cachedData
       }
@@ -202,55 +243,16 @@ export const generateAIPhoneContent = async (
     
     const response = await callAI([
       { role: 'user', content: prompt }
-    ])
+    ], 0.7)
     
-    console.log('AI原始返回:', response)
+    console.log('AI响应:', response)
     
-    // 解析JSON响应 - 改进版
-    let jsonStr = response.trim()
+    // 使用文本解析器代替JSON解析
+    const { parsePhoneContent } = await import('./phoneContentParser')
+    const phoneContent = parsePhoneContent(response, characterId, characterName)
     
-    // 移除markdown代码块标记
-    jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
-    
-    // 尝试提取JSON对象
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0]
-    }
-    
-    // 清理可能的问题字符
-    jsonStr = jsonStr
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
-      .replace(/,(\s*[}\]])/g, '$1') // 移除结尾多余逗号
-    
-    console.log('清理后的JSON:', jsonStr)
-    
-    let generatedContent
-    try {
-      generatedContent = JSON.parse(jsonStr)
-    } catch (parseError: any) {
-      console.error('JSON解析失败，原始内容:', jsonStr)
-      console.error('错误详情:', parseError)
-      throw new Error(`JSON解析失败: ${parseError?.message || '未知错误'}`)
-    }
-    
-    const phoneContent: AIPhoneContent = {
-      characterId,
-      characterName,
-      generatedAt: Date.now(),
-      contacts: generatedContent.contacts || [],
-      wechatChats: generatedContent.wechatChats || [],
-      browserHistory: generatedContent.browserHistory || [],
-      taobaoOrders: generatedContent.taobaoOrders || [],
-      alipayBills: generatedContent.alipayBills || [],
-      photos: generatedContent.photos || [],
-      notes: generatedContent.notes || [],
-      musicPlaylist: generatedContent.musicPlaylist || [],
-      mapHistory: generatedContent.mapHistory || []
-    }
-    
-    // 保存到缓存
-    localStorage.setItem(cacheKey, JSON.stringify(phoneContent))
+    // 保存到历史记录
+    savePhoneHistory(characterId, phoneContent)
     
     return phoneContent
     
@@ -266,7 +268,7 @@ export const generateAIPhoneContent = async (
         { name: '妈妈', phone: '138****8888', relation: '家人', notes: '最爱我的人' }
       ],
       wechatChats: [
-        { name: '好友', lastMessage: '在吗？', time: '刚刚', unread: 1 }
+        { name: '好友', lastMessage: '在吗？', time: '刚刚', unread: 1, messages: [{ content: '在吗？', isSelf: false, time: '刚刚' }] }
       ],
       browserHistory: [
         { title: '百度首页', url: 'https://www.baidu.com', time: '5分钟前' }
@@ -286,24 +288,90 @@ export const generateAIPhoneContent = async (
       musicPlaylist: [
         { title: '歌曲', artist: '歌手', mood: '放松' }
       ],
-      mapHistory: [
-        { name: '家', address: '住宅区', time: '今天' }
+      footprints: [
+        { location: '家', address: '住宅区', time: '08:00', duration: '2小时', activity: '起床洗漱' }
       ]
     }
   }
 }
 
-// 清除缓存
-export const clearPhoneCache = (characterId: string) => {
-  const cacheKey = `ai_phone_${characterId}`
-  localStorage.removeItem(cacheKey)
+// 历史记录接口
+export interface PhoneHistory {
+  id: string
+  characterId: string
+  characterName: string
+  timestamp: number
+  content: AIPhoneContent
 }
 
-// 清除所有缓存
-export const clearAllPhoneCache = () => {
+// 保存手机内容到历史记录
+export const savePhoneHistory = (characterId: string, content: AIPhoneContent) => {
+  const historyKey = `phone_history_${characterId}`
+  const historyListKey = 'phone_history_list'
+  
+  // 创建历史记录
+  const history: PhoneHistory = {
+    id: `${characterId}_${Date.now()}`,
+    characterId,
+    characterName: content.characterName,
+    timestamp: Date.now(),
+    content
+  }
+  
+  // 保存到角色专属历史
+  const saved = localStorage.getItem(historyKey)
+  const historyList: PhoneHistory[] = saved ? JSON.parse(saved) : []
+  historyList.unshift(history) // 最新的放在前面
+  
+  // 只保留最近10条
+  if (historyList.length > 10) {
+    historyList.pop()
+  }
+  
+  localStorage.setItem(historyKey, JSON.stringify(historyList))
+  
+  // 同时保存到总列表（用于快速查找）
+  const allHistorySaved = localStorage.getItem(historyListKey)
+  const allHistory: string[] = allHistorySaved ? JSON.parse(allHistorySaved) : []
+  if (!allHistory.includes(characterId)) {
+    allHistory.push(characterId)
+    localStorage.setItem(historyListKey, JSON.stringify(allHistory))
+  }
+}
+
+// 获取角色的历史记录列表
+export const getPhoneHistory = (characterId: string): PhoneHistory[] => {
+  const historyKey = `phone_history_${characterId}`
+  const saved = localStorage.getItem(historyKey)
+  return saved ? JSON.parse(saved) : []
+}
+
+// 获取单条历史记录
+export const getPhoneHistoryById = (historyId: string): PhoneHistory | null => {
+  const [characterId] = historyId.split('_')
+  const historyList = getPhoneHistory(characterId)
+  return historyList.find(h => h.id === historyId) || null
+}
+
+// 删除历史记录
+export const deletePhoneHistory = (characterId: string, historyId: string) => {
+  const historyKey = `phone_history_${characterId}`
+  const historyList = getPhoneHistory(characterId)
+  const filtered = historyList.filter(h => h.id !== historyId)
+  localStorage.setItem(historyKey, JSON.stringify(filtered))
+}
+
+// 清除角色所有历史
+export const clearCharacterHistory = (characterId: string) => {
+  const historyKey = `phone_history_${characterId}`
+  localStorage.removeItem(historyKey)
+}
+
+// 清除所有历史
+export const clearAllPhoneHistory = () => {
   const keys = Object.keys(localStorage)
   keys.forEach(key => {
-    if (key.startsWith('ai_phone_')) {
+    if (key.startsWith('phone_history_')) {
       localStorage.removeItem(key)
     }
   })

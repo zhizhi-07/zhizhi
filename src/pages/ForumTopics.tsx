@@ -53,6 +53,10 @@ const ForumTopics = () => {
       }
     }
     
+    // 获取已删除的话题ID列表
+    const deletedTopicsStr = localStorage.getItem('forum_deleted_topics')
+    const deletedTopicIds: string[] = deletedTopicsStr ? JSON.parse(deletedTopicsStr) : []
+    
     // 默认话题数据
     const defaultTopics: Topic[] = [
       {
@@ -102,14 +106,42 @@ const ForumTopics = () => {
       },
     ]
     
+    // 过滤掉已删除的默认话题
+    const filteredDefaultTopics = defaultTopics.filter(t => !deletedTopicIds.includes(t.id))
+    
     // 合并用户话题和默认话题（用户话题在前）
-    setTopics([...userTopics, ...defaultTopics])
+    setTopics([...userTopics, ...filteredDefaultTopics])
   }
 
   const toggleFollow = (topicId: string) => {
     setTopics(prev => prev.map(t => 
       t.id === topicId ? { ...t, isFollowing: !t.isFollowing } : t
     ))
+  }
+
+  const deleteTopic = (topicId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // 阻止导航
+    
+    if (confirm('确定要删除这个话题吗？')) {
+      // 如果是默认话题，记录到已删除列表
+      if (topicId.startsWith('default_')) {
+        const deletedTopicsStr = localStorage.getItem('forum_deleted_topics')
+        const deletedTopicIds: string[] = deletedTopicsStr ? JSON.parse(deletedTopicsStr) : []
+        deletedTopicIds.push(topicId)
+        localStorage.setItem('forum_deleted_topics', JSON.stringify(deletedTopicIds))
+      } else {
+        // 如果是用户创建的话题，从列表中删除
+        const savedTopics = localStorage.getItem('forum_topics_list')
+        if (savedTopics) {
+          const userTopics: Topic[] = JSON.parse(savedTopics)
+          const filtered = userTopics.filter(t => t.id !== topicId)
+          localStorage.setItem('forum_topics_list', JSON.stringify(filtered))
+        }
+      }
+      
+      // 重新加载话题列表
+      loadTopics()
+    }
   }
 
   const formatCount = (count: number): string => {
@@ -138,6 +170,21 @@ const ForumTopics = () => {
           <h1 className="text-[17px] font-semibold text-gray-900">话题</h1>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                if (confirm('确定要恢复所有已删除的预设话题吗？')) {
+                  localStorage.removeItem('forum_deleted_topics')
+                  loadTopics()
+                }
+              }}
+              className="w-9 h-9 flex items-center justify-center active:opacity-60"
+              title="恢复已删除话题"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-800">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline points="9 22 9 12 15 12 15 22" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
             <button
               onClick={() => navigate('/forum/search')}
               className="w-9 h-9 flex items-center justify-center active:opacity-60"
@@ -234,17 +281,33 @@ const ForumTopics = () => {
                     </div>
                   </div>
 
-                  {/* 关注按钮 */}
-                  <button
-                    onClick={() => toggleFollow(topic.id)}
-                    className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all flex-shrink-0 ${
-                      topic.isFollowing
-                        ? 'bg-gray-100 text-gray-600 border border-gray-200'
-                        : 'bg-[#ff6c00] text-white'
-                    }`}
-                  >
-                    {topic.isFollowing ? '已关注' : '关注'}
-                  </button>
+                  {/* 操作按钮组 */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFollow(topic.id)
+                      }}
+                      className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-all ${
+                        topic.isFollowing
+                          ? 'bg-gray-100 text-gray-600 border border-gray-200'
+                          : 'bg-[#ff6c00] text-white'
+                      }`}
+                    >
+                      {topic.isFollowing ? '已关注' : '关注'}
+                    </button>
+                    
+                    {/* 删除按钮 */}
+                    <button
+                      onClick={(e) => deleteTopic(topic.id, e)}
+                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 active:opacity-60 transition-colors"
+                      title="删除话题"
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

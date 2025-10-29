@@ -10,6 +10,7 @@ const BackgroundCustomizer = () => {
   const { showStatusBar } = useSettings()
   const desktopFileInputRef = useRef<HTMLInputElement>(null)
   const musicFileInputRef = useRef<HTMLInputElement>(null)
+  const characterCardFileInputRef = useRef<HTMLInputElement>(null)
   
   // 桌面背景
   const [desktopBackground, setDesktopBackground] = useState('')
@@ -18,6 +19,10 @@ const BackgroundCustomizer = () => {
   // 音乐背景
   const [musicBackground, setMusicBackground] = useState('')
   const [musicUploading, setMusicUploading] = useState(false)
+  
+  // 角色卡片背景
+  const [characterCardBackground, setCharacterCardBackground] = useState('')
+  const [characterCardUploading, setCharacterCardUploading] = useState(false)
 
   // 加载背景
   useEffect(() => {
@@ -33,6 +38,12 @@ const BackgroundCustomizer = () => {
         const savedMusic = await getImage('music_player_background')
         if (savedMusic) {
           setMusicBackground(savedMusic)
+        }
+        
+        // 加载角色卡片背景
+        const savedCharacterCard = await getImage('character_card_background')
+        if (savedCharacterCard) {
+          setCharacterCardBackground(savedCharacterCard)
         }
       } catch (error) {
         console.error('加载背景失败:', error)
@@ -153,6 +164,62 @@ const BackgroundCustomizer = () => {
     }
   }
 
+  // 处理角色卡片背景上传
+  const handleCharacterCardUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    setCharacterCardUploading(true)
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const base64String = reader.result as string
+        try {
+          await saveImage('character_card_background', base64String)
+          setCharacterCardBackground(base64String)
+          setCharacterCardUploading(false)
+          alert('角色卡片背景已保存！')
+          // 触发更新
+          window.dispatchEvent(new Event('characterCardBackgroundUpdate'))
+        } catch (error) {
+          console.error('保存失败:', error)
+          alert('保存失败，请重试')
+          setCharacterCardUploading(false)
+        }
+      }
+      reader.onerror = () => {
+        alert('图片读取失败')
+        setCharacterCardUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('图片处理失败:', error)
+      alert('图片处理失败，请重试')
+      setCharacterCardUploading(false)
+    }
+  }
+
+  // 删除角色卡片背景
+  const handleRemoveCharacterCard = async () => {
+    if (confirm('确定要删除角色卡片背景吗？')) {
+      try {
+        await deleteImage('character_card_background')
+        setCharacterCardBackground('')
+        alert('角色卡片背景已删除！')
+        window.dispatchEvent(new Event('characterCardBackgroundUpdate'))
+      } catch (error) {
+        console.error('删除失败:', error)
+        alert('删除失败，请重试')
+      }
+    }
+  }
+
   return (
     <div className="h-full flex flex-col bg-[#f5f7fa]">
       {/* 隐藏的文件输入 */}
@@ -168,6 +235,13 @@ const BackgroundCustomizer = () => {
         type="file"
         accept="image/*"
         onChange={handleMusicUpload}
+        className="hidden"
+      />
+      <input
+        ref={characterCardFileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleCharacterCardUpload}
         className="hidden"
       />
       
@@ -280,12 +354,57 @@ const BackgroundCustomizer = () => {
           </div>
         </div>
 
+        {/* 角色卡片背景 */}
+        <div className="mb-4">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3 px-2">角色卡片背景</h2>
+          <div className="glass-card rounded-2xl p-4 backdrop-blur-md bg-white/80 border border-white/50">
+            <p className="text-xs text-gray-500 mb-3">设置桌面第二页角色卡片的背景图片</p>
+            
+            <div className="flex items-center gap-3">
+              {/* 背景缩略图 */}
+              <div 
+                className="w-24 h-24 rounded-xl overflow-hidden border-2 border-gray-200 flex-shrink-0 flex items-center justify-center"
+                style={{
+                  backgroundImage: characterCardBackground ? `url(${characterCardBackground})` : 'none',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundColor: characterCardBackground ? 'transparent' : '#f5f7fa'
+                }}
+              >
+                {!characterCardBackground && (
+                  <ImageIcon size={32} className="text-gray-400" />
+                )}
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex-1 flex flex-col gap-2">
+                <button
+                  onClick={() => characterCardFileInputRef.current?.click()}
+                  disabled={characterCardUploading}
+                  className="w-full px-4 py-2.5 bg-blue-500 text-white rounded-xl ios-button font-medium text-sm"
+                >
+                  {characterCardUploading ? '上传中...' : characterCardBackground ? '更换背景' : '上传背景'}
+                </button>
+                {characterCardBackground && (
+                  <button
+                    onClick={handleRemoveCharacterCard}
+                    className="w-full px-4 py-2.5 glass-card text-gray-700 rounded-xl ios-button font-medium text-sm"
+                  >
+                    删除背景
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* 使用说明 */}
         <div className="mt-6 p-4 glass-card rounded-2xl backdrop-blur-md bg-white/60 border border-white/50">
           <h3 className="text-sm font-semibold text-gray-900 mb-2">使用说明</h3>
           <ul className="text-xs text-gray-600 space-y-1">
             <li>• 桌面背景会显示在Desktop页面的整体背景</li>
             <li>• 音乐背景只会显示在音乐播放器卡片内</li>
+            <li>• 角色卡片背景会显示在桌面第二页的角色卡片内</li>
             <li>• 建议使用高质量图片，效果更佳</li>
             <li>• 图片会自动保存到IndexedDB，无大小限制</li>
           </ul>

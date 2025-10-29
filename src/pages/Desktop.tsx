@@ -39,9 +39,87 @@ const Desktop = () => {
   // 加载背景
   const [desktopBackground, setDesktopBackground] = useState('')
   const [musicBackground, setMusicBackground] = useState('')
+  const [characterCardBackground, setCharacterCardBackground] = useState('')
   
   // 天气数据
   const [weather, setWeather] = useState<WeatherData | null>(null)
+  
+  // 角色头像
+  const [characterAvatar, setCharacterAvatar] = useState<string>('')
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  
+  // 可编辑文字
+  const [editableTexts, setEditableTexts] = useState({
+    btn1: '小x大王',
+    btn2: '本命为萌',
+    btn3: '早春樱雨',
+    temperature: '19',
+    humidity: '70',
+    status: '生活给我一拳 我出布o(´^｀)o'
+  })
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [tempValue, setTempValue] = useState('')
+  
+  // 加载保存的头像和可编辑文字
+  useEffect(() => {
+    const savedAvatar = localStorage.getItem('character_avatar')
+    if (savedAvatar) {
+      setCharacterAvatar(savedAvatar)
+    }
+    
+    const savedTexts = localStorage.getItem('character_editable_texts')
+    if (savedTexts) {
+      setEditableTexts(JSON.parse(savedTexts))
+    }
+  }, [])
+  
+  // 处理头像点击
+  const handleAvatarClick = () => {
+    avatarInputRef.current?.click()
+  }
+  
+  // 处理头像上传
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string
+      setCharacterAvatar(base64)
+      localStorage.setItem('character_avatar', base64)
+    }
+    reader.readAsDataURL(file)
+  }
+  
+  // 开始编辑文字
+  const handleTextClick = (field: string, currentValue: string) => {
+    setEditingField(field)
+    setTempValue(currentValue)
+  }
+  
+  // 完成编辑
+  const handleTextBlur = (field: string) => {
+    if (tempValue.trim()) {
+      const newTexts = { ...editableTexts, [field]: tempValue.trim() }
+      setEditableTexts(newTexts)
+      localStorage.setItem('character_editable_texts', JSON.stringify(newTexts))
+    }
+    setEditingField(null)
+    setTempValue('')
+  }
+  
+  // 处理输入变化
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTempValue(e.target.value)
+  }
+  
+  // 处理Enter键
+  const handleTextKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
+    if (e.key === 'Enter') {
+      handleTextBlur(field)
+    }
+  }
   
   useEffect(() => {
     const loadCustomIcons = () => {
@@ -89,6 +167,9 @@ const Desktop = () => {
         
         const music = await getImage('music_player_background')
         if (music) setMusicBackground(music)
+        
+        const characterCard = await getImage('character_card_background')
+        if (characterCard) setCharacterCardBackground(characterCard)
       } catch (e) {
         console.error('加载背景失败:', e)
       }
@@ -97,13 +178,16 @@ const Desktop = () => {
     
     const handleDesktopBgUpdate = () => loadBackgrounds()
     const handleMusicBgUpdate = () => loadBackgrounds()
+    const handleCharacterCardBgUpdate = () => loadBackgrounds()
     
     window.addEventListener('desktopBackgroundUpdate', handleDesktopBgUpdate)
     window.addEventListener('musicBackgroundUpdate', handleMusicBgUpdate)
+    window.addEventListener('characterCardBackgroundUpdate', handleCharacterCardBgUpdate)
     
     return () => {
       window.removeEventListener('desktopBackgroundUpdate', handleDesktopBgUpdate)
       window.removeEventListener('musicBackgroundUpdate', handleMusicBgUpdate)
+      window.removeEventListener('characterCardBackgroundUpdate', handleCharacterCardBgUpdate)
     }
   }, [])
 
@@ -450,80 +534,9 @@ const Desktop = () => {
 
             {/* ========== 第二页 ========== */}
             <div className="min-w-full h-full px-4 overflow-y-auto flex flex-col hide-scrollbar" style={{ paddingTop: '20px', paddingBottom: '8px' }}>
-              {/* 角色天气卡片 - 从宝贝项目完整移植 */}
-              <div className="character-card-widget character-card-floating" style={{ marginTop: '10px', marginBottom: '15px', position: 'relative', zIndex: 100 }}>
-                {/* 右上角气泡 */}
-                <div className="character-card-corner-bubble">呆</div>
-                
-                {/* 主角色头像 */}
-                <div className="character-card-main">X</div>
-                
-                {/* 天气信息 */}
-                <div className="character-card-weather-info">
-                  <div className="character-card-weather-value">
-                    {weather?.temperature || 19}°C
-                  </div>
-                  <div className="character-card-weather-value">
-                    {weather?.humidity || 70}%
-                  </div>
-                </div>
-                
-                {/* 状态文字 */}
-                <div className="character-card-bunny-status">
-                  生活给我一拳 我出布o(´^｀)o
-                </div>
-              </div>
-
-              {/* 功能按钮 */}
-              <div className="character-card-function-row" style={{ marginBottom: '15px' }}>
-                <div className="character-card-function-btn" onClick={() => navigate('/customize')}>
-                  修改桌面
-                </div>
-                <div className="character-card-function-btn">
-                  本命为萌
-                </div>
-                <div className="character-card-function-btn">
-                  早春樱雨
-                </div>
-              </div>
-
-              {/* 第二页应用和小组件 */}
-              <div className="grid grid-cols-4 gap-4" style={{ gridAutoRows: '90px' }}>
-                {/* 日历小组件 - 2x2 */}
-                <div 
-                  className="col-span-2 row-span-2 cursor-pointer active:scale-95 transition-transform"
-                  onClick={() => navigate('/calendar')}
-                >
-                  <CalendarWidget />
-                </div>
-                {page2Apps.map((app) => {
-                  const isImageIcon = typeof app.icon === 'string'
-                  return (
-                    <div
-                      key={app.id}
-                      onClick={(e) => handleAppClick(e, app)}
-                      className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform"
-                    >
-                      {isImageIcon ? (
-                        <div className="w-14 h-14">
-                          <img src={app.icon as string} alt={app.name} className="w-full h-full object-contain" />
-                        </div>
-                      ) : (
-                        <div className={`w-14 h-14 ${app.color} rounded-2xl flex items-center justify-center shadow-lg border border-white/30`}>
-                          {React.createElement(app.icon as React.ComponentType<any>, { size: 28, className: "text-gray-300" })}
-                        </div>
-                      )}
-                      <span className="text-xs text-gray-700 text-center font-medium">
-                        {app.name}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* 天气小组件 - 恢复 */}
+              {/* 天气小组件 */}
               <div 
-                className="glass-card rounded-3xl p-4 shadow-lg border border-white/30 relative bg-gradient-to-br from-white/80 to-white/40 mt-4 cursor-pointer ios-button"
+                className="glass-card rounded-3xl p-4 shadow-lg border border-white/30 relative bg-gradient-to-br from-white/80 to-white/40 mb-4 cursor-pointer ios-button"
                 onClick={() => navigate('/weather-detail')}
                 style={{ overflow: 'visible' }}
               >
@@ -626,6 +639,199 @@ const Desktop = () => {
                     </>
                   ) : (
                     <div className="text-sm text-gray-500">加载中...</div>
+                  )}
+                </div>
+              </div>
+
+              {/* 第二页应用和小组件 */}
+              <div className="grid grid-cols-4 gap-4" style={{ gridAutoRows: '90px' }}>
+                {/* 日历小组件 - 2x2 */}
+                <div 
+                  className="col-span-2 row-span-2 cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => navigate('/calendar')}
+                >
+                  <CalendarWidget />
+                </div>
+                {page2Apps.map((app) => {
+                  const isImageIcon = typeof app.icon === 'string'
+                  return (
+                    <div
+                      key={app.id}
+                      onClick={(e) => handleAppClick(e, app)}
+                      className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+                    >
+                      {isImageIcon ? (
+                        <div className="w-14 h-14">
+                          <img src={app.icon as string} alt={app.name} className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className={`w-14 h-14 ${app.color} rounded-2xl flex items-center justify-center shadow-lg border border-white/30`}>
+                          {React.createElement(app.icon as React.ComponentType<any>, { size: 28, className: "text-gray-300" })}
+                        </div>
+                      )}
+                      <span className="text-xs text-gray-700 text-center font-medium">
+                        {app.name}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* 隐藏的文件输入 */}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                style={{ display: 'none' }}
+              />
+
+              {/* 角色天气卡片 - 从宝贝项目完整移植 */}
+              <div 
+                className="character-card-widget character-card-floating" 
+                style={{ 
+                  marginTop: '50px', 
+                  marginBottom: '15px', 
+                  position: 'relative', 
+                  zIndex: 100,
+                  backgroundImage: characterCardBackground ? `url(${characterCardBackground})` : undefined,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              >
+                {/* 右上角气泡 */}
+                <div className="character-card-corner-bubble">呆</div>
+                
+                {/* 主角色头像 */}
+                <div className="character-card-main" onClick={handleAvatarClick} style={{ cursor: 'pointer' }}>
+                  {characterAvatar ? (
+                    <img src={characterAvatar} alt="角色头像" />
+                  ) : (
+                    'X'
+                  )}
+                </div>
+                
+                {/* 天气信息 */}
+                <div className="character-card-weather-info">
+                  <div className="character-card-weather-value" onClick={() => handleTextClick('temperature', editableTexts.temperature)} style={{ cursor: 'pointer' }}>
+                    {editingField === 'temperature' ? (
+                      <input
+                        type="text"
+                        value={tempValue}
+                        onChange={handleTextChange}
+                        onBlur={() => handleTextBlur('temperature')}
+                        onKeyPress={(e) => handleTextKeyPress(e, 'temperature')}
+                        autoFocus
+                        style={{ width: '60px', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', fontWeight: 'inherit' }}
+                      />
+                    ) : (
+                      `${editableTexts.temperature}°C`
+                    )}
+                  </div>
+                  <div className="character-card-weather-value" onClick={() => handleTextClick('humidity', editableTexts.humidity)} style={{ cursor: 'pointer' }}>
+                    {editingField === 'humidity' ? (
+                      <input
+                        type="text"
+                        value={tempValue}
+                        onChange={handleTextChange}
+                        onBlur={() => handleTextBlur('humidity')}
+                        onKeyPress={(e) => handleTextKeyPress(e, 'humidity')}
+                        autoFocus
+                        style={{ width: '60px', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', fontWeight: 'inherit' }}
+                      />
+                    ) : (
+                      `${editableTexts.humidity}%`
+                    )}
+                  </div>
+                </div>
+                
+                {/* 状态文字 */}
+                <div className="character-card-bunny-status" onClick={() => handleTextClick('status', editableTexts.status)} style={{ cursor: 'pointer' }}>
+                  {editingField === 'status' ? (
+                    <input
+                      type="text"
+                      value={tempValue}
+                      onChange={handleTextChange}
+                      onBlur={() => handleTextBlur('status')}
+                      onKeyPress={(e) => handleTextKeyPress(e, 'status')}
+                      autoFocus
+                      style={{ width: '100%', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', color: 'inherit' }}
+                    />
+                  ) : (
+                    editableTexts.status
+                  )}
+                </div>
+              </div>
+
+              {/* 功能按钮 */}
+              <div className="character-card-function-row" style={{ marginBottom: '15px' }}>
+                <div 
+                  className="character-card-function-btn" 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleTextClick('btn1', editableTexts.btn1)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {editingField === 'btn1' ? (
+                    <input
+                      type="text"
+                      value={tempValue}
+                      onChange={handleTextChange}
+                      onBlur={() => handleTextBlur('btn1')}
+                      onKeyPress={(e) => handleTextKeyPress(e, 'btn1')}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      style={{ width: '100%', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', color: 'inherit' }}
+                    />
+                  ) : (
+                    editableTexts.btn1
+                  )}
+                </div>
+                <div 
+                  className="character-card-function-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleTextClick('btn2', editableTexts.btn2)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {editingField === 'btn2' ? (
+                    <input
+                      type="text"
+                      value={tempValue}
+                      onChange={handleTextChange}
+                      onBlur={() => handleTextBlur('btn2')}
+                      onKeyPress={(e) => handleTextKeyPress(e, 'btn2')}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      style={{ width: '100%', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', color: 'inherit' }}
+                    />
+                  ) : (
+                    editableTexts.btn2
+                  )}
+                </div>
+                <div 
+                  className="character-card-function-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleTextClick('btn3', editableTexts.btn3)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {editingField === 'btn3' ? (
+                    <input
+                      type="text"
+                      value={tempValue}
+                      onChange={handleTextChange}
+                      onBlur={() => handleTextBlur('btn3')}
+                      onKeyPress={(e) => handleTextKeyPress(e, 'btn3')}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      style={{ width: '100%', textAlign: 'center', background: 'transparent', border: '1px solid #ccc', borderRadius: '4px', fontSize: 'inherit', color: 'inherit' }}
+                    />
+                  ) : (
+                    editableTexts.btn3
                   )}
                 </div>
               </div>

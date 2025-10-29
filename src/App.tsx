@@ -28,6 +28,8 @@ import { GroupProvider } from './context/GroupContext'
 import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
 import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
 import { AILifeProvider } from './context/AILifeContext'
+import NotificationContainer from './components/NotificationContainer'
+import ForumNotificationManager from './components/ForumNotificationManager'
 import { ForumProvider } from './context/ForumContext'
 import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
@@ -305,6 +307,8 @@ function App() {
                               <Router basename="/zhizhi">
                                 <OfflineIndicator />
                                 <DynamicIslandWrapper />
+                                <NotificationContainer />
+                                <ForumNotificationManager />
                                 <MomentsSocialManager>
                                 <Routes>
                                   <Route path="/wechat" element={<Layout />}>

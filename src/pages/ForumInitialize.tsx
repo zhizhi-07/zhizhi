@@ -17,6 +17,8 @@ import {
   saveSelectedCharacterIds,
   getSelectedCharacterIds
 } from '../utils/forumAI'
+import { getMemesForAI } from '../utils/memeManager'
+import { notifyForumInitStart, notifyForumInitProgress, notifyForumInitComplete } from '../utils/forumNotifications'
 
 const ForumInitialize = () => {
   const navigate = useNavigate()
@@ -55,6 +57,16 @@ const ForumInitialize = () => {
   }
 
   /**
+   * 跳过初始化
+   */
+  const handleSkip = () => {
+    // 标记论坛已初始化
+    localStorage.setItem('forum_initialized', 'true')
+    // 跳转到论坛首页
+    navigate('/forum', { replace: true })
+  }
+
+  /**
    * 全选/全不选
    */
   const toggleSelectAll = () => {
@@ -88,7 +100,19 @@ const ForumInitialize = () => {
     const selectedCharacters = characters.filter(c => selectedIds.includes(c.id))
     
     setInitializing(true)
+    
+    // 显示初始化开始通知
+    notifyForumInitStart()
+    
+    setProgress({ current: 0, total: 3, message: '正在清除旧数据...' })
+    
+    // 清除旧的帖子和话题数据
+    localStorage.removeItem('forum_posts')
+    localStorage.removeItem('forum_topics_list')
+    localStorage.removeItem('forum_comments')
+    
     setProgress({ current: 0, total: 3, message: '正在生成话题和帖子...' })
+    notifyForumInitProgress('正在生成话题和帖子...')
 
     try {
       // 构建AI Prompt（一次性生成所有内容）
@@ -104,16 +128,22 @@ const ForumInitialize = () => {
         `${c.name}（${c.nickname || c.name}）- 性格：${c.personality || c.description || '未设置'} - 签名：${c.signature || '暂无'}`
       ).join('\n')
       
+      // 全部梗库（内置+自定义）
+      const allMemes = getMemesForAI()
+      
       const prompt = `你是论坛内容生成器。请根据用户信息生成论坛初始内容。
 
 ⚠️ 重要规则：
 1. 为每个AI角色生成符合其性格的论坛昵称和个性签名
 2. AI角色的原始名字（${selectedCharacters.map(c => c.name).join('、')}）保持不变
 3. 帖子内容要符合角色性格
+4. ${postStyle === '抽象' ? '可以在帖子中自然融入网络梗，让内容更有趣' : ''}
 
 用户兴趣：${interests.trim()}
 ${hotTopics.trim() ? `热点关注：${hotTopics.trim()}` : ''}
 帖子风格：${postStyle}
+
+${postStyle === '抽象' ? `\n常用网络梗库（1200+条，可自然使用）：\n${allMemes}\n` : ''}
 
 AI角色信息：
 ${characterInfo}
@@ -224,24 +254,75 @@ ${characterInfo}
       })
       
       // 分配帖子到话题并创建完整结构
+      const allForumPosts: any[] = [] // 收集所有帖子用于保存到forumStorage
+      
       topics.forEach(topic => {
         const topicPosts = posts.filter(p => p.topicName === topic.name)
-        topic.posts = topicPosts.map(p => ({
-          id: `post_${Date.now()}_${Math.random()}`,
-          authorId: users.find(u => u.name === p.authorName)?.id || `user_${Math.random()}`,
-          content: p.content,
-          likes: Math.floor(Math.random() * 100),
-          timestamp: Date.now() - Math.random() * 86400000 * 3, // 最近3天
-          comments: [],
-          tags: p.tags
-        }))
+        topic.posts = topicPosts.map(p => {
+          // 查找作者：先查NPC用户，再查AI角色
+          let author = users.find(u => u.name === p.authorName)
+          let isAICharacter = false
+          
+          if (!author) {
+            // 检查是否是AI角色
+            const aiChar = selectedCharacters.find(c => c.name === p.authorName)
+            if (aiChar) {
+              const aiInfo = aiCharacters.find(ai => ai.originalName === aiChar.name)
+              author = {
+                id: aiChar.id,
+                name: aiInfo?.forumNickname || aiChar.name,
+                avatar: aiInfo?.forumAvatar || aiChar.avatar || '😊',
+                bio: aiInfo?.forumSignature || aiChar.signature || ''
+              }
+              isAICharacter = true
+            } else {
+              // 默认作者
+              author = {
+                id: `user_${Math.random()}`,
+                name: p.authorName,
+                avatar: '😊',
+                bio: ''
+              }
+            }
+          }
+          
+          // 创建帖子对象
+          const postObj = {
+            id: `post_${Date.now()}_${Math.random()}`,
+            authorId: author.id,
+            authorName: author.name,
+            authorAvatar: author.avatar,
+            isVerified: isAICharacter, // AI角色显示认证标记
+            content: p.content,
+            type: 'text',
+            timestamp: Date.now() - Math.random() * 86400000 * 3, // 最近3天
+            likeCount: Math.floor(Math.random() * 100) + (isAICharacter ? 50 : 0), // AI角色的帖子更多赞
+            commentCount: Math.floor(Math.random() * 50),
+            shareCount: Math.floor(Math.random() * 30),
+            viewCount: Math.floor(Math.random() * 1000) + 100,
+            isLiked: false,
+            isFavorited: false,
+            tags: p.tags,
+            comments: []
+          }
+          
+          allForumPosts.push(postObj)
+          return postObj
+        })
         topic.postsCount = topic.posts.length
         topic.users = users.slice(0, 15) // 每个话题分配15个用户
       })
       
-      // 保存到localStorage
+      // 保存话题列表到localStorage
       localStorage.setItem('forum_topics_list', JSON.stringify(topics))
+      
+      // 保存帖子到forumStorage
+      localStorage.setItem('forum_posts', JSON.stringify(allForumPosts))
+      
+      // 标记论坛已初始化
       localStorage.setItem('forum_initialized', 'true')
+      
+      console.log(`💾 保存了 ${allForumPosts.length} 个帖子到forum_posts`)
       
       // 保存角色映射（使用AI生成的论坛昵称和签名）
       const forumProfiles = selectedCharacters.map(c => {
@@ -271,6 +352,9 @@ ${characterInfo}
       saveSelectedCharacterIds(selectedIds)
       
       setProgress({ current: 3, total: 3, message: '初始化完成！' })
+      
+      // 显示初始化完成通知
+      notifyForumInitComplete()
       
       // 直接跳转到论坛首页（不再需要角色列表页）
       setTimeout(() => {
@@ -449,7 +533,7 @@ ${characterInfo}
                   帖子风格偏好
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['轻松', '正经', '幽默'].map((style) => (
+                  {['轻松', '正经', '抽象'].map((style) => (
                     <button
                       key={style}
                       onClick={() => setPostStyle(style)}
@@ -501,6 +585,16 @@ ${characterInfo}
         >
           {initializing ? progress.message : step === 1 ? `下一步 (${selectedIds.length})` : '开始生成论坛'}
         </button>
+
+        {/* 跳过按钮 */}
+        {!initializing && (
+          <button
+            onClick={handleSkip}
+            className="w-full mt-3 py-3 text-[14px] text-gray-500 active:opacity-60 transition-opacity"
+          >
+            跳过，稍后再配置
+          </button>
+        )}
         
         {/* 进度条 */}
         {initializing && (

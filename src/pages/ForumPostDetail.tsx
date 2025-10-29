@@ -15,6 +15,8 @@ import { useForum } from '../context/ForumContext'
 import ForumCommentItem from '../components/ForumCommentItem'
 import { BackIcon, MoreVerticalIcon, AddIcon } from '../components/Icons'
 import type { ForumPost, ForumComment } from '../types/forum'
+import { getForumCharacters } from '../utils/forumAI'
+import { parseMentions, handleMentions, insertMention } from '../utils/forumAIReply'
 
 const ForumPostDetail = () => {
   const navigate = useNavigate()
@@ -28,6 +30,8 @@ const ForumPostDetail = () => {
   const [commentText, setCommentText] = useState('')
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null)
   const [showInput, setShowInput] = useState(false)
+  const [showMentionSelector, setShowMentionSelector] = useState(false)
+  const [cursorPosition, setCursorPosition] = useState(0)
   
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -71,17 +75,17 @@ const ForumPostDetail = () => {
   /**
    * 发送评论
    */
-  const handleSendComment = () => {
+  const handleSendComment = async () => {
     if (!post || !commentText.trim()) return
 
     try {
       const currentUser = {
-        id: 'user_current',
+        id: 'currentUser',
         name: '我',
-        avatar: '',
+        avatar: '😊',
       }
 
-      const newComment = addComment({
+      addComment({
         postId: post.id,
         authorId: currentUser.id,
         authorName: currentUser.name,
@@ -94,13 +98,30 @@ const ForumPostDetail = () => {
         likeCount: 0,
       })
 
-      // 重新加载评论列表（确保从存储中获取最新数据）
+      // 检查是否@了角色，触发AI回复
+      const mentions = parseMentions(commentText)
+      if (mentions.length > 0) {
+        console.log('🎯 检测到@角色，准备生成回复:', mentions)
+        // 异步处理AI回复，不阻塞用户操作
+        handleMentions(
+          post.id,
+          commentText.trim(),
+          currentUser.id,
+          currentUser.name,
+          replyTo?.id
+        ).then(() => {
+          // AI回复完成后刷新评论列表
+          const updatedComments = getComments(post.id)
+          setComments(updatedComments)
+        })
+      }
+      
+      // 立即刷新评论列表
       const updatedComments = getComments(post.id)
       setComments(updatedComments)
       
       setCommentText('')
       setReplyTo(null)
-      setShowInput(false)
       
       // 更新帖子评论数
       setPost(prev => prev ? {
@@ -370,11 +391,25 @@ const ForumPostDetail = () => {
           </div>
         )}
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowMentionSelector(!showMentionSelector)}
+            className="w-9 h-9 flex items-center justify-center text-[#ff6c00] active:opacity-60"
+            title="@角色"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M16 8h-6a4 4 0 1 0 0 8h0V14"/>
+            </svg>
+          </button>
           <input
             ref={inputRef}
             type="text"
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={(e) => {
+              setCommentText(e.target.value)
+              setCursorPosition(e.target.selectionStart || 0)
+            }}
+            onClick={(e) => setCursorPosition((e.target as HTMLInputElement).selectionStart || 0)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
             placeholder={replyTo ? `回复 @${replyTo.name}` : "说点什么..."}
             className="flex-1 h-10 px-3 bg-gray-100 rounded-full text-[14px] outline-none"
@@ -391,6 +426,46 @@ const ForumPostDetail = () => {
             发送
           </button>
         </div>
+
+        {/* 角色选择器 */}
+        {showMentionSelector && (
+          <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-2xl max-h-[300px] overflow-y-auto">
+            <div className="p-2">
+              <div className="text-[13px] text-gray-500 px-3 py-2">选择要@的角色</div>
+              {getForumCharacters().map((character) => (
+                <button
+                  key={character.characterId}
+                  onClick={() => {
+                    const result = insertMention(commentText, cursorPosition, character.originalName)
+                    setCommentText(result.newValue)
+                    setCursorPosition(result.newCursorPos)
+                    setShowMentionSelector(false)
+                    inputRef.current?.focus()
+                  }}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 active:bg-gray-100 rounded-lg"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">
+                    {character.forumAvatar || character.originalAvatar || '😊'}
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-[14px] font-medium text-gray-900 truncate">
+                      {character.forumNickname || character.originalName}
+                    </div>
+                    <div className="text-[12px] text-gray-500 truncate">
+                      @{character.originalName}
+                    </div>
+                  </div>
+                </button>
+              ))}
+              {getForumCharacters().length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <p className="text-[14px]">暂无可@的角色</p>
+                  <p className="text-[12px] mt-1">请先在论坛初始化时添加角色</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

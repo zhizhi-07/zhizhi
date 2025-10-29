@@ -7,7 +7,7 @@
  */
 
 import type { Character } from '../context/CharacterContext'
-import { memesData } from './memesRetrieval'
+import { getAllMemes } from './memeManager'
 
 // ==================== 类型定义 ====================
 
@@ -16,7 +16,11 @@ export interface ForumCharacterProfile {
   originalName: string
   originalAvatar: string
   forumName: string
+  forumNickname?: string        // 论坛昵称
+  forumAvatar?: string           // 论坛头像emoji
   forumBio: string
+  forumSignature?: string        // 个性签名
+  personality?: string           // 性格描述
   followersCount: number
   followingCount: number
   influence: 'high' | 'medium' | 'low'
@@ -364,8 +368,8 @@ export function saveSelectedCharacterIds(ids: string[]): void {
  * 获取梗库 - 直接从微信梗库读取（包含含义）
  */
 function getMemes(): Array<{ 梗: string, 含义: string }> {
-  // 直接使用微信梗库，包含梗和含义
-  return memesData.map((m) => ({
+  // 使用统一梗库（内置+自定义）
+  return getAllMemes().map((m) => ({
     梗: m['梗'],
     含义: m['含义']
   }))

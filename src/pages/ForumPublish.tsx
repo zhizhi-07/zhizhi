@@ -14,6 +14,9 @@ import { useSettings } from '../context/SettingsContext'
 import { useForum } from '../context/ForumContext'
 import { BackIcon, ImageIcon, CameraIcon, LocationIcon, AddIcon } from '../components/Icons'
 import { PostType } from '../types/forum'
+import { getForumCharacters } from '../utils/forumAI'
+import { parseMentions, handleMentions, insertMention } from '../utils/forumAIReply'
+import { handlePostInteractions } from '../utils/forumAutoReply'
 
 const ForumPublish = () => {
   const navigate = useNavigate()
@@ -28,6 +31,8 @@ const ForumPublish = () => {
   const [showTagInput, setShowTagInput] = useState(false)
   const [currentTag, setCurrentTag] = useState('')
   const [publishing, setPublishing] = useState(false)
+  const [showMentionSelector, setShowMentionSelector] = useState(false)
+  const [cursorPosition, setCursorPosition] = useState(0)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -93,14 +98,14 @@ const ForumPublish = () => {
     try {
       setPublishing(true)
       
-      // 获取当前用户信息（这里使用模拟数据）
+      // 获取当前用户信息
       const currentUser = {
-        id: 'user_current',
+        id: 'currentUser',
         name: '我',
-        avatar: '',
+        avatar: '😊',
       }
 
-      addPost({
+      const newPost = addPost({
         authorId: currentUser.id,
         authorName: currentUser.name,
         authorAvatar: currentUser.avatar,
@@ -116,6 +121,25 @@ const ForumPublish = () => {
         isLiked: false,
         isFavorited: false,
       })
+
+      console.log('✅ 帖子发布成功:', newPost.id)
+
+      // 检查是否@了角色，触发AI回复
+      const mentions = parseMentions(content)
+      if (mentions.length > 0) {
+        console.log('🎯 帖子中检测到@角色:', mentions)
+        // 异步处理AI评论
+        handleMentions(
+          newPost.id,
+          content.trim(),
+          currentUser.id,
+          currentUser.name
+        )
+      } else {
+        // 没有@角色时，触发随机角色互动（评论、楼中楼、私信）
+        console.log('🎲 触发随机角色互动')
+        handlePostInteractions(newPost)
+      }
 
       // 发布成功，返回论坛页面
       navigate('/forum', { replace: true })
@@ -199,15 +223,71 @@ const ForumPublish = () => {
       {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto">
         {/* 文字输入 */}
-        <div className="p-4">
+        <div className="p-4 relative">
           <textarea
             ref={textareaRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value)
+              setCursorPosition(e.target.selectionStart || 0)
+            }}
+            onClick={(e) => setCursorPosition((e.target as HTMLTextAreaElement).selectionStart || 0)}
             placeholder="分享新鲜事..."
             className="w-full min-h-[150px] text-[16px] text-gray-900 placeholder-gray-400 outline-none resize-none"
             autoFocus
           />
+          
+          {/* @角色按钮 */}
+          <button
+            onClick={() => setShowMentionSelector(!showMentionSelector)}
+            className="absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center text-[#ff6c00] active:opacity-60 bg-white rounded-full shadow-sm"
+            title="@角色"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M16 8h-6a4 4 0 1 0 0 8h0V14"/>
+            </svg>
+          </button>
+
+          {/* 角色选择器 */}
+          {showMentionSelector && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl max-h-[300px] overflow-y-auto z-50">
+              <div className="p-2">
+                <div className="text-[13px] text-gray-500 px-3 py-2">选择要@的角色</div>
+                {getForumCharacters().map((character) => (
+                  <button
+                    key={character.characterId}
+                    onClick={() => {
+                      const result = insertMention(content, cursorPosition, character.originalName)
+                      setContent(result.newValue)
+                      setCursorPosition(result.newCursorPos)
+                      setShowMentionSelector(false)
+                      textareaRef.current?.focus()
+                    }}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 active:bg-gray-100 rounded-lg"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">
+                      {character.forumAvatar || character.originalAvatar || '😊'}
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="text-[14px] font-medium text-gray-900 truncate">
+                        {character.forumNickname || character.originalName}
+                      </div>
+                      <div className="text-[12px] text-gray-500 truncate">
+                        @{character.originalName}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+                {getForumCharacters().length === 0 && (
+                  <div className="text-center text-gray-400 py-8">
+                    <p className="text-[14px]">暂无可@的角色</p>
+                    <p className="text-[12px] mt-1">请先在论坛初始化时添加角色</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 图片预览 */}

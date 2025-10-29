@@ -27,13 +27,18 @@ const AlipayApp = ({ content }: AlipayAppProps) => {
                     ? 'bg-green-400/30' 
                     : 'bg-red-400/30'
                 } flex items-center justify-center`}>
-                  <span className="text-lg">
-                    {bill.type === 'income' ? '💰' : '💸'}
-                  </span>
+                  {bill.type === 'income' ? (
+                    <span className="text-green-600 font-bold">+</span>
+                  ) : (
+                    <span className="text-red-600 font-bold">-</span>
+                  )}
                 </div>
                 <div>
                   <div className="font-medium text-gray-800">{bill.title}</div>
-                  <div className="text-xs text-gray-500">{bill.time}</div>
+                  {bill.reason && (
+                    <div className="text-xs text-gray-600 mt-0.5">{bill.reason}</div>
+                  )}
+                  <div className="text-xs text-gray-500 mt-0.5">{bill.time}</div>
                 </div>
               </div>
               <div className={`text-lg font-bold ${

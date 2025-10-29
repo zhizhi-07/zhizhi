@@ -19,17 +19,38 @@ const PublishMoment = () => {
   const [showLocationInput, setShowLocationInput] = useState(false)
   const [images, setImages] = useState<Array<{id: string, url: string}>>([])
   const [isPublishing, setIsPublishing] = useState(false)
+  
+  // 提醒谁看
+  const [showRemindSelector, setShowRemindSelector] = useState(false)
+  const [remindUsers, setRemindUsers] = useState<string[]>([])
+  
+  // 谁可以看
+  const [showVisibilitySelector, setShowVisibilitySelector] = useState(false)
+  const [visibility, setVisibility] = useState<'public' | 'private' | 'partial'>('public')
+  const [visibleTo, setVisibleTo] = useState<string[]>([])
 
   // 触发AI角色查看朋友圈（批量处理，只调用一次API）
   const triggerAIInteractions = async (momentId: string, momentData: any) => {
     // 获取所有启用了AI朋友圈功能的角色
-    const enabledCharacters = characters.filter(char => {
+    let enabledCharacters = characters.filter(char => {
       const enabled = localStorage.getItem(`ai_moments_enabled_${char.id}`)
       return enabled === 'true'
     })
+    
+    // 根据可见性设置过滤角色
+    if (momentData.visibility === 'private') {
+      console.log('🔒 朋友圈设置为私密，AI角色无法查看')
+      return
+    } else if (momentData.visibility === 'partial') {
+      // 只有在可见列表中的角色才能看到
+      enabledCharacters = enabledCharacters.filter(char => 
+        momentData.visibleTo.includes(char.id)
+      )
+      console.log(`👥 朋友圈部分可见，${enabledCharacters.length} 个角色可以查看`)
+    }
 
     if (enabledCharacters.length === 0) {
-      console.log('📭 没有角色启用AI朋友圈功能')
+      console.log('📭 没有角色可以查看此朋友圈')
       return
     }
 
@@ -223,7 +244,10 @@ const PublishMoment = () => {
       userAvatar: currentUser.avatar,
       content: content.trim(),
       images: images,
-      location: location.trim() || undefined
+      location: location.trim() || undefined,
+      visibility: visibility,
+      visibleTo: visibility === 'partial' ? visibleTo : [],
+      remindUsers: remindUsers
     }
 
     // 生成朋友圈ID
@@ -231,6 +255,34 @@ const PublishMoment = () => {
     
     // 添加朋友圈
     addMoment(momentData)
+    
+    // 给被提醒的用户发送通知
+    if (remindUsers.length > 0) {
+      remindUsers.forEach(userId => {
+        const character = characters.find(c => c.id === userId)
+        if (character) {
+          const chatMessages = localStorage.getItem(`chat_messages_${userId}`)
+          const messages = chatMessages ? JSON.parse(chatMessages) : []
+          
+          const remindMessage = {
+            id: Date.now() + Math.random(),
+            type: 'system',
+            content: `💬 ${currentUser.name} 提醒你查看Ta的朋友圈`,
+            time: new Date().toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: Date.now(),
+            messageType: 'system',
+            isHidden: false
+          }
+          
+          messages.push(remindMessage)
+          localStorage.setItem(`chat_messages_${userId}`, JSON.stringify(messages))
+          console.log(`📬 已向 ${character.name} 发送朋友圈提醒`)
+        }
+      })
+    }
 
     // 为每个启用AI朋友圈的角色添加聊天记录
     characters.forEach(character => {
@@ -380,22 +432,180 @@ const PublishMoment = () => {
 
           <div className="border-t border-gray-100" />
 
-          <button className="w-full flex items-center justify-between px-4 py-4 ios-button">
+          <button 
+            onClick={() => setShowRemindSelector(true)}
+            className="w-full flex items-center justify-between px-4 py-4 ios-button"
+          >
             <span className="text-gray-700 font-medium">提醒谁看</span>
-            <span className="text-gray-400 text-xl">›</span>
+            <div className="flex items-center gap-2">
+              {remindUsers.length > 0 && (
+                <span className="text-gray-400 text-sm">{remindUsers.length}人</span>
+              )}
+              <span className="text-gray-400 text-xl">›</span>
+            </div>
           </button>
 
           <div className="border-t border-gray-100" />
 
-          <button className="w-full flex items-center justify-between px-4 py-4 ios-button">
+          <button 
+            onClick={() => setShowVisibilitySelector(true)}
+            className="w-full flex items-center justify-between px-4 py-4 ios-button"
+          >
             <span className="text-gray-700 font-medium">谁可以看</span>
             <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">公开</span>
+              <span className="text-gray-400 text-sm">
+                {visibility === 'public' ? '公开' : visibility === 'private' ? '私密' : `${visibleTo.length}人可见`}
+              </span>
               <span className="text-gray-400 text-xl">›</span>
             </div>
           </button>
         </div>
       </div>
+
+      {/* 提醒谁看选择器 */}
+      {showRemindSelector && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowRemindSelector(false)}>
+          <div 
+            className="bg-white w-full rounded-t-3xl max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">提醒谁看</h2>
+              <button 
+                onClick={() => setShowRemindSelector(false)}
+                className="text-blue-500 font-medium ios-button"
+              >
+                完成
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {characters.map((character) => {
+                const isSelected = remindUsers.includes(character.id)
+                return (
+                  <button
+                    key={character.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        setRemindUsers(prev => prev.filter(id => id !== character.id))
+                      } else {
+                        setRemindUsers(prev => [...prev, character.id])
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl ios-button transition-colors"
+                  >
+                    <img 
+                      src={character.avatar} 
+                      alt={character.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                    <div className="flex-1 text-left">
+                      <div className="text-base font-medium text-gray-900">{character.name}</div>
+                    </div>
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                      isSelected ? 'bg-green-500 border-green-500' : 'border-gray-300'
+                    }`}>
+                      {isSelected && <span className="text-white text-sm">✓</span>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 谁可以看选择器 */}
+      {showVisibilitySelector && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={() => setShowVisibilitySelector(false)}>
+          <div 
+            className="bg-white w-full rounded-t-3xl max-h-[70vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">谁可以看</h2>
+              <button 
+                onClick={() => setShowVisibilitySelector(false)}
+                className="text-blue-500 font-medium ios-button"
+              >
+                完成
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {/* 可见性选项 */}
+              <div className="p-4 space-y-2">
+                <button
+                  onClick={() => {
+                    setVisibility('public')
+                    setVisibleTo([])
+                  }}
+                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 ios-button transition-colors"
+                >
+                  <span className="text-base text-gray-900">公开</span>
+                  {visibility === 'public' && <span className="text-green-500 text-lg">✓</span>}
+                </button>
+                <button
+                  onClick={() => {
+                    setVisibility('private')
+                    setVisibleTo([])
+                  }}
+                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 ios-button transition-colors"
+                >
+                  <span className="text-base text-gray-900">私密</span>
+                  {visibility === 'private' && <span className="text-green-500 text-lg">✓</span>}
+                </button>
+                <button
+                  onClick={() => {
+                    if (visibility !== 'partial') {
+                      setVisibility('partial')
+                    }
+                  }}
+                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 ios-button transition-colors"
+                >
+                  <span className="text-base text-gray-900">部分可见</span>
+                  {visibility === 'partial' && <span className="text-green-500 text-lg">✓</span>}
+                </button>
+              </div>
+
+              {/* 部分可见时显示用户选择 */}
+              {visibility === 'partial' && (
+                <div className="border-t border-gray-100 p-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">选择可见用户</h3>
+                  {characters.map((character) => {
+                    const isSelected = visibleTo.includes(character.id)
+                    return (
+                      <button
+                        key={character.id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setVisibleTo(prev => prev.filter(id => id !== character.id))
+                          } else {
+                            setVisibleTo(prev => [...prev, character.id])
+                          }
+                        }}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 rounded-xl ios-button transition-colors"
+                      >
+                        <img 
+                          src={character.avatar} 
+                          alt={character.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                        <div className="flex-1 text-left">
+                          <div className="text-sm font-medium text-gray-900">{character.name}</div>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          isSelected ? 'bg-green-500 border-green-500' : 'border-gray-300'
+                        }`}>
+                          {isSelected && <span className="text-white text-xs">✓</span>}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

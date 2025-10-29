@@ -18,6 +18,16 @@ const ForumWelcome = () => {
     setTimeout(() => setShowContent(true), 100)
   }, [])
 
+  /**
+   * 跳过初始化
+   */
+  const handleSkip = () => {
+    // 标记论坛已初始化
+    localStorage.setItem('forum_initialized', 'true')
+    // 跳转到论坛首页
+    navigate('/forum', { replace: true })
+  }
+
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-orange-50 via-white to-pink-50 p-6">
       <div className={`text-center transition-all duration-700 ${showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -48,16 +58,26 @@ const ForumWelcome = () => {
         </p>
 
         {/* 进入按钮 */}
-        <button
-          onClick={() => navigate('/forum/initialize')}
-          className="px-8 py-3.5 bg-gradient-to-r from-[#ff8140] to-[#ff6c00] text-white text-[16px] font-semibold rounded-full shadow-lg active:scale-95 transition-transform hover:shadow-xl"
-        >
-          进入论坛
-        </button>
+        <div className="space-y-3">
+          <button
+            onClick={() => navigate('/forum/initialize')}
+            className="px-8 py-3.5 bg-gradient-to-r from-[#ff8140] to-[#ff6c00] text-white text-[16px] font-semibold rounded-full shadow-lg active:scale-95 transition-transform hover:shadow-xl"
+          >
+            进入论坛
+          </button>
+
+          {/* 跳过按钮 */}
+          <button
+            onClick={handleSkip}
+            className="block mx-auto text-[14px] text-gray-500 active:opacity-60 transition-opacity px-4 py-2"
+          >
+            跳过，直接进入
+          </button>
+        </div>
 
         {/* 提示文字 */}
         <p className="text-xs text-gray-400 mt-8">
-          首次使用需要初始化角色
+          首次使用建议初始化角色以获得更好体验
         </p>
       </div>
     </div>

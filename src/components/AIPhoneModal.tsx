@@ -15,6 +15,8 @@ interface AIPhoneModalProps {
   onClose: () => void
   characterId: string
   characterName: string
+  forceNew?: boolean  // 是否强制生成新内容
+  historyContent?: AIPhoneContent  // 历史记录内容
 }
 
 interface PhoneApp {
@@ -25,7 +27,7 @@ interface PhoneApp {
   onClick: () => void
 }
 
-const AIPhoneModal = ({ onClose, characterId, characterName }: AIPhoneModalProps) => {
+const AIPhoneModal = ({ onClose, characterId, characterName, forceNew = true, historyContent }: AIPhoneModalProps) => {
   const [selectedApp, setSelectedApp] = useState<string | null>(null)
   const [currentTime, setCurrentTime] = useState(new Date())
   const [phoneContent, setPhoneContent] = useState<AIPhoneContent | null>(null)
@@ -39,12 +41,20 @@ const AIPhoneModal = ({ onClose, characterId, characterName }: AIPhoneModalProps
     return () => clearInterval(timer)
   }, [])
 
-  // 生成手机内容
+  // 加载手机内容
   useEffect(() => {
     const loadContent = async () => {
+      // 如果有历史记录内容，直接使用
+      if (historyContent) {
+        setPhoneContent(historyContent)
+        setIsLoading(false)
+        return
+      }
+
+      // 否则调用API生成
       setIsLoading(true)
       try {
-        const content = await generateAIPhoneContent(characterId, characterName)
+        const content = await generateAIPhoneContent(characterId, characterName, forceNew)
         setPhoneContent(content)
       } catch (error) {
         console.error('加载手机内容失败:', error)
@@ -54,7 +64,7 @@ const AIPhoneModal = ({ onClose, characterId, characterName }: AIPhoneModalProps
     }
     
     loadContent()
-  }, [characterId, characterName])
+  }, [characterId, characterName, forceNew, historyContent])
 
   // 所有应用（单页显示）
   const allApps: PhoneApp[] = [
@@ -66,7 +76,7 @@ const AIPhoneModal = ({ onClose, characterId, characterName }: AIPhoneModalProps
     { id: 'photos', name: '相册', IconComponent: ImageIcon, color: 'from-pink-300/50 to-pink-400/50', onClick: () => setSelectedApp('photos') },
     { id: 'notes', name: '备忘录', IconComponent: NotesIcon, color: 'from-yellow-300/50 to-yellow-400/50', onClick: () => setSelectedApp('notes') },
     { id: 'music', name: '音乐', IconComponent: MusicIcon, color: 'from-red-300/50 to-red-400/50', onClick: () => setSelectedApp('music') },
-    { id: 'maps', name: '地图', IconComponent: LocationIcon, color: 'from-green-400/50 to-green-500/50', onClick: () => setSelectedApp('maps') },
+    { id: 'footprints', name: '足迹', IconComponent: LocationIcon, color: 'from-green-400/50 to-green-500/50', onClick: () => setSelectedApp('footprints') },
   ]
 
   const renderAppContent = (appId: string) => {
@@ -96,7 +106,7 @@ const AIPhoneModal = ({ onClose, characterId, characterName }: AIPhoneModalProps
         return <NotesApp content={phoneContent} />
       case 'music':
         return <MusicApp content={phoneContent} />
-      case 'maps':
+      case 'footprints':
         return <MapsApp content={phoneContent} />
       default:
         return (

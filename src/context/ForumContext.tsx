@@ -172,17 +172,35 @@ export const ForumProvider: React.FC<ForumProviderProps> = ({ children }) => {
    */
   const toggleLike = useCallback((postId: string): boolean => {
     try {
+      const post = forumStorage.getPostById(postId)
+      if (!post) return false
+      
+      const wasLiked = forumStorage.isPostLiked(postId)
       const success = forumStorage.togglePostLike(postId)
+      
       if (success) {
-        setPosts(prev => prev.map(post => {
-          if (post.id === postId) {
+        // 如果是点赞（不是取消点赞），且不是给自己的帖子点赞，则发送通知
+        if (!wasLiked && post.authorId !== 'currentUser') {
+          forumStorage.addNotification({
+            type: 'like',
+            fromUserId: 'currentUser',
+            fromUserName: '我',
+            fromUserAvatar: '😊',
+            postId: postId,
+            content: '赞了你的帖子',
+            isRead: false
+          })
+        }
+        
+        setPosts(prev => prev.map(p => {
+          if (p.id === postId) {
             return {
-              ...post,
-              isLiked: !post.isLiked,
-              likeCount: post.isLiked ? post.likeCount - 1 : post.likeCount + 1
+              ...p,
+              isLiked: !p.isLiked,
+              likeCount: p.isLiked ? p.likeCount - 1 : p.likeCount + 1
             }
           }
-          return post
+          return p
         }))
       }
       return success
@@ -231,6 +249,35 @@ export const ForumProvider: React.FC<ForumProviderProps> = ({ children }) => {
   const addComment = useCallback((commentData: Omit<ForumComment, 'id' | 'timestamp'>): ForumComment => {
     try {
       const newComment = forumStorage.addComment(commentData)
+      
+      // 给帖子作者发送评论通知（不是自己评论自己的帖子）
+      const post = forumStorage.getPostById(commentData.postId)
+      if (post && post.authorId !== 'currentUser' && post.authorId !== commentData.authorId) {
+        forumStorage.addNotification({
+          type: 'comment',
+          fromUserId: 'currentUser',
+          fromUserName: '我',
+          fromUserAvatar: '😊',
+          postId: commentData.postId,
+          commentId: newComment.id,
+          content: `评论了你的帖子：${commentData.content.substring(0, 20)}${commentData.content.length > 20 ? '...' : ''}`,
+          isRead: false
+        })
+      }
+      
+      // 如果是回复评论，给被回复者发送通知
+      if (commentData.replyTo && commentData.replyToUserId && commentData.replyToUserId !== 'currentUser') {
+        forumStorage.addNotification({
+          type: 'comment',
+          fromUserId: 'currentUser',
+          fromUserName: '我',
+          fromUserAvatar: '😊',
+          postId: commentData.postId,
+          commentId: newComment.id,
+          content: `回复了你：${commentData.content.substring(0, 20)}${commentData.content.length > 20 ? '...' : ''}`,
+          isRead: false
+        })
+      }
       
       // 更新对应帖子的评论数
       setPosts(prev => prev.map(post => {

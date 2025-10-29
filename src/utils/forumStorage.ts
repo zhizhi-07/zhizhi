@@ -19,6 +19,7 @@ import type {
   PaginatedResult,
   PostSortType
 } from '../types/forum'
+import { notifyNewComment, notifyNewLike, notifyNewFollow, notifyNewDirectMessage } from './forumNotifications'
 
 // ==================== 存储键名常量 ====================
 
@@ -332,6 +333,14 @@ export function getLikedPostIds(): string[] {
 }
 
 /**
+ * 检查帖子是否已点赞
+ */
+export function isPostLiked(postId: string): boolean {
+  const likedIds = getLikedPostIds()
+  return likedIds.includes(postId)
+}
+
+/**
  * 点赞帖子
  */
 export function likePost(postId: string): boolean {
@@ -454,6 +463,76 @@ export function togglePostFavorite(postId: string): boolean {
     return unfavoritePost(postId)
   } else {
     return favoritePost(postId)
+  }
+}
+
+// ==================== 关注用户相关操作 ====================
+
+/**
+ * 获取关注的用户ID列表
+ */
+export function getFollowingUserIds(): string[] {
+  return safeJSONParse<string[]>(
+    localStorage.getItem(STORAGE_KEYS.FOLLOWING_USERS),
+    []
+  )
+}
+
+/**
+ * 检查是否已关注用户
+ */
+export function isUserFollowed(userId: string): boolean {
+  const followingIds = getFollowingUserIds()
+  return followingIds.includes(userId)
+}
+
+/**
+ * 关注用户
+ */
+export function followUser(userId: string, userName: string): boolean {
+  const followingIds = getFollowingUserIds()
+  if (followingIds.includes(userId)) return false
+  
+  followingIds.push(userId)
+  localStorage.setItem(STORAGE_KEYS.FOLLOWING_USERS, JSON.stringify(followingIds))
+  
+  // 如果不是关注自己，给对方发送通知
+  if (userId !== 'currentUser') {
+    addNotification({
+      type: 'follow',
+      fromUserId: 'currentUser',
+      fromUserName: '我',
+      fromUserAvatar: '😊',
+      content: '关注了你',
+      isRead: false
+    })
+  }
+  
+  return true
+}
+
+/**
+ * 取消关注用户
+ */
+export function unfollowUser(userId: string): boolean {
+  const followingIds = getFollowingUserIds()
+  const filtered = followingIds.filter(id => id !== userId)
+  if (filtered.length === followingIds.length) return false
+  
+  localStorage.setItem(STORAGE_KEYS.FOLLOWING_USERS, JSON.stringify(filtered))
+  return true
+}
+
+/**
+ * 切换关注用户状态
+ */
+export function toggleFollowUser(userId: string, userName: string): boolean {
+  const isFollowing = isUserFollowed(userId)
+  
+  if (isFollowing) {
+    return unfollowUser(userId)
+  } else {
+    return followUser(userId, userName)
   }
 }
 
@@ -697,6 +776,23 @@ export function addNotification(notification: Omit<ForumNotification, 'id' | 'ti
   }
   notifications.unshift(newNotification) // 新通知放在最前面
   saveNotifications(notifications)
+  
+  // 触发通知栏显示
+  if (notification.type === 'comment' && notification.fromUserName) {
+    notifyNewComment(
+      notification.fromUserName,
+      notification.content || '',
+      notification.postId || ''
+    )
+  } else if (notification.type === 'like' && notification.fromUserName) {
+    notifyNewLike(
+      notification.fromUserName,
+      notification.postId || ''
+    )
+  } else if (notification.type === 'follow' && notification.fromUserName) {
+    notifyNewFollow(notification.fromUserName)
+  }
+  
   return newNotification
 }
 
@@ -891,6 +987,12 @@ export function addDirectMessage(message: Omit<ForumDirectMessage, 'id'>): Forum
   }
   messages.unshift(newMessage)
   localStorage.setItem(STORAGE_KEYS.DIRECT_MESSAGES, JSON.stringify(messages))
+  
+  // 触发私信通知栏显示
+  if (message.toUserId === 'currentUser' && message.fromUserName) {
+    notifyNewDirectMessage(message.fromUserName, message.content)
+  }
+  
   return newMessage
 }
 
