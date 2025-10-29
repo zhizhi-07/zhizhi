@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useForum } from '../context/ForumContext'
-import { BackIcon, ImageIcon, CameraIcon, LocationIcon } from '../components/Icons'
+import { BackIcon, ImageIcon, CameraIcon, LocationIcon, AddIcon } from '../components/Icons'
 import { PostType } from '../types/forum'
 
 const ForumPublish = () => {
@@ -100,7 +100,7 @@ const ForumPublish = () => {
         avatar: '',
       }
 
-      const newPost = addPost({
+      addPost({
         authorId: currentUser.id,
         authorName: currentUser.name,
         authorAvatar: currentUser.avatar,
@@ -110,6 +110,11 @@ const ForumPublish = () => {
         tags: tags.length > 0 ? tags : undefined,
         location: location || undefined,
         isVerified: false,
+        likeCount: 0,
+        commentCount: 0,
+        shareCount: 0,
+        isLiked: false,
+        isFavorited: false,
       })
 
       // 发布成功，返回论坛页面
@@ -188,6 +193,7 @@ const ForumPublish = () => {
         >
           {publishing ? '发布中...' : '发布'}
         </button>
+      </div>
       </div>
 
       {/* 内容区域 */}

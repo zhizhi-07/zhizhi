@@ -90,6 +90,8 @@ const ForumPostDetail = () => {
         replyTo: replyTo?.id,
         replyToUser: replyTo?.name,
         replyToUserId: replyTo?.id,
+        isLiked: false,
+        likeCount: 0,
       })
 
       setComments(prev => [...prev, newComment])
@@ -177,6 +179,7 @@ const ForumPostDetail = () => {
         <button className="w-9 h-9 flex items-center justify-center active:opacity-60">
           <MoreVerticalIcon size={20} className="text-gray-800" />
         </button>
+      </div>
       </div>
 
       {/* 内容区域 */}
