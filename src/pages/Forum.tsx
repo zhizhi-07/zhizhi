@@ -76,15 +76,7 @@ const Forum = () => {
   }
 
   /**
-   * 转发帖子
-   */
-  const handleShare = (postId: string) => {
-    // TODO: 实现转发功能
-    console.log('转发帖子:', postId)
-  }
-
-  /**
-   * 收藏/取消收藏
+   * 收藏帖子
    */
   const handleFavorite = (postId: string) => {
     toggleFavorite(postId)
@@ -163,7 +155,7 @@ const Forum = () => {
           <span className="text-[11px] text-[#ff6c00] font-medium">首页</span>
         </button>
         
-        {/* 超话 */}
+        {/* 话题 */}
         <button 
           onClick={() => navigate('/forum/topics')}
           className="flex flex-col items-center gap-1 py-1 active:opacity-60"
@@ -171,7 +163,7 @@ const Forum = () => {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-600">
             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" strokeLinecap="round"/>
           </svg>
-          <span className="text-[11px] text-gray-600">超话</span>
+          <span className="text-[11px] text-gray-600">话题</span>
         </button>
         
         {/* 发布 */}
@@ -219,7 +211,6 @@ const Forum = () => {
         post={post}
         onLike={handleLike}
         onComment={handleComment}
-        onShare={handleShare}
         onFavorite={handleFavorite}
       />
     )

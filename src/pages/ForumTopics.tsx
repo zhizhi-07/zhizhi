@@ -1,5 +1,5 @@
 /**
- * ForumTopics.tsx - 论坛话题/超话页面
+ * ForumTopics.tsx - 论坛话题页面
  * 
  * 显示热门话题，可以关注话题
  * 
@@ -135,7 +135,7 @@ const ForumTopics = () => {
             <BackIcon size={22} className="text-gray-800" />
           </button>
 
-          <h1 className="text-[17px] font-semibold text-gray-900">超话</h1>
+          <h1 className="text-[17px] font-semibold text-gray-900">话题</h1>
 
           <div className="flex items-center gap-2">
             <button
@@ -274,7 +274,7 @@ const ForumTopics = () => {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-[#ff6c00]">
             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
           </svg>
-          <span className="text-[11px] text-[#ff6c00] font-medium">超话</span>
+          <span className="text-[11px] text-[#ff6c00] font-medium">话题</span>
         </button>
         
         <button 

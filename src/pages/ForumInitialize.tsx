@@ -13,22 +13,24 @@ import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
 import { BackIcon, AddIcon } from '../components/Icons'
 import { 
-  initializeForumCharacters, 
   saveForumCharacters,
   saveSelectedCharacterIds,
   getSelectedCharacterIds
 } from '../utils/forumAI'
-import type { Character } from '../context/CharacterContext'
 
 const ForumInitialize = () => {
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
   
+  const [step, setStep] = useState(1) // 1=选角色, 2=填写兴趣
   const [selectedIds, setSelectedIds] = useState<string[]>(() => {
     // 读取上次选择
     return getSelectedCharacterIds()
   })
+  const [interests, setInterests] = useState('') // 用户兴趣
+  const [hotTopics, setHotTopics] = useState('') // 热点话题
+  const [postStyle, setPostStyle] = useState('轻松') // 帖子风格
   const [initializing, setInitializing] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' })
 
@@ -64,37 +66,220 @@ const ForumInitialize = () => {
   }
 
   /**
-   * 开始初始化
+   * 进入下一步（填写兴趣）
    */
-  const handleInitialize = async () => {
+  const handleNext = () => {
     if (selectedIds.length === 0) {
       alert('请至少选择一个角色')
+      return
+    }
+    setStep(2)
+  }
+
+  /**
+   * 开始初始化（方案B：一次性生成）
+   */
+  const handleInitialize = async () => {
+    if (!interests.trim()) {
+      alert('请填写你的兴趣爱好')
       return
     }
 
     const selectedCharacters = characters.filter(c => selectedIds.includes(c.id))
     
     setInitializing(true)
-    setProgress({ current: 0, total: selectedCharacters.length + 1, message: '准备初始化...' })
+    setProgress({ current: 0, total: 3, message: '正在生成话题和帖子...' })
 
     try {
-      // 调用AI进行初始化（方案A - 顺序调用）
-      const profiles = await initializeForumCharacters(
-        selectedCharacters,
-        (current, total, message) => {
-          setProgress({ current, total, message })
+      // 构建AI Prompt（一次性生成所有内容）
+      const apiSettings = localStorage.getItem('apiSettings')
+      if (!apiSettings) {
+        throw new Error('请先配置API')
+      }
+      
+      const settings = JSON.parse(apiSettings)
+      
+      // 构建prompt - 包含完整的AI角色信息
+      const characterInfo = selectedCharacters.map(c => 
+        `${c.name}（${c.nickname || c.name}）- 性格：${c.personality || c.description || '未设置'} - 签名：${c.signature || '暂无'}`
+      ).join('\n')
+      
+      const prompt = `你是论坛内容生成器。请根据用户信息生成论坛初始内容。
+
+⚠️ 重要规则：
+1. 为每个AI角色生成符合其性格的论坛昵称和个性签名
+2. AI角色的原始名字（${selectedCharacters.map(c => c.name).join('、')}）保持不变
+3. 帖子内容要符合角色性格
+
+用户兴趣：${interests.trim()}
+${hotTopics.trim() ? `热点关注：${hotTopics.trim()}` : ''}
+帖子风格：${postStyle}
+
+AI角色信息：
+${characterInfo}
+
+请生成内容，格式（用|分隔，每行一个）：
+
+角色|原名|论坛昵称|个性签名|头像emoji
+话题|话题名|话题描述|标签1,标签2
+帖子|话题名|作者原名|帖子内容|标签1,标签2
+用户|user_id|用户名|头像emoji|个人简介
+
+示例：
+角色|${selectedCharacters[0]?.name || '小雪'}|雪の物语|喜欢二次元的普通人|❄️
+话题|游戏讨论|分享游戏心得和攻略|游戏,娱乐
+帖子|游戏讨论|${selectedCharacters[0]?.name || '小雪'}|今天抽到了喜欢的角色~好开心|游戏
+用户|user1|张浩宇|😊|游戏爱好者
+
+要求：
+1. 为每个AI角色生成1条"角色"行（包含论坛昵称和签名）
+2. 生成5-8个话题
+3. 每个AI角色发2-3条帖子（使用原名）
+4. 生成20-30个活跃NPC用户
+5. 每个话题下5-8条帖子
+6. 直接输出，不要代码块标记`
+
+      console.log('🎯 发送prompt:', prompt)
+      setProgress({ current: 1, total: 3, message: '正在调用AI生成内容...' })
+      
+      const response = await fetch(settings.baseUrl + '/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${settings.apiKey}`
+        },
+        body: JSON.stringify({
+          model: settings.model,
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.9,
+          max_tokens: 4000
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('API调用失败')
+      }
+      
+      const data = await response.json()
+      const result = data.choices?.[0]?.message?.content || ''
+      
+      console.log('📦 AI返回:', result)
+      setProgress({ current: 2, total: 3, message: '正在解析生成的内容...' })
+      
+      // 解析结果
+      const lines = result.split('\n').map((l: string) => l.trim()).filter((l: string) => l)
+      
+      const aiCharacters: any[] = [] // AI角色的论坛信息
+      const topics: any[] = []
+      const posts: any[] = []
+      const users: any[] = []
+      
+      lines.forEach((line: string) => {
+        const parts = line.split('|')
+        if (parts[0] === '角色' && parts.length >= 5) {
+          // 解析AI角色的论坛昵称和签名
+          aiCharacters.push({
+            originalName: parts[1].trim(),
+            forumNickname: parts[2].trim(),
+            forumSignature: parts[3].trim(),
+            forumAvatar: parts[4].trim()
+          })
+        } else if (parts[0] === '话题' && parts.length >= 4) {
+          topics.push({
+            id: `topic_${Date.now()}_${Math.random()}`,
+            name: parts[1].trim(),
+            description: parts[2].trim(),
+            tags: parts[3].split(',').map((t: string) => t.trim()),
+            postsCount: 0,
+            followersCount: Math.floor(Math.random() * 500) + 100,
+            isFollowing: false,
+            posts: [],
+            users: []
+          })
+        } else if (parts[0] === '帖子' && parts.length >= 5) {
+          posts.push({
+            topicName: parts[1].trim(),
+            authorName: parts[2].trim(),
+            content: parts[3].trim(),
+            tags: parts[4].split(',').map(t => t.trim())
+          })
+        } else if (parts[0] === '用户' && parts.length >= 5) {
+          users.push({
+            id: parts[1].trim(),
+            name: parts[2].trim(),
+            avatar: parts[3].trim(),
+            bio: parts[4].trim(),
+            followers: Math.floor(Math.random() * 500) + 50
+          })
         }
-      )
-
-      // 保存结果
-      saveForumCharacters(profiles)
+      })
+      
+      console.log('✅ 解析结果:', { 
+        aiCharacters: aiCharacters.length, 
+        topics: topics.length, 
+        posts: posts.length, 
+        users: users.length 
+      })
+      
+      // 分配帖子到话题并创建完整结构
+      topics.forEach(topic => {
+        const topicPosts = posts.filter(p => p.topicName === topic.name)
+        topic.posts = topicPosts.map(p => ({
+          id: `post_${Date.now()}_${Math.random()}`,
+          authorId: users.find(u => u.name === p.authorName)?.id || `user_${Math.random()}`,
+          content: p.content,
+          likes: Math.floor(Math.random() * 100),
+          timestamp: Date.now() - Math.random() * 86400000 * 3, // 最近3天
+          comments: [],
+          tags: p.tags
+        }))
+        topic.postsCount = topic.posts.length
+        topic.users = users.slice(0, 15) // 每个话题分配15个用户
+      })
+      
+      // 保存到localStorage
+      localStorage.setItem('forum_topics_list', JSON.stringify(topics))
+      localStorage.setItem('forum_initialized', 'true')
+      
+      // 保存角色映射（使用AI生成的论坛昵称和签名）
+      const forumProfiles = selectedCharacters.map(c => {
+        // 找到AI生成的论坛信息
+        const aiInfo = aiCharacters.find(ai => ai.originalName === c.name)
+        
+        return {
+          characterId: c.id,
+          originalName: c.name,
+          originalAvatar: c.avatar,
+          forumName: c.name, // 保持原名
+          forumNickname: aiInfo?.forumNickname || c.nickname || c.name,
+          forumAvatar: aiInfo?.forumAvatar || '😊',
+          forumBio: aiInfo?.forumSignature || c.signature || '',
+          forumSignature: aiInfo?.forumSignature || c.signature || '',
+          personality: c.personality || c.description || '',
+          followersCount: Math.floor(Math.random() * 200) + 50,
+          followingCount: Math.floor(Math.random() * 100) + 20,
+          influence: 'medium' as const,
+          isFollowedByUser: false
+        }
+      })
+      
+      console.log('💾 保存论坛角色:', forumProfiles.map(p => `${p.forumName} → ${p.forumNickname}`))
+      
+      saveForumCharacters(forumProfiles)
       saveSelectedCharacterIds(selectedIds)
-
-      // 跳转到角色列表页
-      navigate('/forum/character-list', { replace: true })
+      
+      setProgress({ current: 3, total: 3, message: '初始化完成！' })
+      
+      // 直接跳转到论坛首页（不再需要角色列表页）
+      setTimeout(() => {
+        navigate('/forum', { replace: true })
+      }, 800)
+      
     } catch (error) {
-      console.error('初始化失败:', error)
-      alert('初始化失败，请检查API配置')
+      console.error('❌ 初始化失败:', error)
+      alert('初始化失败：' + (error as Error).message)
       setInitializing(false)
     }
   }
@@ -107,17 +292,20 @@ const ForumInitialize = () => {
         
         <div className="px-4 py-2.5 flex items-center justify-between">
           <button
-            onClick={() => navigate('/forum/welcome')}
+            onClick={() => step === 2 ? setStep(1) : navigate('/forum/welcome')}
             className="w-9 h-9 flex items-center justify-center active:opacity-60"
             disabled={initializing}
           >
             <BackIcon size={22} className="text-gray-800" />
           </button>
-          <h1 className="text-[17px] font-semibold text-gray-900">选择角色</h1>
+          <h1 className="text-[17px] font-semibold text-gray-900">
+            {step === 1 ? '选择角色' : '填写兴趣'}
+          </h1>
           <button
             onClick={() => navigate('/create-character')}
             className="w-9 h-9 flex items-center justify-center active:opacity-60"
-            disabled={initializing}
+            disabled={initializing || step === 2}
+            style={{ opacity: step === 2 ? 0 : 1 }}
           >
             <AddIcon size={20} className="text-[#ff6c00]" />
           </button>
@@ -126,6 +314,9 @@ const ForumInitialize = () => {
 
       {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto">
+        {step === 1 ? (
+          // ========== 第1步：选择角色 ==========
+          <>
         {/* 说明 */}
         <div className="bg-orange-50 border-l-4 border-orange-400 p-4 m-4">
           <p className="text-[14px] text-gray-700 leading-relaxed">
@@ -211,20 +402,104 @@ const ForumInitialize = () => {
             })}
           </div>
         )}
+          </>
+        ) : (
+          // ========== 第2步：填写兴趣 ==========
+          <>
+            {/* 说明 */}
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-4 m-4">
+              <p className="text-[14px] text-gray-700 leading-relaxed">
+                告诉我们你的兴趣，我们将根据你的喜好生成个性化的话题和帖子
+              </p>
+            </div>
+
+            {/* 表单 */}
+            <div className="bg-white p-4 space-y-4">
+              <div>
+                <label className="block text-[15px] font-medium text-gray-900 mb-2">
+                  你的兴趣爱好 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={interests}
+                  onChange={(e) => setInterests(e.target.value)}
+                  placeholder="例如：游戏、科技、美食、旅行"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-[15px] outline-none focus:border-[#ff6c00]"
+                  disabled={initializing}
+                />
+                <p className="text-[12px] text-gray-500 mt-1">用逗号分隔多个兴趣</p>
+              </div>
+
+              <div>
+                <label className="block text-[15px] font-medium text-gray-900 mb-2">
+                  最近关注的热点
+                </label>
+                <input
+                  type="text"
+                  value={hotTopics}
+                  onChange={(e) => setHotTopics(e.target.value)}
+                  placeholder="例如：原神新版本、AI绘画、最新电影"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-lg text-[15px] outline-none focus:border-[#ff6c00]"
+                  disabled={initializing}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[15px] font-medium text-gray-900 mb-2">
+                  帖子风格偏好
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['轻松', '正经', '幽默'].map((style) => (
+                    <button
+                      key={style}
+                      onClick={() => setPostStyle(style)}
+                      disabled={initializing}
+                      className={`py-2.5 rounded-lg text-[14px] font-medium transition-all ${
+                        postStyle === style
+                          ? 'bg-[#ff6c00] text-white'
+                          : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 已选角色预览 */}
+            <div className="bg-white mt-2 p-4">
+              <div className="text-[14px] text-gray-600 mb-3">
+                已选择 {selectedIds.length} 个角色
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {characters.filter(c => selectedIds.includes(c.id)).map((character) => (
+                  <div
+                    key={character.id}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full"
+                  >
+                    <span className="text-lg">{character.avatar}</span>
+                    <span className="text-[13px] text-gray-700">{character.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 底部按钮 */}
       <div className="p-4 bg-white border-t border-gray-100">
         <button
-          onClick={handleInitialize}
-          disabled={selectedIds.length === 0 || initializing}
+          onClick={step === 1 ? handleNext : handleInitialize}
+          disabled={(step === 1 && selectedIds.length === 0) || (step === 2 && !interests.trim()) || initializing}
           className={`w-full py-3.5 rounded-full text-[16px] font-semibold transition-all ${
-            selectedIds.length === 0 || initializing
+            ((step === 1 && selectedIds.length === 0) || (step === 2 && !interests.trim())) || initializing
               ? 'bg-gray-200 text-gray-400'
               : 'bg-gradient-to-r from-[#ff8140] to-[#ff6c00] text-white active:scale-98 shadow-lg'
           }`}
         >
-          {initializing ? progress.message : `确定并初始化 (${selectedIds.length})`}
+          {initializing ? progress.message : step === 1 ? `下一步 (${selectedIds.length})` : '开始生成论坛'}
         </button>
         
         {/* 进度条 */}

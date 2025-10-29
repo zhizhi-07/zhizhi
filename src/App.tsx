@@ -148,6 +148,9 @@ const WeatherDetail = lazy(() => import('./pages/WeatherDetail'))
 // 音乐播放器
 const MusicPlayer = lazy(() => import('./pages/MusicPlayer'))
 const UploadSong = lazy(() => import('./pages/UploadSong'))
+
+// AI手机查看
+const AIPhoneSelect = lazy(() => import('./pages/AIPhoneSelect'))
 const MusicSearch = lazy(() => import('./pages/MusicSearch'))
 const MusicTogetherChat = lazy(() => import('./pages/MusicTogetherChat'))
 const MusicInviteDemo = lazy(() => import('./pages/MusicInviteDemo'))
@@ -186,6 +189,7 @@ const ForumCreateTopic = lazy(() => import('./pages/ForumCreateTopic'))
 const ForumTopicDetail = lazy(() => import('./pages/ForumTopicDetail'))
 const ForumNotifications = lazy(() => import('./pages/ForumNotifications'))
 const ForumProfile = lazy(() => import('./pages/ForumProfile'))
+const ForumUserProfile = lazy(() => import('./pages/ForumUserProfile'))
 const ForumMemeManager = lazy(() => import('./pages/ForumMemeManager'))
 
 // DynamicIsland包装组件
@@ -397,6 +401,7 @@ function App() {
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                   <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
                                   <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
+                                  <Route path="/ai-phone-select" element={<PageWrapper><AIPhoneSelect /></PageWrapper>} />
                                   
                                   {/* 论坛功能 */}
                                   <Route path="/forum" element={<PageWrapper><Forum /></PageWrapper>} />
@@ -411,6 +416,7 @@ function App() {
                                   <Route path="/forum/topic/:id" element={<PageWrapper><ForumTopicDetail /></PageWrapper>} />
                                   <Route path="/forum/notifications" element={<PageWrapper><ForumNotifications /></PageWrapper>} />
                                   <Route path="/forum/profile" element={<PageWrapper><ForumProfile /></PageWrapper>} />
+                                  <Route path="/forum/user/:userId" element={<PageWrapper><ForumUserProfile /></PageWrapper>} />
                                   <Route path="/forum/memes" element={<PageWrapper><ForumMemeManager /></PageWrapper>} />
                                   
                                   <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />

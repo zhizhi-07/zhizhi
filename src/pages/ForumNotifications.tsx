@@ -11,67 +11,28 @@ import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { BackIcon, AddIcon } from '../components/Icons'
-
-interface Notification {
-  id: string
-  type: 'like' | 'comment' | 'follow' | 'system'
-  fromUserId: string
-  fromUserName: string
-  fromUserAvatar: string
-  content: string
-  postId?: string
-  timestamp: number
-  isRead: boolean
-}
+import * as forumStorage from '../utils/forumStorage'
+import type { ForumNotification, ForumDirectMessage } from '../types/forum'
 
 const ForumNotifications = () => {
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [activeTab, setActiveTab] = useState<'all' | 'like' | 'comment'>('all')
+  const [notifications, setNotifications] = useState<ForumNotification[]>([])
+  const [directMessages, setDirectMessages] = useState<ForumDirectMessage[]>([])
+  const [activeTab, setActiveTab] = useState<'all' | 'like' | 'comment' | 'dm'>('all')
 
   useEffect(() => {
     loadNotifications()
   }, [])
 
   const loadNotifications = () => {
-    // 模拟通知数据
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'like',
-        fromUserId: 'u1',
-        fromUserName: '用户A',
-        fromUserAvatar: '',
-        content: '赞了你的微博',
-        postId: 'p1',
-        timestamp: Date.now() - 3600000,
-        isRead: false,
-      },
-      {
-        id: '2',
-        type: 'comment',
-        fromUserId: 'u2',
-        fromUserName: '用户B',
-        fromUserAvatar: '',
-        content: '评论了你的微博：很赞！',
-        postId: 'p2',
-        timestamp: Date.now() - 7200000,
-        isRead: false,
-      },
-      {
-        id: '3',
-        type: 'follow',
-        fromUserId: 'u3',
-        fromUserName: '用户C',
-        fromUserAvatar: '',
-        content: '关注了你',
-        timestamp: Date.now() - 10800000,
-        isRead: true,
-      },
-    ]
+    // 从存储中加载真实通知数据
+    const realNotifications = forumStorage.getNotifications()
+    setNotifications(realNotifications)
     
-    setNotifications(mockNotifications)
+    // 加载私信
+    const dms = forumStorage.getDirectMessages()
+    setDirectMessages(dms)
   }
 
   const formatTime = (timestamp: number): string => {
@@ -145,7 +106,8 @@ const ForumNotifications = () => {
           {[
             { key: 'all' as const, label: '全部' },
             { key: 'like' as const, label: '赞' },
-            { key: 'comment' as const, label: '评论' }
+            { key: 'comment' as const, label: '评论' },
+            { key: 'dm' as const, label: '私信' }
           ].map(tab => (
             <button
               key={tab.key}
@@ -157,6 +119,11 @@ const ForumNotifications = () => {
               }`}
             >
               {tab.label}
+              {tab.key === 'dm' && forumStorage.getUnreadDirectMessageCount() > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[11px] rounded-full">
+                  {forumStorage.getUnreadDirectMessageCount()}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -164,49 +131,105 @@ const ForumNotifications = () => {
 
       {/* 通知列表 */}
       <div className="flex-1 overflow-y-auto">
-        {notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-4 opacity-30">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
-            <p className="text-[14px]">暂无消息</p>
-          </div>
-        ) : (
-          <div>
-            {notifications.map(notification => (
-              <div
-                key={notification.id}
-                className={`flex items-start gap-3 p-4 border-b border-gray-50 active:bg-gray-50 ${
-                  !notification.isRead ? 'bg-orange-50/30' : ''
-                }`}
-                onClick={() => notification.postId && navigate(`/forum/post/${notification.postId}`)}
-              >
-                {/* 图标 */}
-                {getNotificationIcon(notification.type)}
+        {activeTab === 'dm' ? (
+          // 私信列表
+          directMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-4 opacity-30">
+                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+              <p className="text-[14px]">暂无私信</p>
+            </div>
+          ) : (
+            <div>
+              {directMessages.map(dm => (
+                <div
+                  key={dm.id}
+                  className={`flex items-start gap-3 p-4 border-b border-gray-50 active:bg-gray-50 cursor-pointer ${
+                    !dm.isRead ? 'bg-blue-50/30' : ''
+                  }`}
+                  onClick={() => {
+                    forumStorage.markDirectMessageAsRead(dm.id)
+                    loadNotifications()
+                  }}
+                >
+                  {/* 头像 */}
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 flex items-center justify-center text-xl">
+                    {dm.fromUserAvatar}
+                  </div>
 
-                {/* 内容 */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-[14px] text-gray-900">
-                      {notification.fromUserName}
-                    </span>
-                    <span className="text-[12px] text-gray-400">
-                      {formatTime(notification.timestamp)}
-                    </span>
+                  {/* 内容 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-[14px] text-gray-900">
+                        {dm.fromUserName}
+                      </span>
+                      <span className="text-[12px] text-gray-400">
+                        {formatTime(dm.timestamp)}
+                      </span>
+                    </div>
+                    <div className="text-[13px] text-gray-600 line-clamp-2">
+                      {dm.content}
+                    </div>
                   </div>
-                  <div className="text-[13px] text-gray-600">
-                    {notification.content}
-                  </div>
+
+                  {/* 未读标记 */}
+                  {!dm.isRead && (
+                    <div className="w-2 h-2 bg-[#ff6c00] rounded-full mt-2" />
+                  )}
                 </div>
+              ))}
+            </div>
+          )
+        ) : (
+          // 通知列表
+          notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-4 opacity-30">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <p className="text-[14px]">暂无消息</p>
+            </div>
+          ) : (
+            <div>
+              {notifications.filter(n => {
+                if (activeTab === 'all') return true
+                return n.type === activeTab
+              }).map(notification => (
+                <div
+                  key={notification.id}
+                  className={`flex items-start gap-3 p-4 border-b border-gray-50 active:bg-gray-50 ${
+                    !notification.isRead ? 'bg-orange-50/30' : ''
+                  }`}
+                  onClick={() => notification.postId && navigate(`/forum/post/${notification.postId}`)}
+                >
+                  {/* 图标 */}
+                  {getNotificationIcon(notification.type)}
 
-                {/* 未读标记 */}
-                {!notification.isRead && (
-                  <div className="w-2 h-2 bg-[#ff6c00] rounded-full mt-2" />
-                )}
-              </div>
-            ))}
-          </div>
+                  {/* 内容 */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-[14px] text-gray-900">
+                        {notification.fromUserName}
+                      </span>
+                      <span className="text-[12px] text-gray-400">
+                        {formatTime(notification.timestamp)}
+                      </span>
+                    </div>
+                    <div className="text-[13px] text-gray-600">
+                      {notification.content}
+                    </div>
+                  </div>
+
+                  {/* 未读标记 */}
+                  {!notification.isRead && (
+                    <div className="w-2 h-2 bg-[#ff6c00] rounded-full mt-2" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 
@@ -235,7 +258,7 @@ const ForumNotifications = () => {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-600">
             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" strokeLinecap="round"/>
           </svg>
-          <span className="text-[11px] text-gray-600">超话</span>
+          <span className="text-[11px] text-gray-600">话题</span>
         </button>
         
         <button 

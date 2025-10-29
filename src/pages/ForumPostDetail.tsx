@@ -94,7 +94,10 @@ const ForumPostDetail = () => {
         likeCount: 0,
       })
 
-      setComments(prev => [...prev, newComment])
+      // 重新加载评论列表（确保从存储中获取最新数据）
+      const updatedComments = getComments(post.id)
+      setComments(updatedComments)
+      
       setCommentText('')
       setReplyTo(null)
       setShowInput(false)
@@ -319,7 +322,7 @@ const ForumPostDetail = () => {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-600">
               <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" strokeLinecap="round"/>
             </svg>
-            <span className="text-[11px] text-gray-600">超话</span>
+            <span className="text-[11px] text-gray-600">话题</span>
           </button>
           
           <button className="flex flex-col items-center -mt-3">
@@ -350,44 +353,45 @@ const ForumPostDetail = () => {
         </div>
       </div>
 
-      {/* 评论输入弹窗 */}
-      {showInput && (
-        <div className="fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 p-4 safe-area-bottom z-50">
-          {replyTo && (
-            <div className="flex items-center justify-between mb-2 text-[13px] text-gray-500">
-              <span>回复 @{replyTo.name}</span>
-              <button
-                onClick={() => setReplyTo(null)}
-                className="text-gray-400 active:opacity-60"
-              >
-                取消
-              </button>
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
-              placeholder={replyTo ? `回复 @${replyTo.name}` : "说点什么..."}
-              className="flex-1 h-10 px-3 bg-gray-100 rounded-full text-[14px] outline-none"
-            />
+      {/* 底部评论输入框 - 始终显示 */}
+      <div className="fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 p-4 safe-area-bottom z-50">
+        {replyTo && (
+          <div className="flex items-center justify-between mb-2 text-[13px] text-gray-500">
+            <span>回复 @{replyTo.name}</span>
             <button
-              onClick={handleSendComment}
-              disabled={!commentText.trim()}
-              className={`px-5 h-10 rounded-full text-[14px] font-medium ${
-                commentText.trim()
-                  ? 'bg-[#ff6c00] text-white active:opacity-80'
-                  : 'bg-gray-200 text-gray-400'
-              }`}
+              onClick={() => {
+                setReplyTo(null)
+                setCommentText('')
+              }}
+              className="text-gray-400 active:opacity-60"
             >
-              发送
+              取消
             </button>
           </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            ref={inputRef}
+            type="text"
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleSendComment()}
+            placeholder={replyTo ? `回复 @${replyTo.name}` : "说点什么..."}
+            className="flex-1 h-10 px-3 bg-gray-100 rounded-full text-[14px] outline-none"
+          />
+          <button
+            onClick={handleSendComment}
+            disabled={!commentText.trim()}
+            className={`px-5 h-10 rounded-full text-[14px] font-medium ${
+              commentText.trim()
+                ? 'bg-[#ff6c00] text-white active:opacity-80'
+                : 'bg-gray-200 text-gray-400'
+            }`}
+          >
+            发送
+          </button>
         </div>
-      )}
+      </div>
     </div>
   )
 }

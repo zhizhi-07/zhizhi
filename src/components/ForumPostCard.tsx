@@ -191,16 +191,16 @@ const ForumPostCard: React.FC<ForumPostCardProps> = ({
           {/* 互动工具栏 */}
           {showActions && (
             <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-50">
-              {/* 转发 */}
+              {/* 收藏 */}
               <button 
-                onClick={() => onShare?.(post.id)}
+                onClick={() => onFavorite?.(post.id)}
                 className="flex items-center gap-1.5 active:opacity-60 transition-opacity"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-gray-400">
-                  <path d="M18 8A6 6 0 106 8M6 8v4m12-4v4M6 16h12M9 20h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={post.isFavorited ? 'currentColor' : 'none'} className={post.isFavorited ? 'text-yellow-500' : 'text-gray-400'}>
+                  <path d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <span className="text-[13px] text-gray-500">
-                  {post.shareCount > 0 ? formatCount(post.shareCount) : ''}
+                  {post.isFavorited ? '已收藏' : ''}
                 </span>
               </button>
 

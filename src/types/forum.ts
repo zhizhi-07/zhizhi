@@ -146,6 +146,20 @@ export interface ForumNotification {
   isRead: boolean                     // 是否已读
 }
 
+/**
+ * 私信接口
+ */
+export interface ForumDirectMessage {
+  id: string                          // 私信ID
+  fromUserId: string                  // 发送者ID
+  fromUserName: string                // 发送者名称
+  fromUserAvatar: string              // 发送者头像
+  toUserId: string                    // 接收者ID (currentUser)
+  content: string                     // 私信内容
+  timestamp: number                   // 时间戳
+  isRead: boolean                     // 是否已读
+}
+
 // ==================== 过滤和查询接口 ====================
 
 /**

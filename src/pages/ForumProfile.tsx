@@ -14,6 +14,7 @@ import { useForum } from '../context/ForumContext'
 import ForumPostCard from '../components/ForumPostCard'
 import { BackIcon, SettingsIcon, AddIcon, CameraIcon } from '../components/Icons'
 import type { ForumPost } from '../types/forum'
+import * as forumStorage from '../utils/forumStorage'
 
 const ForumProfile = () => {
   const navigate = useNavigate()
@@ -70,6 +71,9 @@ const ForumProfile = () => {
   }, [activeTab])
 
   const loadUserData = () => {
+    // 获取真实统计数据
+    const stats = forumStorage.getUserStats()
+    
     // 我的帖子
     const myPostsList = posts.filter(p => p.authorId === userInfo.id)
     setMyPosts(myPostsList)
@@ -81,6 +85,14 @@ const ForumProfile = () => {
     // 我的草稿
     const draftsList = getDrafts()
     setDrafts(draftsList)
+    
+    // 更新用户信息中的统计数据
+    setUserInfo((prev: any) => ({
+      ...prev,
+      followersCount: stats.followers,
+      followingCount: stats.following,
+      postsCount: stats.posts,
+    }))
   }
 
   // ==================== 编辑功能 ====================
@@ -450,7 +462,7 @@ const ForumProfile = () => {
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-600">
             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" strokeLinecap="round"/>
           </svg>
-          <span className="text-[11px] text-gray-600">超话</span>
+          <span className="text-[11px] text-gray-600">话题</span>
         </button>
         
         <button 

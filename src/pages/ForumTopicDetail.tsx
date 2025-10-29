@@ -11,6 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { BackIcon, AddIcon } from '../components/Icons'
+import * as forumStorage from '../utils/forumStorage'
 
 const ForumTopicDetail = () => {
   const navigate = useNavigate()
@@ -50,8 +51,35 @@ const ForumTopicDetail = () => {
       avatar: '😊',
       followers: 0
     }
-    setUsers([currentUser, ...(foundTopic.users || [])])
-    setPosts(foundTopic.posts || [])
+    const allUsers = [currentUser, ...(foundTopic.users || [])]
+    setUsers(allUsers)
+    
+    // 确保每个帖子都有comments数组
+    const postsWithComments = (foundTopic.posts || []).map((post: any) => ({
+      ...post,
+      comments: post.comments || []
+    }))
+    setPosts(postsWithComments)
+    
+    console.log('📚 加载话题帖子:', postsWithComments)
+    
+    // 保存NPC用户信息到localStorage（用于用户主页）
+    const npcUsers = JSON.parse(localStorage.getItem('forum_npc_users') || '[]')
+    const updatedNpcUsers = [...npcUsers]
+    foundTopic.users?.forEach((user: any) => {
+      if (!updatedNpcUsers.find(u => u.id === user.id)) {
+        updatedNpcUsers.push({
+          id: user.id,
+          name: user.name,
+          avatar: user.avatar,
+          bio: user.bio || '这个人很懒，什么都没留下',
+          followers: user.followers || Math.floor(Math.random() * 500) + 50,
+          following: Math.floor(Math.random() * 200) + 20,
+          posts: 0 // 会在ForumUserProfile中动态计算
+        })
+      }
+    })
+    localStorage.setItem('forum_npc_users', JSON.stringify(updatedNpcUsers))
   }, [id])
 
   const formatTime = (timestamp: number): string => {
@@ -90,20 +118,27 @@ const ForumTopicDetail = () => {
       content: replyContent.trim(),
       likes: 0,
       timestamp: Date.now(),
-      replyTo: replyingTo.commentId,
+      replyTo: replyingTo.commentId || undefined, // 空字符串转为undefined，表示直接评论帖子
       isUserComment: true // 标记为用户评论
     }
+    
+    console.log('💬 发送评论:', newComment)
+    console.log('📮 回复到帖子ID:', replyingTo.postId)
     
     // 添加到帖子评论列表
     const updatedPosts = posts.map(post => {
       if (post.id === replyingTo.postId) {
-        return {
+        const updatedPost = {
           ...post,
-          comments: [...post.comments, newComment]
+          comments: [...(post.comments || []), newComment]
         }
+        console.log('✅ 更新帖子:', updatedPost)
+        return updatedPost
       }
       return post
     })
+    
+    console.log('📝 更新后的所有帖子:', updatedPosts)
     setPosts(updatedPosts)
     
     // 记录用户评论（用于后续AI生成）
@@ -122,6 +157,7 @@ const ForumTopicDetail = () => {
         return t
       })
       localStorage.setItem('forum_topics_list', JSON.stringify(updatedTopics))
+      console.log('💾 已保存到localStorage')
     }
     
     // 清空输入
@@ -148,65 +184,33 @@ const ForumTopicDetail = () => {
       const settings = JSON.parse(apiSettings)
       
       // 构建prompt
-      const prompt = `你现在要模拟一个真实的社交网络互动场景。
+      const prompt = `你是论坛互动生成器。用户在话题"${topic.name}"中发了${userComments.length}条评论。
 
-话题：${topic.name}
-话题介绍：${topic.description}
-
-用户发表了以下评论：
+用户的评论：
 ${userComments.map((c, i) => {
   const post = posts.find(p => p.id === c.postId)
   const originalComment = post?.comments.find((oc: any) => oc.id === c.replyTo)
   const originalAuthor = originalComment ? getUserInfo(originalComment.authorId) : null
-  return `${i+1}. 回复了 @${originalAuthor?.name || '某人'}："${c.content}"`
+  return `【评论${i+1}】ID:${c.id} 回复@${originalAuthor?.name}说："${c.content}"`
 }).join('\n')}
 
-请生成真实的社交反应（JSON格式）：
+现有用户列表：
+${users.filter(u => u.id !== 'currentUser').slice(0, 10).map(u => `${u.id}|${u.name}`).join('\n')}
 
-{
-  "replies": [
-    // 不同用户回复用户的评论（3-6条）
-    {
-      "targetCommentId": "user_c_xxx",  // 用户的评论ID
-      "userId": "已有用户ID",  // 从现有用户中选
-      "content": "回复内容（15-40字，自然真实）"
-    }
-  ],
-  "deepReplies": [
-    // 楼中楼：A回复用户 → B也回复用户，或者A和B互相争论
-    {
-      "targetCommentId": "user_c_xxx",
-      "userId": "用户ID",
-      "content": "内容",
-      "replyToReply": "c_xxx"  // 回复某条回复用户的评论
-    }
-  ],
-  "privateMessages": [
-    // 有人私信用户（1-2条）
-    {
-      "userId": "用户ID",
-      "message": "私信内容（20-50字）",
-      "reason": "为什么私信"  // 比如"认同观点""想深入讨论""表达不满"
-    }
-  ],
-  "calloutPosts": [
-    // 可能有人发帖挂用户（0-1条，不是每次都有）
-    {
-      "authorId": "用户ID",
-      "content": "帖子内容（50-100字，表达对用户观点的强烈反对或支持）"
-    }
-  ]
-}
+请生成3-5条回复，每行一个，格式：
+回复|评论ID|用户ID|回复内容
+
+示例：
+回复|user_c_1234567890|user1|哈哈说得对
+回复|user_c_1234567890|user3|楼主观点我不同意
+回复|user_c_1234567890|user5|有道理诶
 
 要求：
-- 不同用户有不同态度（赞同/反对/中立/调侃）
-- 内容要真实自然，符合各个用户的性格
-- 私信理由要合理
-- 挂人帖不是每次都有，只有观点特别激烈时才会出现
-- 楼中楼要有真实的互动感
-
-现有用户信息：
-${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
+- 内容真实自然，15-30字
+- 不同用户有不同态度
+- 直接输出，不要代码块标记
+- 每行格式必须是：回复|评论ID|用户ID|回复内容
+`
 
       console.log('🎯 发送prompt:', prompt)
       
@@ -235,29 +239,31 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
       
       console.log('📦 AI返回:', result)
       
-      // 解析JSON
-      let cleanedResult = result.replace(/```json\s*/g, '').replace(/```\s*/g, '')
-      const jsonMatch = cleanedResult.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        throw new Error('AI返回格式错误')
+      // 解析简单格式：回复|评论ID|用户ID|回复内容
+      const lines = result.split('\n').filter((l: string) => l.trim().startsWith('回复'))
+      
+      if (lines.length === 0) {
+        throw new Error('AI没有生成回复')
       }
       
-      let jsonStr = jsonMatch[0]
-      jsonStr = jsonStr.replace(/(\w+):/g, '"$1":')
-      jsonStr = jsonStr.replace(/""(\w+)""/g, '"$1"')
+      const replies: any[] = []
+      lines.forEach((line: string) => {
+        const parts = line.split('|')
+        if (parts.length === 4) {
+          replies.push({
+            targetCommentId: parts[1].trim(),
+            userId: parts[2].trim(),
+            content: parts[3].trim()
+          })
+        }
+      })
       
-      const interactions = JSON.parse(jsonStr)
-      
-      console.log('✅ 解析成功:', interactions)
+      console.log('✅ 解析成功:', replies)
       
       // 应用生成的互动
-      applyInteractions(interactions)
+      applyReplies(replies)
       
-      alert(`✨ AI生成完成！\n\n` +
-        `💬 收到 ${interactions.replies?.length || 0} 条回复\n` +
-        `🔄 ${interactions.deepReplies?.length || 0} 条楼中楼互动\n` +
-        `📩 ${interactions.privateMessages?.length || 0} 条私信\n` +
-        `📢 ${interactions.calloutPosts?.length || 0} 个挂你的帖子`)
+      alert(`✨ AI生成完成！收到 ${replies.length} 条回复`)
       
     } catch (error) {
       console.error('❌ 生成失败:', error)
@@ -267,91 +273,51 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
     }
   }
 
-  // 应用AI生成的互动
-  const applyInteractions = (interactions: any) => {
+  // 应用AI生成的回复
+  const applyReplies = (replies: any[]) => {
     let updatedPosts = [...posts]
     
-    // 1. 添加回复
-    if (interactions.replies) {
-      interactions.replies.forEach((reply: any) => {
-        const userComment = userComments.find(c => c.id === reply.targetCommentId)
-        if (userComment) {
-          updatedPosts = updatedPosts.map(post => {
-            if (post.id === userComment.postId) {
-              const newComment = {
-                id: `ai_c_${Date.now()}_${Math.random()}`,
-                authorId: reply.userId,
-                content: reply.content,
-                likes: Math.floor(Math.random() * 20),
-                timestamp: Date.now() + Math.random() * 600000, // 未来10分钟内
-                replyTo: reply.targetCommentId
-              }
-              return {
-                ...post,
-                comments: [...post.comments, newComment]
-              }
+    // 添加回复并创建通知
+    replies.forEach((reply: any) => {
+      const userComment = userComments.find(c => c.id === reply.targetCommentId)
+      if (userComment) {
+        const replyUser = users.find(u => u.id === reply.userId)
+        
+        updatedPosts = updatedPosts.map(post => {
+          if (post.id === userComment.postId) {
+            const newComment = {
+              id: `ai_c_${Date.now()}_${Math.random()}`,
+              authorId: reply.userId,
+              content: reply.content,
+              likes: Math.floor(Math.random() * 20),
+              timestamp: Date.now() + Math.random() * 600000,
+              replyTo: reply.targetCommentId
             }
-            return post
-          })
-        }
-      })
-    }
-    
-    // 2. 添加楼中楼
-    if (interactions.deepReplies) {
-      interactions.deepReplies.forEach((reply: any) => {
-        const userComment = userComments.find(c => c.id === reply.targetCommentId)
-        if (userComment) {
-          updatedPosts = updatedPosts.map(post => {
-            if (post.id === userComment.postId) {
-              const newComment = {
-                id: `ai_deep_${Date.now()}_${Math.random()}`,
-                authorId: reply.userId,
+            
+            // 创建评论通知
+            if (replyUser) {
+              forumStorage.addNotification({
+                type: 'comment',
+                fromUserId: reply.userId,
+                fromUserName: replyUser.name,
+                fromUserAvatar: replyUser.avatar,
                 content: reply.content,
-                likes: Math.floor(Math.random() * 15),
-                timestamp: Date.now() + Math.random() * 600000,
-                replyTo: reply.replyToReply || reply.targetCommentId
-              }
-              return {
-                ...post,
-                comments: [...post.comments, newComment]
-              }
+                postId: post.id,
+                commentId: newComment.id,
+                isRead: false
+              })
+              console.log('🔔 创建通知:', replyUser.name, '回复了你')
             }
-            return post
-          })
-        }
-      })
-    }
-    
-    // 3. 添加挂人帖子
-    if (interactions.calloutPosts && interactions.calloutPosts.length > 0) {
-      interactions.calloutPosts.forEach((callout: any) => {
-        const newPost = {
-          id: `ai_post_${Date.now()}_${Math.random()}`,
-          authorId: callout.authorId,
-          content: callout.content,
-          likes: Math.floor(Math.random() * 100),
-          timestamp: Date.now() + Math.random() * 600000,
-          comments: []
-        }
-        updatedPosts.unshift(newPost) // 添加到顶部
-      })
-    }
-    
-    // 4. 保存私信通知到localStorage（私信界面还没做，先保存）
-    if (interactions.privateMessages && interactions.privateMessages.length > 0) {
-      const existingMessages = JSON.parse(localStorage.getItem('forum_private_messages') || '[]')
-      const newMessages = interactions.privateMessages.map((pm: any) => ({
-        id: `pm_${Date.now()}_${Math.random()}`,
-        from: pm.userId,
-        content: pm.message,
-        reason: pm.reason,
-        timestamp: Date.now(),
-        topicId: topic.id,
-        unread: true
-      }))
-      localStorage.setItem('forum_private_messages', JSON.stringify([...existingMessages, ...newMessages]))
-    }
+            
+            return {
+              ...post,
+              comments: [...post.comments, newComment]
+            }
+          }
+          return post
+        })
+      }
+    })
     
     setPosts(updatedPosts)
     
@@ -431,13 +397,21 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
             <div key={post.id} className="bg-white mb-2 p-4">
               {/* 作者信息 */}
               <div className="flex items-start gap-2.5 mb-3">
-                <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0">
+                <button
+                  onClick={() => post.authorId !== 'currentUser' && navigate(`/forum/user/${post.authorId}`)}
+                  className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-2xl flex-shrink-0 active:opacity-70"
+                  disabled={post.authorId === 'currentUser'}
+                >
                   {author.avatar}
-                </div>
+                </button>
                 <div className="flex-1">
-                  <div className="text-[15px] font-medium text-gray-900">
+                  <button
+                    onClick={() => post.authorId !== 'currentUser' && navigate(`/forum/user/${post.authorId}`)}
+                    className="text-[15px] font-medium text-gray-900 active:text-[#ff6c00] text-left"
+                    disabled={post.authorId === 'currentUser'}
+                  >
                     {author.name}
-                  </div>
+                  </button>
                   <div className="text-[12px] text-gray-400">
                     {formatTime(post.timestamp)} · {formatCount(author.followers)} 粉丝
                   </div>
@@ -450,9 +424,14 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
               </div>
 
               {/* 互动栏 */}
-              <div className="flex items-center gap-4 text-[13px] text-gray-500 pt-3 border-t border-gray-50">
-                <span>❤️ {formatCount(post.likes)}</span>
-                <span>💬 {post.comments.length}</span>
+              <div className="flex items-center gap-4 text-[13px] pt-3 border-t border-gray-50">
+                <span className="text-gray-500">❤️ {formatCount(post.likes)}</span>
+                <button
+                  onClick={() => setReplyingTo({postId: post.id, commentId: ''})}
+                  className="text-gray-500 hover:text-[#ff6c00] active:opacity-60 flex items-center gap-1"
+                >
+                  💬 <span>{post.comments?.length || 0}</span> <span className="text-[#ff6c00]">评论</span>
+                </button>
               </div>
 
               {/* 评论列表 */}
@@ -469,14 +448,30 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
 
                     return (
                       <div key={comment.id} className="flex gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+                        <button
+                          onClick={() => comment.authorId !== 'currentUser' && navigate(`/forum/user/${comment.authorId}`)}
+                          className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-sm flex-shrink-0 active:opacity-70"
+                          disabled={comment.authorId === 'currentUser'}
+                        >
                           {commentAuthor?.avatar || '😊'}
-                        </div>
+                        </button>
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px]">
-                            <span className="font-medium text-gray-900">{commentAuthor?.name}</span>
+                            <button
+                              onClick={() => comment.authorId !== 'currentUser' && navigate(`/forum/user/${comment.authorId}`)}
+                              className="font-medium text-gray-900 active:text-[#ff6c00]"
+                              disabled={comment.authorId === 'currentUser'}
+                            >
+                              {commentAuthor?.name}
+                            </button>
                             {replyToAuthor && (
-                              <span className="text-gray-500"> 回复 <span className="text-[#5b7599]">@{replyToAuthor.name}</span></span>
+                              <span className="text-gray-500"> 回复 <button
+                                onClick={() => replyToComment?.authorId !== 'currentUser' && navigate(`/forum/user/${replyToComment?.authorId}`)}
+                                className="text-[#5b7599] active:text-[#ff6c00]"
+                                disabled={replyToComment?.authorId === 'currentUser'}
+                              >
+                                @{replyToAuthor.name}
+                              </button></span>
                             )}
                             <span className="text-gray-700">: {comment.content}</span>
                           </div>
@@ -501,16 +496,18 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
         })}
       </div>
 
-      {/* 回复输入框 */}
+      {/* 评论/回复输入框 */}
       {replyingTo && (
         <div className="bg-white border-t border-gray-200 p-3 flex-shrink-0">
           <div className="flex items-center gap-2 mb-2">
             <span className="text-[13px] text-gray-600">
-              回复 @{getUserInfo(
-                posts.find(p => p.id === replyingTo.postId)
-                  ?.comments.find((c: any) => c.id === replyingTo.commentId)
-                  ?.authorId
-              )?.name}
+              {replyingTo.commentId 
+                ? `回复 @${getUserInfo(
+                    posts.find(p => p.id === replyingTo.postId)
+                      ?.comments.find((c: any) => c.id === replyingTo.commentId)
+                      ?.authorId
+                  )?.name || '用户'}`
+                : '评论'}
             </span>
             <button
               onClick={() => {
@@ -577,7 +574,7 @@ ${users.slice(0, 10).map(u => `${u.id}: ${u.name} (${u.bio})`).join('\n')}`
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="text-[#ff6c00]">
             <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
           </svg>
-          <span className="text-[11px] text-[#ff6c00] font-medium">超话</span>
+          <span className="text-[11px] text-[#ff6c00] font-medium">话题</span>
         </button>
         
         <button 

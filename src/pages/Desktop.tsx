@@ -5,10 +5,11 @@ import { useMusicPlayer } from '../context/MusicPlayerContext'
 import CalendarWidget from '../components/CalendarWidget'
 import { getImage } from '../utils/imageStorage'
 import { fetchWeather, type WeatherData } from '../utils/weather'
+import '../css/character-card.css'
 import { 
   MusicIcon, HeartIcon, PauseIcon, SkipForwardIcon, PlayIcon,
-  ChatIcon, SettingsIcon, FileIcon, ImageIcon,
-  FootprintIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon, ForumIcon
+  ChatIcon, SettingsIcon, FileIcon,
+  FootprintIcon, PhoneAppIcon, CalendarIcon, BrowserIcon, ForumIcon
 } from '../components/Icons'
 
 // 应用数据类型
@@ -41,7 +42,6 @@ const Desktop = () => {
   
   // 天气数据
   const [weather, setWeather] = useState<WeatherData | null>(null)
-  const [weatherLoading, setWeatherLoading] = useState(true)
   
   useEffect(() => {
     const loadCustomIcons = () => {
@@ -119,8 +119,6 @@ const Desktop = () => {
   useEffect(() => {
     const loadWeather = async () => {
       try {
-        setWeatherLoading(true)
-        
         // 检查是否启用自定义天气
         const customEnabled = localStorage.getItem('custom_weather_enabled') === 'true'
         const customData = localStorage.getItem('custom_weather_data')
@@ -139,7 +137,6 @@ const Desktop = () => {
               windSpeed: 10,
               airQuality: 'good'
             })
-            setWeatherLoading(false)
             return
           } catch (e) {
             console.error('加载自定义天气失败:', e)
@@ -163,8 +160,6 @@ const Desktop = () => {
           windSpeed: 10,
           airQuality: 'good'
         })
-      } finally {
-        setWeatherLoading(false)
       }
     }
     
@@ -234,14 +229,12 @@ const Desktop = () => {
     { id: 'settings', name: '系统设置', icon: getAppIcon('settings', SettingsIcon), color: 'glass-card', route: '/settings-new' },
   ]
 
-  // 第二页应用
+  // 第二页应用（已删除游戏和朋友圈）
   const page2Apps: AppItem[] = [
     { id: 'footprint', name: '足迹', icon: getAppIcon('footprint', FootprintIcon), color: 'glass-card', route: '/ai-footprint' },
     { id: 'forum', name: '论坛', icon: getAppIcon('forum', ForumIcon), color: 'glass-card', route: '/forum' },
-    { id: 'calculator', name: '计算器', icon: getAppIcon('calculator', CalculatorIcon), color: 'glass-card', route: '/calculator' },
+    { id: 'aiphone', name: '查手机', icon: getAppIcon('aiphone', PhoneAppIcon), color: 'glass-card', route: '/ai-phone-select' },
     { id: 'calendar', name: '日历', icon: getAppIcon('calendar', CalendarIcon), color: 'glass-card', route: '/calendar' },
-    { id: 'games', name: '游戏', icon: getAppIcon('games', GameIcon), color: 'glass-card', route: '/games' },
-    { id: 'moments', name: '朋友圈', icon: getAppIcon('moments', MomentsIcon), color: 'glass-card', route: '/moments' },
   ]
 
   // Dock 应用
@@ -307,7 +300,11 @@ const Desktop = () => {
       
       {/* 内容容器 */}
       <div className="relative h-full flex flex-col">
-        <StatusBar />
+        <div style={{ background: 'transparent', position: 'relative', zIndex: 1 }}>
+          <div style={{ background: 'transparent' }}>
+            <StatusBar />
+          </div>
+        </div>
 
         {/* 主要内容区域 - 整页滑动 */}
         <div 
@@ -452,10 +449,81 @@ const Desktop = () => {
             </div>
 
             {/* ========== 第二页 ========== */}
-            <div className="min-w-full h-full px-4 py-2 overflow-y-auto flex flex-col hide-scrollbar">
-              {/* 天气小组件 */}
+            <div className="min-w-full h-full px-4 overflow-y-auto flex flex-col hide-scrollbar" style={{ paddingTop: '20px', paddingBottom: '8px' }}>
+              {/* 角色天气卡片 - 从宝贝项目完整移植 */}
+              <div className="character-card-widget character-card-floating" style={{ marginTop: '10px', marginBottom: '15px', position: 'relative', zIndex: 100 }}>
+                {/* 右上角气泡 */}
+                <div className="character-card-corner-bubble">呆</div>
+                
+                {/* 主角色头像 */}
+                <div className="character-card-main">X</div>
+                
+                {/* 天气信息 */}
+                <div className="character-card-weather-info">
+                  <div className="character-card-weather-value">
+                    {weather?.temperature || 19}°C
+                  </div>
+                  <div className="character-card-weather-value">
+                    {weather?.humidity || 70}%
+                  </div>
+                </div>
+                
+                {/* 状态文字 */}
+                <div className="character-card-bunny-status">
+                  生活给我一拳 我出布o(´^｀)o
+                </div>
+              </div>
+
+              {/* 功能按钮 */}
+              <div className="character-card-function-row" style={{ marginBottom: '15px' }}>
+                <div className="character-card-function-btn" onClick={() => navigate('/customize')}>
+                  修改桌面
+                </div>
+                <div className="character-card-function-btn">
+                  本命为萌
+                </div>
+                <div className="character-card-function-btn">
+                  早春樱雨
+                </div>
+              </div>
+
+              {/* 第二页应用和小组件 */}
+              <div className="grid grid-cols-4 gap-4" style={{ gridAutoRows: '90px' }}>
+                {/* 日历小组件 - 2x2 */}
+                <div 
+                  className="col-span-2 row-span-2 cursor-pointer active:scale-95 transition-transform"
+                  onClick={() => navigate('/calendar')}
+                >
+                  <CalendarWidget />
+                </div>
+                {page2Apps.map((app) => {
+                  const isImageIcon = typeof app.icon === 'string'
+                  return (
+                    <div
+                      key={app.id}
+                      onClick={(e) => handleAppClick(e, app)}
+                      className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform"
+                    >
+                      {isImageIcon ? (
+                        <div className="w-14 h-14">
+                          <img src={app.icon as string} alt={app.name} className="w-full h-full object-contain" />
+                        </div>
+                      ) : (
+                        <div className={`w-14 h-14 ${app.color} rounded-2xl flex items-center justify-center shadow-lg border border-white/30`}>
+                          {React.createElement(app.icon as React.ComponentType<any>, { size: 28, className: "text-gray-300" })}
+                        </div>
+                      )}
+                      <span className="text-xs text-gray-700 text-center font-medium">
+                        {app.name}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* 天气小组件 - 恢复 */}
               <div 
-                className="glass-card rounded-3xl p-4 shadow-lg border border-white/30 relative bg-gradient-to-br from-white/80 to-white/40 mb-4 cursor-pointer ios-button"
+                className="glass-card rounded-3xl p-4 shadow-lg border border-white/30 relative bg-gradient-to-br from-white/80 to-white/40 mt-4 cursor-pointer ios-button"
                 onClick={() => navigate('/weather-detail')}
                 style={{ overflow: 'visible' }}
               >
@@ -536,11 +604,7 @@ const Desktop = () => {
                 })()}
                 
                 <div className="relative z-10 flex flex-col h-full">
-                  {weatherLoading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-                    </div>
-                  ) : weather ? (
+                  {weather ? (
                     <>
                       <div className="text-5xl font-extralight text-gray-800 leading-none mb-1">
                         {weather.temperature}<span className="text-2xl align-top">°</span>
@@ -561,43 +625,9 @@ const Desktop = () => {
                       </div>
                     </>
                   ) : (
-                    <div className="text-sm text-gray-500">加载失败</div>
+                    <div className="text-sm text-gray-500">加载中...</div>
                   )}
                 </div>
-              </div>
-
-              {/* 第二页应用和小组件 */}
-              <div className="grid grid-cols-4 gap-4" style={{ gridAutoRows: '90px' }}>
-                {/* 日历小组件 - 2x2 */}
-                <div 
-                  className="col-span-2 row-span-2 cursor-pointer active:scale-95 transition-transform"
-                  onClick={() => navigate('/calendar')}
-                >
-                  <CalendarWidget />
-                </div>
-                {page2Apps.map((app) => {
-                  const isImageIcon = typeof app.icon === 'string'
-                  return (
-                    <div
-                      key={app.id}
-                      onClick={(e) => handleAppClick(e, app)}
-                      className="flex flex-col items-center gap-1 cursor-pointer active:scale-95 transition-transform"
-                    >
-                      {isImageIcon ? (
-                        <div className="w-14 h-14">
-                          <img src={app.icon as string} alt={app.name} className="w-full h-full object-contain" />
-                        </div>
-                      ) : (
-                        <div className={`w-14 h-14 ${app.color} rounded-2xl flex items-center justify-center shadow-lg border border-white/30`}>
-                          {React.createElement(app.icon as React.ComponentType<any>, { size: 28, className: "text-gray-300" })}
-                        </div>
-                      )}
-                      <span className="text-xs text-gray-700 text-center font-medium">
-                        {app.name}
-                      </span>
-                    </div>
-                  )
-                })}
               </div>
             </div>
           </div>
