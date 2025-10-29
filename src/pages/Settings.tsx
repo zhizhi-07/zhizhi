@@ -485,7 +485,7 @@ const Settings = () => {
             >
               <span className="text-gray-900 font-medium">关于汁汁</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">v1.0.0</span>
+                <span className="text-sm text-gray-500">v1.0.9</span>
                 <span className="text-gray-400 text-xl">›</span>
               </div>
             </div>
