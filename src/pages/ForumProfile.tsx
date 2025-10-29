@@ -309,6 +309,24 @@ const ForumProfile = () => {
         </div>
       </div>
 
+      {/* 功能列表 */}
+      <div className="bg-white mb-2">
+        <button
+          onClick={() => navigate('/forum/memes')}
+          className="w-full px-4 py-3.5 flex items-center justify-between active:bg-gray-50"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 flex items-center justify-center">
+              <span className="text-lg">🎭</span>
+            </div>
+            <span className="text-[15px] text-gray-900">梗库管理</span>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-400">
+            <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
+
       {/* 隐藏的文件输入 */}
       <input
         ref={fileInputRef}

@@ -7,6 +7,7 @@
  */
 
 import type { Character } from '../context/CharacterContext'
+import { memesData } from './memesRetrieval'
 
 // ==================== 类型定义 ====================
 
@@ -360,6 +361,25 @@ export function saveSelectedCharacterIds(ids: string[]): void {
 // ==================== 话题内容生成 ====================
 
 /**
+ * 获取梗库 - 直接从微信梗库读取（包含含义）
+ */
+function getMemes(): Array<{ 梗: string, 含义: string }> {
+  // 直接使用微信梗库，包含梗和含义
+  return memesData.map((m) => ({
+    梗: m['梗'],
+    含义: m['含义']
+  }))
+}
+
+/**
+ * 保存梗库（论坛不需要单独保存，使用微信的）
+ */
+export function saveMemes(_memes: string[]): void {
+  // 论坛和微信共享梗库，不需要单独保存
+  console.log('💡 论坛使用微信梗库，无需单独保存')
+}
+
+/**
  * 生成话题的完整讨论内容（一次API调用）
  */
 export async function generateTopicContent(topicName: string, topicDesc: string): Promise<{
@@ -369,104 +389,117 @@ export async function generateTopicContent(topicName: string, topicDesc: string)
   console.log('🎯 [话题生成] 开始生成话题:', topicName)
   console.log('📝 [话题生成] 话题介绍:', topicDesc)
   
+  // 获取梗库
+  const memes = getMemes()
+  const memesSection = memes.length > 0 ? `
+
+🎭 网络梗库（请自然地融入到帖子和评论中，理解含义后使用）：
+${memes.map((m, i) => `${i + 1}. "${m.梗}" - ${m.含义}`).join('\n')}
+
+示例用法（要符合梗的含义）：
+- "这波操作真的绷不住了"（表示忍不住笑了）
+- "经典，纯纯的纯良"（讽刺某事很离谱）
+- "我的评价是不如..."（用于吐槽）
+- "你礼貌吗？"（表示被冒犯或质疑对方）
+` : ''
+  
   const prompt = `你现在要为话题「${topicName}」创建一个真实的论坛讨论区。
 
 话题介绍：${topicDesc}
+${memesSection}
 
-请模拟一个真实的论坛场景，生成：
+请生成10-15条帖子和评论，使用以下简单格式（每行一条，用|||分隔）：
 
-1. 10-15条帖子，围绕话题展开，要有：
-   - 不同观点（赞同、反对、中立）
-   - 不同内容形式（分享经验、提问、讨论、吐槽）
-   - 每条帖子80-150字
-   
-2. 每条帖子下面3-8条评论，评论要：
-   - 有互动回复（A评论 → B回复A → C回复B）
-   - 有观点碰撞（"我不同意" "说得对" "但是..."）
-   - 自然真实的对话
-   - 每条评论20-50字
+用户格式：
+U|||用户ID|||昵称|||签名|||emoji头像|||粉丝数
 
-3. 虚拟用户（15-20个）：
-   - 昵称（符合身份，5-10字）
-   - 个性签名（20字内）
-   - emoji头像（😊🎮👨‍💼👩‍💻🎨📷🍔✈️等）
-   - 粉丝数（100-50000，根据影响力）
+帖子格式：
+P|||帖子ID|||用户ID|||内容(80-150字)|||点赞数
 
-返回严格的JSON格式，不要有任何其他文字：
-{
-  "users": [
-    {
-      "id": "user1",
-      "name": "昵称",
-      "bio": "签名",
-      "avatar": "emoji",
-      "followers": 数字
-    }
-  ],
-  "posts": [
-    {
-      "id": "post1",
-      "authorId": "user1",
-      "content": "帖子内容",
-      "likes": 数字,
-      "timestamp": 时间戳（从现在往前推1-24小时）,
-      "comments": [
-        {
-          "id": "c1",
-          "authorId": "user2",
-          "content": "评论内容",
-          "likes": 数字,
-          "timestamp": 时间戳,
-          "replyTo": null
-        },
-        {
-          "id": "c2",
-          "authorId": "user3",
-          "content": "回复@user2的内容",
-          "likes": 数字,
-          "timestamp": 时间戳,
-          "replyTo": "c1"
-        }
-      ]
-    }
-  ]
-}
+评论格式：
+C|||评论ID|||用户ID|||内容(20-50字)|||回复哪个帖子|||回复哪个评论(可选)|||点赞数
 
 要求：
-- 至少10条帖子
-- 每条帖子至少3条评论
-- 至少30%的评论是回复其他评论的（replyTo不为null）
-- 要有观点碰撞和讨论氛围
-- 用户昵称和签名要多样化且真实
-- 帖子和评论的时间戳要合理（评论时间要晚于帖子时间）`
+1. 先生成15-20个用户(用户ID用user1, user2...)
+2. 然后生成10-15条帖子(帖子ID用post1, post2...)
+3. 每个帖子下3-8条评论(评论ID用c1, c2...)
+4. 评论可以互相回复形成楼中楼
+5. 内容要有不同观点：赞同、反对、调侃、吐槽等
+${memesSection ? '6. 自然融入梗库里的梗，不要生硬' : ''}
+
+示例：
+U|||user1|||键盘侠|||专业抬杠二十年|||👨‍💼|||12000
+P|||post1|||user1|||今天这话题我必须说两句...|||45
+C|||c1|||user2|||同意楼主|||post1||||||12
+C|||c2|||user3|||我不这么认为|||post1|||c1|||8
+
+直接输出，不要有其他说明文字！`
 
   const result = await callAI(prompt)
   
   console.log('📦 [话题生成] AI原始返回长度:', result.length)
   
   try {
-    // 1. 去除markdown代码块
-    let cleanedResult = result.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+    // 解析简单文本格式
+    const lines = result.split('\n').map(line => line.trim()).filter(line => line.length > 0)
     
-    // 2. 提取JSON
-    const jsonMatch = cleanedResult.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('❌ [话题生成] 未找到JSON格式')
-      console.error('返回内容:', result.substring(0, 500))
-      throw new Error('AI返回格式错误：未找到JSON')
+    const users: any[] = []
+    const posts: any[] = []
+    const commentsByPost: { [postId: string]: any[] } = {}
+    
+    const now = Date.now()
+    
+    for (const line of lines) {
+      const parts = line.split('|||').map(p => p.trim())
+      
+      if (parts[0] === 'U' && parts.length >= 6) {
+        // 用户: U|||ID|||昵称|||签名|||头像|||粉丝数
+        users.push({
+          id: parts[1],
+          name: parts[2],
+          bio: parts[3],
+          avatar: parts[4],
+          followers: parseInt(parts[5]) || 1000
+        })
+      } else if (parts[0] === 'P' && parts.length >= 5) {
+        // 帖子: P|||ID|||用户ID|||内容|||点赞数
+        const postId = parts[1]
+        posts.push({
+          id: postId,
+          authorId: parts[2],
+          content: parts[3],
+          likes: parseInt(parts[4]) || 0,
+          timestamp: now - Math.floor(Math.random() * 24 * 3600 * 1000), // 过去24小时内
+          comments: []
+        })
+        commentsByPost[postId] = []
+      } else if (parts[0] === 'C' && parts.length >= 7) {
+        // 评论: C|||ID|||用户ID|||内容|||帖子ID|||回复评论ID|||点赞数
+        const comment = {
+          id: parts[1],
+          authorId: parts[2],
+          content: parts[3],
+          likes: parseInt(parts[6]) || 0,
+          timestamp: now - Math.floor(Math.random() * 20 * 3600 * 1000),
+          replyTo: parts[5] || null
+        }
+        
+        const postId = parts[4]
+        if (!commentsByPost[postId]) {
+          commentsByPost[postId] = []
+        }
+        commentsByPost[postId].push(comment)
+      }
     }
     
-    let jsonStr = jsonMatch[0]
+    // 将评论添加到对应的帖子
+    posts.forEach(post => {
+      if (commentsByPost[post.id]) {
+        post.comments = commentsByPost[post.id]
+      }
+    })
     
-    // 3. 修复常见的JSON格式错误
-    // 修复缺少引号的键名（如 avatar: → "avatar":）
-    jsonStr = jsonStr.replace(/(\w+):/g, '"$1":')
-    // 修复已经有引号的重复加引号问题（如 ""key"": → "key":）
-    jsonStr = jsonStr.replace(/""(\w+)""/g, '"$1"')
-    
-    console.log('🔍 [话题生成] 修复后的JSON前200字:', jsonStr.substring(0, 200))
-    
-    const data = JSON.parse(jsonStr)
+    const data = { users, posts }
     
     console.log('✅ [话题生成] 解析成功')
     console.log('👥 [话题生成] 用户数量:', data.users?.length)

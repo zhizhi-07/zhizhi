@@ -31,13 +31,32 @@ const ForumTopics = () => {
 
   useEffect(() => {
     loadTopics()
+    
+    // 每3秒检查一次是否有新话题生成完成
+    const interval = setInterval(() => {
+      loadTopics()
+    }, 3000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const loadTopics = () => {
-    // 模拟话题数据
-    const mockTopics: Topic[] = [
+    // 从localStorage加载用户创建的话题
+    const savedTopics = localStorage.getItem('forum_topics_list')
+    let userTopics: Topic[] = []
+    
+    if (savedTopics) {
+      try {
+        userTopics = JSON.parse(savedTopics)
+      } catch (e) {
+        console.error('加载话题失败:', e)
+      }
+    }
+    
+    // 默认话题数据
+    const defaultTopics: Topic[] = [
       {
-        id: '1',
+        id: 'default_1',
         name: '今日热搜',
         description: '实时热点，大家都在看',
         postsCount: 128900,
@@ -46,7 +65,7 @@ const ForumTopics = () => {
         isHot: true,
       },
       {
-        id: '2',
+        id: 'default_2',
         name: '科技前沿',
         description: 'AI、编程、前沿科技讨论',
         postsCount: 89600,
@@ -55,7 +74,7 @@ const ForumTopics = () => {
         isHot: true,
       },
       {
-        id: '3',
+        id: 'default_3',
         name: '美食分享',
         description: '吃货天堂，分享美食',
         postsCount: 67800,
@@ -64,7 +83,7 @@ const ForumTopics = () => {
         isHot: true,
       },
       {
-        id: '4',
+        id: 'default_4',
         name: '游戏天地',
         description: '游戏资讯、攻略、交流',
         postsCount: 145600,
@@ -73,7 +92,7 @@ const ForumTopics = () => {
         isHot: true,
       },
       {
-        id: '5',
+        id: 'default_5',
         name: '摄影分享',
         description: '记录生活，分享美好瞬间',
         postsCount: 45600,
@@ -83,7 +102,8 @@ const ForumTopics = () => {
       },
     ]
     
-    setTopics(mockTopics)
+    // 合并用户话题和默认话题（用户话题在前）
+    setTopics([...userTopics, ...defaultTopics])
   }
 
   const toggleFollow = (topicId: string) => {
