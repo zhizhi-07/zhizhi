@@ -2,7 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { BackIcon, MoreIcon, SendIcon, AddCircleIcon } from '../components/Icons'
+import { BackIcon, MoreIcon, SendIcon, AddCircleIcon, EmojiIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
 import { useCharacter } from '../context/CharacterContext'
 import { useUser } from '../context/UserContext'
@@ -1293,6 +1293,14 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
               )}
             </div>
 
+            {/* 表情包按钮 */}
+            <button 
+              onClick={() => setShowEmojiPanel(true)}
+              className="ios-button text-gray-700"
+            >
+              <EmojiIcon size={22} />
+            </button>
+
             {/* 智能切换：有输入内容显示发送按钮，无内容显示AI主动回复按钮 */}
             {inputValue.trim() ? (
               <button
@@ -1321,10 +1329,6 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             onClose={() => setShowAddMenu(false)}
             onSelectImage={() => alert('相册功能开发中...')}
             onSelectCamera={() => alert('拍摄功能开发中...')}
-            onSelectEmoji={() => {
-              setShowAddMenu(false)
-              setShowEmojiPanel(true)
-            }}
             onSelectRedPacket={() => setShowRedEnvelopeSender(true)}
             onSelectVoiceMessage={() => alert('语音功能开发中...')}
             onSelectVoiceCall={() => alert('语音通话功能开发中...')}

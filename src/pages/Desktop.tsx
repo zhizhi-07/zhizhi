@@ -8,7 +8,7 @@ import { fetchWeather, type WeatherData } from '../utils/weather'
 import { 
   MusicIcon, HeartIcon, PauseIcon, SkipForwardIcon, PlayIcon,
   ChatIcon, SettingsIcon, FileIcon, ImageIcon,
-  FootprintIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon
+  FootprintIcon, CalculatorIcon, CalendarIcon, GameIcon, MomentsIcon, BrowserIcon, ForumIcon
 } from '../components/Icons'
 
 // 应用数据类型
@@ -237,7 +237,7 @@ const Desktop = () => {
   // 第二页应用
   const page2Apps: AppItem[] = [
     { id: 'footprint', name: '足迹', icon: getAppIcon('footprint', FootprintIcon), color: 'glass-card', route: '/ai-footprint' },
-    { id: 'photos', name: '相册', icon: getAppIcon('photos', ImageIcon), color: 'glass-card', route: '/photos' },
+    { id: 'forum', name: '论坛', icon: getAppIcon('forum', ForumIcon), color: 'glass-card', route: '/forum' },
     { id: 'calculator', name: '计算器', icon: getAppIcon('calculator', CalculatorIcon), color: 'glass-card', route: '/calculator' },
     { id: 'calendar', name: '日历', icon: getAppIcon('calendar', CalendarIcon), color: 'glass-card', route: '/calendar' },
     { id: 'games', name: '游戏', icon: getAppIcon('games', GameIcon), color: 'glass-card', route: '/games' },

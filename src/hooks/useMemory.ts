@@ -2,13 +2,18 @@ import { useRef, useMemo, useCallback } from 'react'
 import { memoryManager } from '../utils/memorySystem'
 
 // Hook 用于在聊天中自动提取和使用记忆
-export const useMemory = (characterId: string) => {
+export const useMemory = (characterId: string, characterName?: string, characterPersonality?: string) => {
   const memorySystem = useRef(memoryManager.getSystem(characterId))
 
   // 从对话中提取记忆和总结（异步）
   const extractMemories = useCallback(async (userMessage: string, aiResponse: string) => {
-    return await memorySystem.current.extractMemoriesFromConversation(userMessage, aiResponse)
-  }, [])
+    return await memorySystem.current.extractMemoriesFromConversation(
+      userMessage, 
+      aiResponse, 
+      characterName, 
+      characterPersonality
+    )
+  }, [characterName, characterPersonality])
 
   // 从角色描述中提取初始记忆（异步）
   const extractInitialMemories = useCallback(async (characterDescription: string) => {

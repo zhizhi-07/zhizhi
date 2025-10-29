@@ -257,7 +257,7 @@ const Settings = () => {
         >
           <BackIcon size={24} />
         </button>
-        <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+        <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
           设置
         </h1>
         <div className="w-6"></div>

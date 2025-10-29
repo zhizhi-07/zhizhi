@@ -526,3 +526,8 @@ export const FootprintIcon = ({ size = 24, className = '' }: IconProps) => (
   </svg>
 )
 
+export const ForumIcon = ({ size = 24, className = '' }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+    <path d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+)

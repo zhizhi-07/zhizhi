@@ -14,7 +14,13 @@ const MemorySummary = () => {
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const character = id ? getCharacter(id) : undefined
-  const memorySystem = useMemory(id || '')
+  
+  // 传入角色名称和性格，让记忆总结也用角色的语气
+  const memorySystem = useMemory(
+    id || '', 
+    character?.name, 
+    character?.description
+  )
 
   const [summary, setSummary] = useState('')
   const [summaryInterval, setSummaryInterval] = useState(30)

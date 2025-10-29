@@ -93,7 +93,7 @@ const CreateIntimatePay = () => {
         >
           <BackIcon size={24} className="text-gray-900" />
         </button>
-        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-[17px] font-medium text-gray-900">开通亲密付</h1>
+        <h1 className="absolute left-1/2 transform -translate-x-1/2 text-[17px] font-medium text-gray-900 pointer-events-none">开通亲密付</h1>
         <button
           onClick={handleConfirm}
           disabled={!selectedCharacterId || !monthlyLimit}

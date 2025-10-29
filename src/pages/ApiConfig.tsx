@@ -136,11 +136,11 @@ const ApiConfig = () => {
         <div className="px-4 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate(-1)}
-            className="ios-button text-blue-500 -ml-2"
+            className="ios-button text-blue-500 -ml-2 relative z-10"
           >
             <BackIcon size={24} />
           </button>
-          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
+          <h1 className="text-base font-semibold text-gray-900 absolute left-1/2 transform -translate-x-1/2 pointer-events-none">
             API配置
           </h1>
           <button

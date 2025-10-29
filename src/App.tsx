@@ -28,6 +28,7 @@ import { GroupProvider } from './context/GroupContext'
 import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
 import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
 import { AILifeProvider } from './context/AILifeContext'
+import { ForumProvider } from './context/ForumContext'
 import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
@@ -172,6 +173,20 @@ const MiniPrograms = lazy(() => import('./pages/MiniPrograms'))
 const SettingsNew = lazy(() => import('./pages/SettingsNew'))
 const About = lazy(() => import('./pages/About'))
 
+// 论坛功能
+const Forum = lazy(() => import('./pages/Forum'))
+const ForumWelcome = lazy(() => import('./pages/ForumWelcome'))
+const ForumInitialize = lazy(() => import('./pages/ForumInitialize'))
+const ForumCharacterList = lazy(() => import('./pages/ForumCharacterList'))
+const ForumPublish = lazy(() => import('./pages/ForumPublish'))
+const ForumPostDetail = lazy(() => import('./pages/ForumPostDetail'))
+const ForumSearch = lazy(() => import('./pages/ForumSearch'))
+const ForumTopics = lazy(() => import('./pages/ForumTopics'))
+const ForumCreateTopic = lazy(() => import('./pages/ForumCreateTopic'))
+const ForumTopicDetail = lazy(() => import('./pages/ForumTopicDetail'))
+const ForumNotifications = lazy(() => import('./pages/ForumNotifications'))
+const ForumProfile = lazy(() => import('./pages/ForumProfile'))
+
 // DynamicIsland包装组件
 const DynamicIslandWrapper = () => {
   const musicPlayer = useMusicPlayer()
@@ -280,6 +295,7 @@ function App() {
                       <AccountingProvider>
                         <GroupProvider>
                           <GroupRedEnvelopeProvider>
+                            <ForumProvider>
                             <MusicPlayerProvider>
                               <Router basename="/zhizhi">
                                 <OfflineIndicator />
@@ -380,11 +396,27 @@ function App() {
                                   <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                   <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
                                   <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
+                                  
+                                  {/* 论坛功能 */}
+                                  <Route path="/forum" element={<PageWrapper><Forum /></PageWrapper>} />
+                                  <Route path="/forum/welcome" element={<PageWrapper><ForumWelcome /></PageWrapper>} />
+                                  <Route path="/forum/initialize" element={<PageWrapper><ForumInitialize /></PageWrapper>} />
+                                  <Route path="/forum/character-list" element={<PageWrapper><ForumCharacterList /></PageWrapper>} />
+                                  <Route path="/forum/publish" element={<PageWrapper><ForumPublish /></PageWrapper>} />
+                                  <Route path="/forum/post/:id" element={<PageWrapper><ForumPostDetail /></PageWrapper>} />
+                                  <Route path="/forum/search" element={<PageWrapper><ForumSearch /></PageWrapper>} />
+                                  <Route path="/forum/topics" element={<PageWrapper><ForumTopics /></PageWrapper>} />
+                                  <Route path="/forum/create-topic" element={<PageWrapper><ForumCreateTopic /></PageWrapper>} />
+                                  <Route path="/forum/topic/:id" element={<PageWrapper><ForumTopicDetail /></PageWrapper>} />
+                                  <Route path="/forum/notifications" element={<PageWrapper><ForumNotifications /></PageWrapper>} />
+                                  <Route path="/forum/profile" element={<PageWrapper><ForumProfile /></PageWrapper>} />
+                                  
                                   <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
                                 </Routes>
                                 </MomentsSocialManager>
                               </Router>
                             </MusicPlayerProvider>
+                            </ForumProvider>
                           </GroupRedEnvelopeProvider>
                         </GroupProvider>
                       </AccountingProvider>

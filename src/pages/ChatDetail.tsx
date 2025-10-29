@@ -3576,6 +3576,19 @@ ${emojiInstructions}
         }
       }
       
+      // 检查AI是否要开始直播
+      let liveStreamMatch = aiResponse.match(/\[开始直播:(.+?):(.+?)\]/)
+      let aiLiveStreamData: { popularityLevel: string; openingMessage: string } | null = null
+      
+      if (liveStreamMatch) {
+        aiLiveStreamData = {
+          popularityLevel: liveStreamMatch[1],
+          openingMessage: liveStreamMatch[2]
+        }
+        cleanedResponse = cleanedResponse.replace(/\[开始直播:.+?:.+?\]/g, '').trim()
+        console.log('📺 AI开始直播:', aiLiveStreamData)
+      }
+      
       // 检查AI是否要领取红包（支持多种格式）
       if (/[\[【\(（]\s*(领取红包|领红包)\s*[\]】\)）]/.test(aiResponse)) {
         redEnvelopeAction = 'claim'
@@ -4440,6 +4453,45 @@ ${emojiInstructions}
         console.log('🎵 AI发送了一起听邀请:', aiMusicInviteData.songTitle, '-', aiMusicInviteData.songArtist)
       }
       
+      // 如果AI开始直播
+      if (aiLiveStreamData && id) {
+        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500))
+        
+        // 创建直播ID和数据
+        const liveStreamId = `${id}_${Date.now()}`
+        const liveStreamInfo = {
+          characterId: id,
+          popularityLevel: aiLiveStreamData.popularityLevel,
+          openingMessage: aiLiveStreamData.openingMessage,
+          startTime: Date.now()
+        }
+        
+        // 保存到localStorage
+        localStorage.setItem(`live_stream_${liveStreamId}`, JSON.stringify(liveStreamInfo))
+        
+        // 创建直播消息
+        const liveStreamMessage: Message = {
+          id: Date.now(),
+          type: 'system',
+          content: `${character?.name || 'AI'} 开始了直播`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'live_stream',
+          liveStreamData: {
+            liveStreamId,
+            popularityLevel: aiLiveStreamData.popularityLevel,
+            openingMessage: aiLiveStreamData.openingMessage
+          }
+        }
+        
+        newMessages = [...newMessages, liveStreamMessage]
+        safeSetMessages(newMessages)
+        console.log('📺 AI开始了直播:', aiLiveStreamData)
+      }
+      
       // 如果AI发了红包
       if (aiRedEnvelopeData && id) {
         await new Promise(resolve => setTimeout(resolve, 500)) // 稍微延迟一下
@@ -5269,6 +5321,57 @@ ${emojiInstructions}
                              )}
                            </div>
                          </div>
+                       </div>
+                     </div>
+                   )
+                 }
+                 
+                 // 直播消息 - 显示直播卡片
+                 if (message.messageType === 'live_stream' && message.liveStreamData) {
+                   return (
+                     <div key={message.id} className="flex justify-center mb-4">
+                       <div 
+                         className="glass-card rounded-2xl p-4 shadow-lg w-[260px] cursor-pointer hover:scale-105 transition-transform"
+                         onClick={() => navigate(`/live-room/${message.liveStreamData!.liveStreamId}`)}
+                       >
+                         <div className="flex items-center gap-3 mb-3">
+                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+                             <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                               <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                             </svg>
+                           </div>
+                           <div className="flex-1">
+                             <div className="flex items-center gap-2">
+                               <span className="text-sm text-gray-900 font-medium">直播中</span>
+                               <span className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full animate-pulse">LIVE</span>
+                             </div>
+                             <div className="text-xs text-gray-500 mt-1">{character?.name || 'AI'} 开始了直播</div>
+                           </div>
+                         </div>
+                         <div className="border-t border-gray-200 pt-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                              </svg>
+                              <span>{(() => {
+                                // 根据人气等级计算初始观众数
+                                const configs: Record<string, [number, number]> = {
+                                  '新人': [30, 80],
+                                  '小有名气': [100, 300],
+                                  '知名主播': [500, 1000],
+                                  '顶流': [2000, 5000]
+                                }
+                                const range = configs[message.liveStreamData.popularityLevel] || [100, 300]
+                                const viewers = Math.floor(Math.random() * (range[1] - range[0]) + range[0])
+                                return `${viewers}人在线`
+                              })()}</span>
+                            </div>
+                            <span className="px-3 py-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-medium rounded-full">
+                              进入直播间
+                            </span>
+                          </div>
+                        </div>
                        </div>
                      </div>
                    )

@@ -1,4 +1,4 @@
-import { ImageIcon, CameraIcon, RedPacketIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, EmojiIcon } from './Icons'
+import { ImageIcon, CameraIcon, RedPacketIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon } from './Icons'
 
 interface GroupChatMenuProps {
   onClose: () => void
@@ -9,7 +9,6 @@ interface GroupChatMenuProps {
   onSelectVoiceMessage: () => void
   onSelectVoiceCall: () => void
   onSelectVideoCall: () => void
-  onSelectEmoji: () => void
 }
 
 const GroupChatMenu = ({
@@ -20,13 +19,11 @@ const GroupChatMenu = ({
   onSelectLocation,
   onSelectVoiceMessage,
   onSelectVoiceCall,
-  onSelectVideoCall,
-  onSelectEmoji
+  onSelectVideoCall
 }: GroupChatMenuProps) => {
   const menuItems = [
     { id: 'image', label: '相册', Icon: ImageIcon, onClick: onSelectImage },
     { id: 'camera', label: '拍摄', Icon: CameraIcon, onClick: onSelectCamera },
-    { id: 'emoji', label: '表情', Icon: EmojiIcon, onClick: onSelectEmoji },
     { id: 'redpacket', label: '红包', Icon: RedPacketIcon, onClick: onSelectRedPacket },
     { id: 'voice-msg', label: '语音', Icon: MicIcon, onClick: onSelectVoiceMessage },
     { id: 'voice', label: '语音通话', Icon: PhoneIcon, onClick: onSelectVoiceCall },
