@@ -109,15 +109,61 @@ const Moments = () => {
     
     addComment(momentId, currentUser.id, currentUser.name, currentUser.avatar, finalComment)
     
-    // 如果是回复AI角色的评论，触发AI反应
+    // 找到这条朋友圈
+    const moment = moments.find(m => m.id === momentId)
+    
+    // 如果评论的是别人的朋友圈，同步到对方的聊天记录
+    if (moment && moment.userId !== currentUser.id) {
+      const targetCharacter = getCharacter(moment.userId)
+      if (targetCharacter) {
+        const chatMessages = localStorage.getItem(`chat_messages_${moment.userId}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        const commentNotification = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: `💬 ${currentUser.name} 评论了你的朋友圈：${finalComment}`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: false
+        }
+        
+        messages.push(commentNotification)
+        localStorage.setItem(`chat_messages_${moment.userId}`, JSON.stringify(messages))
+        console.log(`💾 评论已同步到 ${targetCharacter.name} 的聊天记录`)
+      }
+    }
+    
+    // 如果是回复AI角色的评论，同步到该角色的聊天记录并触发AI反应
     if (replyToUserId && replyToUserId !== currentUser.id) {
       const character = getCharacter(replyToUserId)
       if (character) {
-        // 不再添加到聊天记录，只记录到朋友圈
-        console.log(`💾 你的回复已保存到朋友圈（不显示在聊天中）`)
+        // 同步回复到被回复者的聊天记录
+        const chatMessages = localStorage.getItem(`chat_messages_${replyToUserId}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        const replyNotification = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: `💬 ${currentUser.name} 回复了你的朋友圈评论：${finalComment}`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: false
+        }
+        
+        messages.push(replyNotification)
+        localStorage.setItem(`chat_messages_${replyToUserId}`, JSON.stringify(messages))
+        console.log(`💾 回复已同步到 ${character.name} 的聊天记录`)
         
         // 触发AI的反应（让AI决定回复评论还是私信）
-        const moment = moments.find(m => m.id === momentId)
         if (moment) {
           console.log(`🔔 用户回复了 ${character.name} 的评论，触发AI反应...`)
           
@@ -308,7 +354,7 @@ const Moments = () => {
                     
                     {/* 动态内容 */}
                     <p className="text-gray-800 leading-relaxed mb-2">
-                      {moment.content}
+                      {moment.content.replace(/\[图片[：:][^\]]+\]/g, '')}
                     </p>
                     
                     {/* 图片网格 */}

@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useMusicPlayer } from '../context/MusicPlayerContext'
+import { searchOnlineMusic, getSongUrl, getLyric } from '../services/musicApi'
 
 interface MusicDetailModalProps {
   songTitle: string
@@ -15,7 +18,10 @@ const MusicDetailModal = ({
   isOpen,
   onClose
 }: MusicDetailModalProps) => {
+  const navigate = useNavigate()
+  const musicPlayer = useMusicPlayer()
   const [isClosing, setIsClosing] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -102,17 +108,87 @@ const MusicDetailModal = ({
           {/* 操作按钮 */}
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                // TODO: 搜索并播放歌曲
-                console.log('播放音乐:', songTitle, songArtist)
-                alert('即将支持在线播放功能')
+              onClick={async () => {
+                setIsSearching(true)
+                try {
+                  // 搜索歌曲
+                  const query = `${songTitle} ${songArtist}`
+                  console.log('搜索歌曲:', query)
+                  const results = await searchOnlineMusic(query)
+                  
+                  if (results.length === 0) {
+                    alert('未找到该歌曲，请尝试其他搜索方式')
+                    setIsSearching(false)
+                    return
+                  }
+                  
+                  // 选择第一个结果
+                  const song = results[0]
+                  console.log('找到歌曲:', song)
+                  
+                  // 获取播放链接
+                  const url = await getSongUrl(song.id)
+                  if (!url) {
+                    alert('无法获取播放链接，该歌曲可能暂时无法播放')
+                    setIsSearching(false)
+                    return
+                  }
+                  
+                  // 获取歌词
+                  const lyrics = await getLyric(song.id)
+                  
+                  // 创建播放对象
+                  const playableSong = {
+                    id: song.id,
+                    title: song.name,
+                    artist: song.artists,
+                    album: song.album,
+                    duration: song.duration,
+                    cover: song.cover,
+                    audioUrl: url,
+                    lyrics: lyrics || undefined
+                  }
+                  
+                  // 设置播放列表和当前歌曲
+                  musicPlayer.setPlaylist([playableSong])
+                  musicPlayer.setCurrentSong(playableSong, 0)
+                  musicPlayer.play()
+                  
+                  console.log('开始播放:', playableSong.title)
+                  
+                  // 关闭弹窗
+                  handleClose()
+                  
+                  // 跳转到播放器
+                  setTimeout(() => {
+                    navigate('/music-player')
+                  }, 100)
+                } catch (error) {
+                  console.error('播放失败:', error)
+                  alert('播放失败，请重试')
+                } finally {
+                  setIsSearching(false)
+                }
               }}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full py-3 px-6 font-medium shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+              disabled={isSearching}
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full py-3 px-6 font-medium shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z"/>
-              </svg>
-              播放
+              {isSearching ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  搜索中...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  播放
+                </>
+              )}
             </button>
             
             <button
@@ -133,7 +209,7 @@ const MusicDetailModal = ({
 
           {/* 提示文字 */}
           <p className="text-xs text-gray-400 text-center mt-4">
-            点击播放按钮在音乐播放器中搜索
+            {isSearching ? '正在搜索歌曲...' : '点击播放按钮在线搜索并播放'}
           </p>
         </div>
       </div>

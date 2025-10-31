@@ -1,4 +1,4 @@
-import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, CoupleSpaceIcon, RefreshIcon, XiaohongshuIcon } from './Icons'
+import { ImageIcon, CameraIcon, RedPacketIcon, TransferIcon, IntimatePayIcon, LocationIcon, PhoneIcon, VideoIcon, MicIcon, CoupleSpaceIcon, RefreshIcon, XiaohongshuIcon, MusicIcon } from './Icons'
 
 interface ChatMenuProps {
   onClose: () => void
@@ -14,6 +14,7 @@ interface ChatMenuProps {
   onSelectVoiceCall: () => void
   onSelectVideoCall: () => void
   onSelectXiaohongshu: () => void
+  onSelectMusicInvite: () => void
   onRegenerateAI: () => void
   hasCoupleSpace?: boolean
 }
@@ -32,6 +33,7 @@ const ChatMenu = ({
   onSelectVoiceCall,
   onSelectVideoCall,
   onSelectXiaohongshu,
+  onSelectMusicInvite,
   onRegenerateAI,
   hasCoupleSpace
 }: ChatMenuProps) => {
@@ -62,6 +64,7 @@ const ChatMenu = ({
     { id: 'voice-msg', label: '语音', Icon: MicIcon, onClick: onSelectVoiceMessage },
     { id: 'voice', label: '语音通话', Icon: PhoneIcon, onClick: onSelectVoiceCall },
     { id: 'video', label: '视频通话', Icon: VideoIcon, onClick: onSelectVideoCall },
+    { id: 'music-invite', label: '一起听', Icon: MusicIcon, onClick: onSelectMusicInvite },
     { id: 'location', label: '位置', Icon: LocationIcon, onClick: onSelectLocation },
     { id: 'regenerate', label: '重回', Icon: RefreshIcon, onClick: onRegenerateAI },
   ]

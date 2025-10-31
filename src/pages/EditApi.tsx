@@ -135,7 +135,7 @@ const EditApi = () => {
         setItem(STORAGE_KEYS.API_SETTINGS, formData)
       }
     }
-    navigate('/api-list')
+    navigate('/api-list', { replace: true })
   }
 
   return (

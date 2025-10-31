@@ -28,8 +28,10 @@ import { GroupProvider } from './context/GroupContext'
 import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
 import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
 import { AILifeProvider } from './context/AILifeContext'
+import { CallProvider } from './context/CallContext'
 import NotificationContainer from './components/NotificationContainer'
 import ForumNotificationManager from './components/ForumNotificationManager'
+import BackgroundChatNotificationManager from './components/BackgroundChatNotificationManager'
 import { ForumProvider } from './context/ForumContext'
 import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
@@ -37,6 +39,7 @@ import Layout from './components/Layout'
 import MomentsSocialManager from './components/MomentsSocialManager'
 import ErrorBoundary from './components/ErrorBoundary'
 import OfflineIndicator from './components/OfflineIndicator'
+import GlobalCallScreen from './components/GlobalCallScreen'
 import { initPerformanceMonitor } from './utils/performance'
 
 // 通用加载组件
@@ -304,134 +307,138 @@ function App() {
                           <GroupRedEnvelopeProvider>
                             <ForumProvider>
                             <MusicPlayerProvider>
-                              <Router basename="/zhizhi">
-                                <OfflineIndicator />
-                                <DynamicIslandWrapper />
-                                <NotificationContainer />
-                                <ForumNotificationManager />
-                                <MomentsSocialManager>
-                                <Routes>
-                                  <Route path="/wechat" element={<Layout />}>
-                                    <Route index element={<ChatList />} />
-                                    <Route path="contacts" element={<Contacts />} />
-                                    <Route path="discover" element={<Discover />} />
-                                    <Route path="me" element={<Me />} />
-                                  </Route>
-                                  
-                                  {/* 懒加载路由 */}
-                                  <Route path="/chat/:id" element={<PageWrapper><ChatDetail /></PageWrapper>} />
-                                  <Route path="/settings" element={<PageWrapper><Settings /></PageWrapper>} />
-                                  <Route path="/settings-new" element={<PageWrapper><SettingsNew /></PageWrapper>} />
-                                  <Route path="/profile/:id" element={<PageWrapper><Profile /></PageWrapper>} />
-                                  <Route path="/edit-profile" element={<PageWrapper><EditProfile /></PageWrapper>} />
-                                  <Route path="/users" element={<PageWrapper><UserList /></PageWrapper>} />
-                                  <Route path="/create-user" element={<PageWrapper><CreateUser /></PageWrapper>} />
-                                  <Route path="/create-character" element={<PageWrapper><CreateCharacter /></PageWrapper>} />
-                                  <Route path="/api-config" element={<PageWrapper><ApiConfig /></PageWrapper>} />
-                                  <Route path="/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
-                                  <Route path="/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
-                                  <Route path="/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
-                                  {/* 兼容带 /wechat 前缀的 API 路由 */}
-                                  <Route path="/wechat/api-config" element={<PageWrapper><ApiConfig /></PageWrapper>} />
-                                  <Route path="/wechat/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
-                                  <Route path="/wechat/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
-                                  <Route path="/wechat/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
-                                  <Route path="/character/:id" element={<PageWrapper><CharacterDetail /></PageWrapper>} />
-                                  <Route path="/edit-character/:id" element={<PageWrapper><EditCharacter /></PageWrapper>} />
-                                  <Route path="/moments" element={<PageWrapper><Moments /></PageWrapper>} />
-                                  <Route path="/publish-moment" element={<PageWrapper><PublishMoment /></PageWrapper>} />
-                                  <Route path="/moment-notifications" element={<PageWrapper><MomentNotifications /></PageWrapper>} />
-                                  {/* 兼容带 /wechat 前缀的朋友圈路由 */}
-                                  <Route path="/wechat/moments" element={<PageWrapper><Moments /></PageWrapper>} />
-                                  <Route path="/send-transfer/:id" element={<PageWrapper><SendTransfer /></PageWrapper>} />
-                                  <Route path="/chat-settings/:id" element={<PageWrapper><ChatSettings /></PageWrapper>} />
-                                  <Route path="/memory/:characterId" element={<PageWrapper><MemoryViewer /></PageWrapper>} />
-                                  <Route path="/memory-summary/:characterId" element={<PageWrapper><MemorySummary /></PageWrapper>} />
-                                  <Route path="/wallet" element={<PageWrapper><Wallet /></PageWrapper>} />
-                                  <Route path="/services" element={<PageWrapper><Services /></PageWrapper>} />
-                                  <Route path="/transaction-history" element={<PageWrapper><TransactionHistory /></PageWrapper>} />
-                                  <Route path="/card-wallet" element={<PageWrapper><CardWallet /></PageWrapper>} />
-                                  <Route path="/create-intimate-pay/:characterId" element={<PageWrapper><CreateIntimatePay /></PageWrapper>} />
-                                  <Route path="/intimate-pay/:characterId" element={<PageWrapper><IntimatePayDetail /></PageWrapper>} />
-                                  <Route path="/intimate-pay/receive/:characterId/:amount" element={<PageWrapper><ReceiveIntimatePay /></PageWrapper>} />
-                                  <Route path="/wallet-help" element={<PageWrapper><WalletHelp /></PageWrapper>} />
-                                  <Route path="/diary/:characterId" element={<PageWrapper><Diary /></PageWrapper>} />
-                                  <Route path="/streak/:characterId" element={<PageWrapper><StreakDetail /></PageWrapper>} />
-                                  <Route path="/about" element={<PageWrapper><About /></PageWrapper>} />
-                                  <Route path="/accounting" element={<PageWrapper><Accounting /></PageWrapper>} />
-                                  <Route path="/accounting-chat" element={<PageWrapper><AccountingChat /></PageWrapper>} />
-                                  <Route path="/add-transaction" element={<PageWrapper><AddTransaction /></PageWrapper>} />
-                                  <Route path="/groups" element={<PageWrapper><GroupList /></PageWrapper>} />
-                                  <Route path="/create-group" element={<PageWrapper><CreateGroup /></PageWrapper>} />
-                                  <Route path="/group/:id" element={<PageWrapper><GroupChatDetail /></PageWrapper>} />
-                                  <Route path="/group-settings/:id" element={<PageWrapper><GroupSettings /></PageWrapper>} />
-                                  <Route path="/shake-shake" element={<PageWrapper><ShakeShake /></PageWrapper>} />
-                                  <Route path="/live" element={<PageWrapper><Live /></PageWrapper>} />
-                                  <Route path="/live-room/:id" element={<PageWrapper><LiveRoom /></PageWrapper>} />
-                                  <Route path="/couple-space" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
-                                  <Route path="/couple-space/:characterId" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
-                                  <Route path="/couple-album" element={<PageWrapper><CoupleAlbum /></PageWrapper>} />
-                                  <Route path="/couple-anniversary" element={<PageWrapper><CoupleAnniversary /></PageWrapper>} />
-                                  <Route path="/couple-message-board" element={<PageWrapper><CoupleMessageBoard /></PageWrapper>} />
-                                  <Route path="/calendar" element={<PageWrapper><CalendarView /></PageWrapper>} />
-                                  <Route path="/ai-footprint" element={<PageWrapper><AIFootprint /></PageWrapper>} />
-                                  <Route path="/ai-footprint/:characterId" element={<PageWrapper><AIFootprint /></PageWrapper>} />
-                                  <Route path="/life-settings/:characterId" element={<PageWrapper><LifeSettings /></PageWrapper>} />
-                                  <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
-                                  <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
-                                  <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />
-                                  <Route path="/bubble-store" element={<PageWrapper><BubbleStore /></PageWrapper>} />
-                                  <Route path="/font-customizer" element={<PageWrapper><FontCustomizer /></PageWrapper>} />
-                                  <Route path="/icon-customizer" element={<PageWrapper><IconCustomizer /></PageWrapper>} />
-                                  <Route path="/background-customizer" element={<PageWrapper><BackgroundCustomizer /></PageWrapper>} />
-                                  <Route path="/weather-detail" element={<PageWrapper><WeatherDetail /></PageWrapper>} />
-                                  <Route path="/music-player" element={<PageWrapper><MusicPlayer /></PageWrapper>} />
-                                  <Route path="/upload-song" element={<PageWrapper><UploadSong /></PageWrapper>} />
-                                  <Route path="/music-search" element={<PageWrapper><MusicSearch /></PageWrapper>} />
-                                  <Route path="/music-together-chat" element={<PageWrapper><MusicTogetherChat /></PageWrapper>} />
-                                  <Route path="/music-invite-demo" element={<PageWrapper><MusicInviteDemo /></PageWrapper>} />
-                                  <Route path="/game/gomoku/:characterId" element={<PageWrapper><GomokuGame /></PageWrapper>} />
-                                  <Route path="/game/character-select" element={<PageWrapper><GameCharacterSelect /></PageWrapper>} />
-                                  <Route path="/game-list" element={<PageWrapper><GameList /></PageWrapper>} />
-                                  <Route path="/game/undercover/:groupId" element={<PageWrapper><UndercoverGame /></PageWrapper>} />
-                                  <Route path="/desktop" element={<PageWrapper><Desktop /></PageWrapper>} />
-                                  <Route path="/story-mode/:characterId" element={<PageWrapper><StoryMode /></PageWrapper>} />
-                                  <Route path="/preset" element={<PageWrapper><PresetManager /></PageWrapper>} />
-                                  <Route path="/offline-chat" element={<PageWrapper><OfflineChat /></PageWrapper>} />
-                                  <Route path="/customize" element={<PageWrapper><Customize /></PageWrapper>} />
-                                  <Route path="/statusbar-customize" element={<PageWrapper><StatusBarCustomize /></PageWrapper>} />
-                                  <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
-                                  <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
-                                  <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
-                                  <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
-                                  <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
-                                  <Route path="/ai-phone-select" element={<PageWrapper><AIPhoneSelect /></PageWrapper>} />
-                                  
-                                  {/* 论坛功能 */}
-                                  <Route path="/forum" element={<PageWrapper><Forum /></PageWrapper>} />
-                                  <Route path="/forum/welcome" element={<PageWrapper><ForumWelcome /></PageWrapper>} />
-                                  <Route path="/forum/initialize" element={<PageWrapper><ForumInitialize /></PageWrapper>} />
-                                  <Route path="/forum/character-list" element={<PageWrapper><ForumCharacterList /></PageWrapper>} />
-                                  <Route path="/forum/publish" element={<PageWrapper><ForumPublish /></PageWrapper>} />
-                                  <Route path="/forum/post/:id" element={<PageWrapper><ForumPostDetail /></PageWrapper>} />
-                                  <Route path="/forum/search" element={<PageWrapper><ForumSearch /></PageWrapper>} />
-                                  <Route path="/forum/topics" element={<PageWrapper><ForumTopics /></PageWrapper>} />
-                                  <Route path="/forum/create-topic" element={<PageWrapper><ForumCreateTopic /></PageWrapper>} />
-                                  <Route path="/forum/topic/:id" element={<PageWrapper><ForumTopicDetail /></PageWrapper>} />
-                                  <Route path="/forum/notifications" element={<PageWrapper><ForumNotifications /></PageWrapper>} />
-                                  <Route path="/forum/profile" element={<PageWrapper><ForumProfile /></PageWrapper>} />
-                                  <Route path="/forum/user/:userId" element={<PageWrapper><ForumUserProfile /></PageWrapper>} />
-                                  <Route path="/forum/memes" element={<PageWrapper><ForumMemeManager /></PageWrapper>} />
-                                  
-                                  <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
-                                </Routes>
-                                </MomentsSocialManager>
-                              </Router>
-                            </MusicPlayerProvider>
-                            </ForumProvider>
-                          </GroupRedEnvelopeProvider>
-                        </GroupProvider>
-                      </AccountingProvider>
+                              <CallProvider>
+                                <Router basename={import.meta.env.BASE_URL || "/"}>
+                                  <OfflineIndicator />
+                                  <DynamicIslandWrapper />
+                                  <NotificationContainer />
+                                  <ForumNotificationManager />
+                                  <BackgroundChatNotificationManager />
+                                  <GlobalCallScreen />
+                                  <MomentsSocialManager>
+                                  <Routes>
+                                    <Route path="/wechat" element={<Layout />}>
+                                      <Route index element={<ChatList />} />
+                                      <Route path="contacts" element={<Contacts />} />
+                                      <Route path="discover" element={<Discover />} />
+                                      <Route path="me" element={<Me />} />
+                                    </Route>
+                                    
+                                    {/* 懒加载路由 */}
+                                    <Route path="/chat/:id" element={<PageWrapper><ChatDetail /></PageWrapper>} />
+                                    <Route path="/settings" element={<PageWrapper><Settings /></PageWrapper>} />
+                                    <Route path="/settings-new" element={<PageWrapper><SettingsNew /></PageWrapper>} />
+                                    <Route path="/profile/:id" element={<PageWrapper><Profile /></PageWrapper>} />
+                                    <Route path="/edit-profile" element={<PageWrapper><EditProfile /></PageWrapper>} />
+                                    <Route path="/users" element={<PageWrapper><UserList /></PageWrapper>} />
+                                    <Route path="/create-user" element={<PageWrapper><CreateUser /></PageWrapper>} />
+                                    <Route path="/create-character" element={<PageWrapper><CreateCharacter /></PageWrapper>} />
+                                    <Route path="/api-config" element={<PageWrapper><ApiConfig /></PageWrapper>} />
+                                    <Route path="/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
+                                    <Route path="/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
+                                    <Route path="/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
+                                    {/* 兼容带 /wechat 前缀的 API 路由 */}
+                                    <Route path="/wechat/api-config" element={<PageWrapper><ApiConfig /></PageWrapper>} />
+                                    <Route path="/wechat/api-list" element={<PageWrapper><ApiList /></PageWrapper>} />
+                                    <Route path="/wechat/add-api" element={<PageWrapper><AddApi /></PageWrapper>} />
+                                    <Route path="/wechat/edit-api/:id" element={<PageWrapper><EditApi /></PageWrapper>} />
+                                    <Route path="/character/:id" element={<PageWrapper><CharacterDetail /></PageWrapper>} />
+                                    <Route path="/edit-character/:id" element={<PageWrapper><EditCharacter /></PageWrapper>} />
+                                    <Route path="/moments" element={<PageWrapper><Moments /></PageWrapper>} />
+                                    <Route path="/publish-moment" element={<PageWrapper><PublishMoment /></PageWrapper>} />
+                                    <Route path="/moment-notifications" element={<PageWrapper><MomentNotifications /></PageWrapper>} />
+                                    {/* 兼容带 /wechat 前缀的朋友圈路由 */}
+                                    <Route path="/wechat/moments" element={<PageWrapper><Moments /></PageWrapper>} />
+                                    <Route path="/send-transfer/:id" element={<PageWrapper><SendTransfer /></PageWrapper>} />
+                                    <Route path="/chat-settings/:id" element={<PageWrapper><ChatSettings /></PageWrapper>} />
+                                    <Route path="/memory/:characterId" element={<PageWrapper><MemoryViewer /></PageWrapper>} />
+                                    <Route path="/memory-summary/:characterId" element={<PageWrapper><MemorySummary /></PageWrapper>} />
+                                    <Route path="/wallet" element={<PageWrapper><Wallet /></PageWrapper>} />
+                                    <Route path="/services" element={<PageWrapper><Services /></PageWrapper>} />
+                                    <Route path="/transaction-history" element={<PageWrapper><TransactionHistory /></PageWrapper>} />
+                                    <Route path="/card-wallet" element={<PageWrapper><CardWallet /></PageWrapper>} />
+                                    <Route path="/create-intimate-pay/:characterId" element={<PageWrapper><CreateIntimatePay /></PageWrapper>} />
+                                    <Route path="/intimate-pay/:characterId" element={<PageWrapper><IntimatePayDetail /></PageWrapper>} />
+                                    <Route path="/intimate-pay/receive/:characterId/:monthlyLimit" element={<PageWrapper><ReceiveIntimatePay /></PageWrapper>} />
+                                    <Route path="/wallet-help" element={<PageWrapper><WalletHelp /></PageWrapper>} />
+                                    <Route path="/diary/:characterId" element={<PageWrapper><Diary /></PageWrapper>} />
+                                    <Route path="/streak/:characterId" element={<PageWrapper><StreakDetail /></PageWrapper>} />
+                                    <Route path="/about" element={<PageWrapper><About /></PageWrapper>} />
+                                    <Route path="/accounting" element={<PageWrapper><Accounting /></PageWrapper>} />
+                                    <Route path="/accounting-chat" element={<PageWrapper><AccountingChat /></PageWrapper>} />
+                                    <Route path="/add-transaction" element={<PageWrapper><AddTransaction /></PageWrapper>} />
+                                    <Route path="/groups" element={<PageWrapper><GroupList /></PageWrapper>} />
+                                    <Route path="/create-group" element={<PageWrapper><CreateGroup /></PageWrapper>} />
+                                    <Route path="/group/:id" element={<PageWrapper><GroupChatDetail /></PageWrapper>} />
+                                    <Route path="/group-settings/:id" element={<PageWrapper><GroupSettings /></PageWrapper>} />
+                                    <Route path="/shake-shake" element={<PageWrapper><ShakeShake /></PageWrapper>} />
+                                    <Route path="/live" element={<PageWrapper><Live /></PageWrapper>} />
+                                    <Route path="/live-room/:id" element={<PageWrapper><LiveRoom /></PageWrapper>} />
+                                    <Route path="/couple-space" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
+                                    <Route path="/couple-space/:characterId" element={<PageWrapper><CoupleSpace /></PageWrapper>} />
+                                    <Route path="/couple-album" element={<PageWrapper><CoupleAlbum /></PageWrapper>} />
+                                    <Route path="/couple-anniversary" element={<PageWrapper><CoupleAnniversary /></PageWrapper>} />
+                                    <Route path="/couple-message-board" element={<PageWrapper><CoupleMessageBoard /></PageWrapper>} />
+                                    <Route path="/calendar" element={<PageWrapper><CalendarView /></PageWrapper>} />
+                                    <Route path="/ai-footprint" element={<PageWrapper><AIFootprint /></PageWrapper>} />
+                                    <Route path="/ai-footprint/:characterId" element={<PageWrapper><AIFootprint /></PageWrapper>} />
+                                    <Route path="/life-settings/:characterId" element={<PageWrapper><LifeSettings /></PageWrapper>} />
+                                    <Route path="/spark-moments" element={<PageWrapper><SparkMoments /></PageWrapper>} />
+                                    <Route path="/memes-library" element={<PageWrapper><MemesLibrary /></PageWrapper>} />
+                                    <Route path="/mini-programs" element={<PageWrapper><MiniPrograms /></PageWrapper>} />
+                                    <Route path="/bubble-store" element={<PageWrapper><BubbleStore /></PageWrapper>} />
+                                    <Route path="/font-customizer" element={<PageWrapper><FontCustomizer /></PageWrapper>} />
+                                    <Route path="/icon-customizer" element={<PageWrapper><IconCustomizer /></PageWrapper>} />
+                                    <Route path="/background-customizer" element={<PageWrapper><BackgroundCustomizer /></PageWrapper>} />
+                                    <Route path="/weather-detail" element={<PageWrapper><WeatherDetail /></PageWrapper>} />
+                                    <Route path="/music-player" element={<PageWrapper><MusicPlayer /></PageWrapper>} />
+                                    <Route path="/upload-song" element={<PageWrapper><UploadSong /></PageWrapper>} />
+                                    <Route path="/music-search" element={<PageWrapper><MusicSearch /></PageWrapper>} />
+                                    <Route path="/music-together-chat" element={<PageWrapper><MusicTogetherChat /></PageWrapper>} />
+                                    <Route path="/music-invite-demo" element={<PageWrapper><MusicInviteDemo /></PageWrapper>} />
+                                    <Route path="/game/gomoku/:characterId" element={<PageWrapper><GomokuGame /></PageWrapper>} />
+                                    <Route path="/game/character-select" element={<PageWrapper><GameCharacterSelect /></PageWrapper>} />
+                                    <Route path="/game-list" element={<PageWrapper><GameList /></PageWrapper>} />
+                                    <Route path="/game/undercover/:groupId" element={<PageWrapper><UndercoverGame /></PageWrapper>} />
+                                    <Route path="/desktop" element={<PageWrapper><Desktop /></PageWrapper>} />
+                                    <Route path="/story-mode/:characterId" element={<PageWrapper><StoryMode /></PageWrapper>} />
+                                    <Route path="/preset" element={<PageWrapper><PresetManager /></PageWrapper>} />
+                                    <Route path="/offline-chat" element={<PageWrapper><OfflineChat /></PageWrapper>} />
+                                    <Route path="/customize" element={<PageWrapper><Customize /></PageWrapper>} />
+                                    <Route path="/statusbar-customize" element={<PageWrapper><StatusBarCustomize /></PageWrapper>} />
+                                    <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
+                                    <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
+                                    <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
+                                    <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
+                                    <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />
+                                    <Route path="/ai-phone-select" element={<PageWrapper><AIPhoneSelect /></PageWrapper>} />
+                                    
+                                    {/* 论坛功能 */}
+                                    <Route path="/forum" element={<PageWrapper><Forum /></PageWrapper>} />
+                                    <Route path="/forum/welcome" element={<PageWrapper><ForumWelcome /></PageWrapper>} />
+                                    <Route path="/forum/initialize" element={<PageWrapper><ForumInitialize /></PageWrapper>} />
+                                    <Route path="/forum/character-list" element={<PageWrapper><ForumCharacterList /></PageWrapper>} />
+                                    <Route path="/forum/publish" element={<PageWrapper><ForumPublish /></PageWrapper>} />
+                                    <Route path="/forum/post/:id" element={<PageWrapper><ForumPostDetail /></PageWrapper>} />
+                                    <Route path="/forum/search" element={<PageWrapper><ForumSearch /></PageWrapper>} />
+                                    <Route path="/forum/topics" element={<PageWrapper><ForumTopics /></PageWrapper>} />
+                                    <Route path="/forum/create-topic" element={<PageWrapper><ForumCreateTopic /></PageWrapper>} />
+                                    <Route path="/forum/topic/:id" element={<PageWrapper><ForumTopicDetail /></PageWrapper>} />
+                                    <Route path="/forum/notifications" element={<PageWrapper><ForumNotifications /></PageWrapper>} />
+                                    <Route path="/forum/profile" element={<PageWrapper><ForumProfile /></PageWrapper>} />
+                                    <Route path="/forum/user/:userId" element={<PageWrapper><ForumUserProfile /></PageWrapper>} />
+                                    <Route path="/forum/memes" element={<PageWrapper><ForumMemeManager /></PageWrapper>} />
+                                    
+                                    <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
+                                  </Routes>
+                                  </MomentsSocialManager>
+                                </Router>
+                              </CallProvider>
+                              </MusicPlayerProvider>
+                              </ForumProvider>
+                            </GroupRedEnvelopeProvider>
+                          </GroupProvider>
+                        </AccountingProvider>
                       </RedEnvelopeProvider>
                     </MomentsProvider>
                   </AILifeProvider>

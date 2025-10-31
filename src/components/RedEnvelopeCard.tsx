@@ -28,28 +28,45 @@ const RedEnvelopeCard = ({ redEnvelope, onClick, coverImage, iconImage }: RedEnv
       onClick={onClick}
       data-red-envelope-id={redEnvelope.id}
       style={{
-        backgroundImage: coverImage ? `url(${coverImage})` : undefined,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
         position: 'relative',
-        overflow: 'visible'  // 让伪元素可以显示在外面
+        overflow: 'hidden'
       }}
     >
-      <div className="red-packet-content">
-        <div className="red-packet-blessing">{redEnvelope.blessing}</div>
+      {/* 背景层 - 封面图会覆盖气泡底色 */}
+      {coverImage && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${coverImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            zIndex: 0
+          }}
+        />
+      )}
+      
+      {/* 内容层 */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div className="red-packet-content">
+          <div className="red-packet-blessing">{redEnvelope.blessing}</div>
+        </div>
+        <div 
+          className="red-packet-icon"
+          style={{
+            backgroundImage: iconImage ? `url(${iconImage})` : 'none',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            color: iconImage ? 'transparent' : undefined
+          }}
+        >
+          领
+        </div>
+        {statusTag}
       </div>
-      <div 
-        className="red-packet-icon"
-        style={{
-          backgroundImage: iconImage ? `url(${iconImage})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          color: iconImage ? 'transparent' : undefined
-        }}
-      >
-        领
-      </div>
-      {statusTag}
     </div>
   )
 }

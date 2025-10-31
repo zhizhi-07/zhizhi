@@ -123,7 +123,7 @@ const AddApi = () => {
     addApiConfig(formData)
     // 保存到localStorage供API调用使用
     setItem(STORAGE_KEYS.API_SETTINGS, formData)
-    navigate('/api-list')
+    navigate('/api-list', { replace: true })
   }
 
   return (

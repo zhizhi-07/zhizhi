@@ -8,13 +8,13 @@ import { useUser } from '../context/UserContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
 import MusicInviteCard from '../components/MusicInviteCard'
+import MusicInviteSelector from '../components/MusicInviteSelector'
 import MusicShareCard from '../components/MusicShareCard'
 import MusicDetailModal from '../components/MusicDetailModal'
 // import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
 import { getCoupleSpaceContentSummary } from '../utils/coupleSpaceContentUtils'
 import ChatMenu from '../components/ChatMenu'
-import CallScreen from '../components/CallScreen'
 import IncomingCallScreen from '../components/IncomingCallScreen'
 import RedEnvelopeSender from '../components/RedEnvelopeSender'
 import RedEnvelopeDetail from '../components/RedEnvelopeDetail'
@@ -45,7 +45,10 @@ import { lorebookManager } from '../utils/lorebookSystem'
 import { calculateContextTokens, formatTokenCount } from '../utils/tokenCounter'
 import { XiaohongshuNote } from '../types/xiaohongshu'
 import { markAIReplying, markAIReplyComplete } from '../utils/backgroundAI'
-import { clearUnread, incrementUnread } from '../utils/unreadMessages'
+import { incrementUnread, clearUnread } from '../utils/unreadMessages'
+import { updateChatListLastMessage, showBackgroundChatNotification } from '../utils/chatListSync'
+import { storageObserver } from '../utils/storageObserver'
+import { useCall } from '../context/CallContext'
 
 interface Message {
   id: number
@@ -206,19 +209,12 @@ const ChatDetail = () => {
     return localStorage.getItem(`chat_background_${id}`) || ''
   })
   
-  // 监听聊天背景变化
+  // 监听聊天背景变化 - 使用storageObserver替代高频轮询
   useEffect(() => {
-    const handleStorageChange = () => {
-      setChatBackground(localStorage.getItem(`chat_background_${id}`) || '')
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    const interval = setInterval(handleStorageChange, 500)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
-    }
+    if (!id) return
+    return storageObserver.observe(`chat_background_${id}`, (value) => {
+      setChatBackground(value || '')
+    })
   }, [id])
   
   // 检查是否应用全局背景到所有界面
@@ -227,20 +223,11 @@ const ChatDetail = () => {
     return saved === 'true'
   })
   
-  // 监听设置变化
+  // 监听设置变化 - 使用storageObserver替代高频轮询
   useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('apply_background_to_all_pages')
-      setApplyToAllPages(saved === 'true')
-    }
-    
-    window.addEventListener('storage', handleStorageChange)
-    const interval = setInterval(handleStorageChange, 500)
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
-    }
+    return storageObserver.observe('apply_background_to_all_pages', (value) => {
+      setApplyToAllPages(value === 'true')
+    })
   }, [])
   
   // 获取当前聊天的背景样式
@@ -280,7 +267,7 @@ const ChatDetail = () => {
   // 从localStorage读取当前聊天的主动打电话设置
   const [enableProactiveCalls, setEnableProactiveCalls] = useState(() => {
     const saved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-    return saved === 'true'
+    return saved === null ? true : saved === 'true'  // 默认开启
   })
 
   // 读取气泡自定义设置 - 使用 state 以便响应变化
@@ -311,37 +298,75 @@ const ChatDetail = () => {
     return localStorage.getItem(`transfer_icon_${id}`) || ''
   })
   
-  // 监听 localStorage 变化，实时更新气泡样式、封面和字体
+  // 监听 localStorage 变化，实时更新气泡样式、封面和字体 - 使用storageObserver替代高频轮询
   useEffect(() => {
-    const handleStorageChange = () => {
-      setUserBubbleColor(localStorage.getItem(`user_bubble_color_${id}`) || localStorage.getItem('user_bubble_color') || '#FFD4E5')
-      setAiBubbleColor(localStorage.getItem(`ai_bubble_color_${id}`) || localStorage.getItem('ai_bubble_color') || '#FFFFFF')
-      setUserBubbleCSS(localStorage.getItem(`user_bubble_css_${id}`) || localStorage.getItem('user_bubble_css') || '')
-      setAiBubbleCSS(localStorage.getItem(`ai_bubble_css_${id}`) || localStorage.getItem('ai_bubble_css') || '')
-      setRedEnvelopeCover(localStorage.getItem(`red_envelope_cover_${id}`) || '')
-      setRedEnvelopeIcon(localStorage.getItem(`red_envelope_icon_${id}`) || '')
-      setTransferCover(localStorage.getItem(`transfer_cover_${id}`) || '')
-      setTransferIcon(localStorage.getItem(`transfer_icon_${id}`) || '')
-      
-      // 应用自定义字体
-      const fontId = localStorage.getItem('chat_font_family')
-      const fontFamilyValue = localStorage.getItem('chat_font_family_value')
-      
-      if (fontId && fontId !== 'system' && fontFamilyValue) {
-        document.documentElement.style.setProperty('--chat-font-family', fontFamilyValue)
-      } else {
-        document.documentElement.style.removeProperty('--chat-font-family')
-      }
-    }
+    if (!id) return
     
-    window.addEventListener('storage', handleStorageChange)
-    
-    // 使用轮询检测 localStorage 变化（因为同一页面的 storage 事件不会触发）
-    const interval = setInterval(handleStorageChange, 500)
+    const unsubscribers = [
+      storageObserver.observe(`user_bubble_color_${id}`, (value) => {
+        setUserBubbleColor(value || localStorage.getItem('user_bubble_color') || '#FFD4E5')
+      }),
+      storageObserver.observe('user_bubble_color', (value) => {
+        if (!localStorage.getItem(`user_bubble_color_${id}`)) {
+          setUserBubbleColor(value || '#FFD4E5')
+        }
+      }),
+      storageObserver.observe(`ai_bubble_color_${id}`, (value) => {
+        setAiBubbleColor(value || localStorage.getItem('ai_bubble_color') || '#FFFFFF')
+      }),
+      storageObserver.observe('ai_bubble_color', (value) => {
+        if (!localStorage.getItem(`ai_bubble_color_${id}`)) {
+          setAiBubbleColor(value || '#FFFFFF')
+        }
+      }),
+      storageObserver.observe(`user_bubble_css_${id}`, (value) => {
+        setUserBubbleCSS(value || localStorage.getItem('user_bubble_css') || '')
+      }),
+      storageObserver.observe('user_bubble_css', (value) => {
+        if (!localStorage.getItem(`user_bubble_css_${id}`)) {
+          setUserBubbleCSS(value || '')
+        }
+      }),
+      storageObserver.observe(`ai_bubble_css_${id}`, (value) => {
+        setAiBubbleCSS(value || localStorage.getItem('ai_bubble_css') || '')
+      }),
+      storageObserver.observe('ai_bubble_css', (value) => {
+        if (!localStorage.getItem(`ai_bubble_css_${id}`)) {
+          setAiBubbleCSS(value || '')
+        }
+      }),
+      storageObserver.observe(`red_envelope_cover_${id}`, (value) => {
+        setRedEnvelopeCover(value || '')
+      }),
+      storageObserver.observe(`red_envelope_icon_${id}`, (value) => {
+        setRedEnvelopeIcon(value || '')
+      }),
+      storageObserver.observe(`transfer_cover_${id}`, (value) => {
+        setTransferCover(value || '')
+      }),
+      storageObserver.observe(`transfer_icon_${id}`, (value) => {
+        setTransferIcon(value || '')
+      }),
+      storageObserver.observe('chat_font_family', (value) => {
+        const fontFamilyValue = localStorage.getItem('chat_font_family_value')
+        if (value && value !== 'system' && fontFamilyValue) {
+          document.documentElement.style.setProperty('--chat-font-family', fontFamilyValue)
+        } else {
+          document.documentElement.style.removeProperty('--chat-font-family')
+        }
+      }),
+      storageObserver.observe('chat_font_family_value', (value) => {
+        const fontId = localStorage.getItem('chat_font_family')
+        if (fontId && fontId !== 'system' && value) {
+          document.documentElement.style.setProperty('--chat-font-family', value)
+        } else {
+          document.documentElement.style.removeProperty('--chat-font-family')
+        }
+      })
+    ]
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
+      unsubscribers.forEach(unsub => unsub())
     }
   }, [id])
   
@@ -442,6 +467,9 @@ const ChatDetail = () => {
   const [anniversaryTitle, setAnniversaryTitle] = useState('')
   const [anniversaryDescription, setAnniversaryDescription] = useState('')
   
+  // 音乐邀请相关状态
+  const [showMusicInviteSelector, setShowMusicInviteSelector] = useState(false)
+  
   // 消息分页加载
   const [displayCount, setDisplayCount] = useState(30) // 初始显示30条
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -486,10 +514,10 @@ const ChatDetail = () => {
   const [showXiaohongshuSelector, setShowXiaohongshuSelector] = useState(false)
   const [showXiaohongshuInput, setShowXiaohongshuInput] = useState(false)
   
-  // 通话相关状态
-  const [showCallScreen, setShowCallScreen] = useState(false)
-  const [isVideoCall, setIsVideoCall] = useState(false)
+  // 通话相关状态 - 使用全局CallContext
+  const { startCall } = useCall()
   const [showIncomingCall, setShowIncomingCall] = useState(false) // 来电界面
+  const [incomingCallIsVideo, setIncomingCallIsVideo] = useState(false) // 来电类型
   
   // 长按消息菜单相关状态
   const [longPressedMessage, setLongPressedMessage] = useState<Message | null>(null)
@@ -503,13 +531,18 @@ const ChatDetail = () => {
   // 查看撤回消息原内容
   const [viewingRecalledMessage, setViewingRecalledMessage] = useState<Message | null>(null)
   
-  const [callMessages, setCallMessages] = useState<Array<{id: number, type: 'user' | 'ai' | 'narrator', content: string, time: string}>>([])
-  const [callStartTime, setCallStartTime] = useState<number | null>(null)
+  // 批量删除模式
+  const [isBatchDeleteMode, setIsBatchDeleteMode] = useState(false)
+  const [selectedMessageIds, setSelectedMessageIds] = useState<Set<number>>(new Set())
+  
   const [expandedCallId, setExpandedCallId] = useState<number | null>(null) // 展开的通话详情ID
-  const [callAITyping, setCallAITyping] = useState(false) // 通话中AI正在输入
   
   // 角色状态弹窗
   const [showStatusModal, setShowStatusModal] = useState(false)
+  
+  // 编辑消息状态
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [editingContent, setEditingContent] = useState('')
   
   // AI读取消息数量设置
   const [aiMessageLimit, setAiMessageLimit] = useState(() => {
@@ -812,35 +845,23 @@ const ChatDetail = () => {
 
   // 背景设置现在由全局 BackgroundContext 管理
   
-  // 监听旁白设置变化
+  // 监听旁白设置变化 - 使用storageObserver替代轮询
   useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem(`narrator_enabled_${id}`)
-      setEnableNarration(saved === 'true')
-      
-      const callsSaved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-      setEnableProactiveCalls(callsSaved === 'true')
-    }
+    if (!id) return
     
-    window.addEventListener('storage', handleStorageChange)
-    
-    const interval = setInterval(() => {
-      const saved = localStorage.getItem(`narrator_enabled_${id}`)
-      if ((saved === 'true') !== enableNarration) {
-        setEnableNarration(saved === 'true')
-      }
-      
-      const callsSaved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-      if ((callsSaved === 'true') !== enableProactiveCalls) {
-        setEnableProactiveCalls(callsSaved === 'true')
-      }
-    }, 2000) // 从500ms改为2000ms，减少CPU占用
+    const unsubscribers = [
+      storageObserver.observe(`narrator_enabled_${id}`, (value) => {
+        setEnableNarration(value === 'true')
+      }),
+      storageObserver.observe(`proactive_calls_enabled_${id}`, (value) => {
+        setEnableProactiveCalls(value === null ? true : value === 'true')
+      })
+    ]
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange)
-      clearInterval(interval)
+      unsubscribers.forEach(unsub => unsub())
     }
-  }, [id, enableNarration, enableProactiveCalls])
+  }, [id])
 
   // AI主动发消息功能 - 基于真实动机
   useEffect(() => {
@@ -1397,6 +1418,221 @@ ${character.description || ''}
     setShowRedEnvelopeSender(false)
   }
 
+  // 处理发送音乐邀请
+  const handleSendMusicInvite = async (songTitle: string, songArtist: string, songCover?: string) => {
+    const now = Date.now()
+    const inviteMessage: Message = {
+      id: now,
+      type: 'sent',
+      content: '',
+      time: new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      timestamp: now,
+      messageType: 'musicInvite',
+      musicInvite: {
+        songTitle,
+        songArtist,
+        songCover,
+        inviterName: currentUser?.name || '我',
+        status: 'pending'
+      }
+    }
+    
+    setMessages(prev => [...prev, inviteMessage])
+    setShowMusicInviteSelector(false)
+    
+    console.log('🎵 用户发送一起听邀请:', songTitle, '-', songArtist)
+    
+    // AI智能响应邀请
+    setTimeout(() => {
+      handleAIRespondToMusicInvite(now, songTitle, songArtist)
+    }, 1500 + Math.random() * 1000) // 1.5-2.5秒后响应
+  }
+
+  // AI智能响应音乐邀请
+  const handleAIRespondToMusicInvite = async (inviteMessageId: number, songTitle: string, songArtist: string) => {
+    if (!character) return
+    
+    // 获取当前好感度
+    const favorability = character.favorability || 50
+    
+    // 获取当前时间信息
+    const currentHour = new Date().getHours()
+    const isLateNight = currentHour >= 23 || currentHour < 6 // 深夜23:00-6:00
+    const isWorkTime = currentHour >= 9 && currentHour < 18 // 工作时间9:00-18:00
+    
+    // 计算基础接受概率
+    let acceptChance = 0.3 // 基础30%
+    
+    // 好感度影响（好感度越高，越容易接受）
+    if (favorability >= 80) {
+      acceptChance += 0.5 // +50%
+    } else if (favorability >= 60) {
+      acceptChance += 0.3 // +30%
+    } else if (favorability >= 40) {
+      acceptChance += 0.1 // +10%
+    }
+    
+    // 时间影响
+    if (isLateNight) {
+      acceptChance -= 0.2 // 深夜-20%
+    }
+    
+    // 歌曲类型判断（简单的关键词匹配）
+    const romanticKeywords = ['爱', '情', '心', '想你', '喜欢', '告白', '陪你']
+    const energeticKeywords = ['嗨', '燃', '跳', '舞', '派对', 'DJ']
+    const sadKeywords = ['伤', '痛', '哭', '离别', '孤独', '想念']
+    
+    const isRomantic = romanticKeywords.some(kw => songTitle.includes(kw))
+    const isEnergetic = energeticKeywords.some(kw => songTitle.includes(kw))
+    const isSad = sadKeywords.some(kw => songTitle.includes(kw))
+    
+    // 浪漫歌曲在好感度高时更容易接受
+    if (isRomantic && favorability >= 60) {
+      acceptChance += 0.15
+    }
+    
+    // 深夜不适合嗨歌
+    if (isEnergetic && isLateNight) {
+      acceptChance -= 0.25
+    }
+    
+    // 限制概率范围
+    acceptChance = Math.max(0.1, Math.min(0.95, acceptChance))
+    
+    const willAccept = Math.random() < acceptChance
+    
+    console.log('🎵 AI决策:', {
+      songTitle,
+      favorability,
+      acceptChance: `${(acceptChance * 100).toFixed(0)}%`,
+      willAccept,
+      isLateNight,
+      isRomantic,
+      isEnergetic
+    })
+    
+    // 构建AI回复的提示词
+    const currentDate = new Date()
+    const timeString = `${currentDate.toLocaleDateString('zh-CN')} ${currentDate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+    
+    const recentChats = messages.slice(-10).map(msg => 
+      `${msg.type === 'sent' ? currentUser?.name || '用户' : character.name}: ${msg.content}`
+    ).join('\n')
+    
+    const decisionPrompt = `你是 ${character.name}。
+${character.description || ''}
+
+现在是${timeString}，${currentUser?.name || '用户'}邀请你一起听歌：《${songTitle}》- ${songArtist}
+
+你们最近的聊天：
+${recentChats || '刚开始聊天'}
+
+你对${currentUser?.name || '用户'}的好感度：${favorability}/100
+
+${willAccept ? 
+`你决定【接受】邀请。请用自然、符合你性格的方式表达接受，可以：
+- 表达对这首歌的看法或喜欢
+- 说明为什么想和对方一起听
+- 表达期待或开心的心情
+- 可以俏皮、可以温柔、可以兴奋
+
+示例风格：
+"好呀！我也很喜欢这首歌～一起听吧 🎵"
+"《${songTitle}》！这首我超爱的！马上来～"
+"嗯嗯，想和你一起听这首～"` 
+: 
+`你决定【拒绝】邀请。请用委婉、自然的方式拒绝，要：
+- 给出合理的理由（如：现在有事、累了想休息、不太喜欢这类歌等）
+- 保持友好，不伤感情
+- 可以建议改天或推荐其他歌曲
+
+示例风格：
+"啊...现在有点累了，想休息一下，下次吧～"
+"这首歌好像不太是我的风格呢...要不换一首？"
+"现在在忙呢，等会儿再一起听好不好～"`
+}
+
+重要：
+1. 只回复一句话，简短自然
+2. 不要使用[]、【】等标记
+3. 符合你的性格和关系亲密度
+4. 不要解释你的决定原因
+
+直接回复：`
+
+    try {
+      const aiResponse = await callAI(decisionPrompt)
+      const cleanedResponse = aiResponse.replace(/\[.*?\]/g, '').trim()
+      
+      // 添加AI的文字回复
+      const now = Date.now()
+      const responseMessage: Message = {
+        id: now,
+        type: 'received',
+        content: cleanedResponse,
+        time: new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        timestamp: now
+      }
+      
+      setMessages(prev => [...prev, responseMessage])
+      
+      // 稍等一下再更新邀请状态
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === inviteMessageId && msg.messageType === 'musicInvite'
+            ? { 
+                ...msg, 
+                musicInvite: { 
+                  ...msg.musicInvite!, 
+                  status: willAccept ? 'accepted' : 'rejected' 
+                } 
+              }
+            : msg
+        ))
+        
+        // 如果接受，自动跳转到一起听页面
+        if (willAccept) {
+          setTimeout(() => {
+            navigate('/music-together-chat', {
+              state: {
+                song: {
+                  title: songTitle,
+                  artist: songArtist
+                },
+                characterId: id,
+                characterName: character.name,
+                characterAvatar: character.avatar
+              }
+            })
+          }, 800)
+        }
+      }, 500)
+      
+    } catch (error) {
+      console.error('AI响应音乐邀请失败:', error)
+      // 失败时随机接受或拒绝
+      setTimeout(() => {
+        setMessages(prev => prev.map(msg => 
+          msg.id === inviteMessageId && msg.messageType === 'musicInvite'
+            ? { 
+                ...msg, 
+                musicInvite: { 
+                  ...msg.musicInvite!, 
+                  status: willAccept ? 'accepted' : 'rejected' 
+                } 
+              }
+            : msg
+        ))
+      }, 500)
+    }
+  }
+
   const handleOpenRedEnvelope = (redEnvelopeId: string) => {
     if (!id) return
     
@@ -1928,17 +2164,33 @@ ${character.description || ''}
     }
   }
 
-  // 删除消息（真正删除，保存到localStorage）
+  // 删除消息（永久删除，抹除一切痕迹）
   const handleDeleteMessage = () => {
     if (longPressedMessage) {
+      // 确认删除
+      if (!confirm('确定要永久删除这条消息吗？\n\n⚠️ 此操作无法撤销！')) {
+        setShowMessageMenu(false)
+        setLongPressedMessage(null)
+        return
+      }
+      
+      // 从消息列表中永久移除
       const newMessages = messages.filter(msg => msg.id !== longPressedMessage.id)
-      safeSetMessages(newMessages) // 使用safeSetMessages确保保存到localStorage
-      console.log('🗑️ 消息已删除并保存到localStorage')
+      
+      // 立即保存到state和localStorage
+      safeSetMessages(newMessages)
+      
+      // 确保localStorage中的数据已更新
+      if (id) {
+        localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+      }
+      
+      console.log('🗑️ 消息已永久删除（ID:', longPressedMessage.id, '）')
       setShowMessageMenu(false)
       setLongPressedMessage(null)
     }
   }
-
+  
   // 撤回消息（用户和AI都可以撤回）
   const handleRecallMessage = () => {
     if (longPressedMessage) {
@@ -1974,6 +2226,113 @@ ${character.description || ''}
       setShowMessageMenu(false)
       setLongPressedMessage(null)
     }
+  }
+  
+  // 批量删除消息（永久删除）
+  const handleBatchDelete = () => {
+    if (selectedMessageIds.size === 0) {
+      alert('请先选择要删除的消息')
+      return
+    }
+    
+    if (confirm(`确定要永久删除选中的 ${selectedMessageIds.size} 条消息吗？\n\n⚠️ 此操作无法撤销！`)) {
+      // 从消息列表中永久移除所有选中的消息
+      const newMessages = messages.filter(msg => !selectedMessageIds.has(msg.id))
+      
+      // 立即保存
+      safeSetMessages(newMessages)
+      
+      // 确保localStorage中的数据已更新
+      if (id) {
+        localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+      }
+      
+      console.log(`🗑️ 批量删除了 ${selectedMessageIds.size} 条消息`)
+      
+      // 重置批量删除模式
+      setIsBatchDeleteMode(false)
+      setSelectedMessageIds(new Set())
+    }
+  }
+  
+  // 切换消息选择状态
+  const toggleMessageSelection = (messageId: number) => {
+    setSelectedMessageIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(messageId)) {
+        newSet.delete(messageId)
+      } else {
+        newSet.add(messageId)
+      }
+      return newSet
+    })
+  }
+  
+  // 进入批量删除模式
+  const enterBatchDeleteMode = () => {
+    setIsBatchDeleteMode(true)
+    setShowMessageMenu(false)
+    setLongPressedMessage(null)
+  }
+  
+  // 开始编辑消息
+  const handleEditMessage = () => {
+    if (longPressedMessage) {
+      // 只允许编辑用户自己发送的文本消息
+      if (longPressedMessage.type !== 'sent') {
+        alert('只能编辑自己发送的消息')
+        setShowMessageMenu(false)
+        setLongPressedMessage(null)
+        return
+      }
+      
+      // 不允许编辑特殊类型的消息
+      if (longPressedMessage.messageType && 
+          longPressedMessage.messageType !== 'text' && 
+          !longPressedMessage.content) {
+        alert('此类型的消息不支持编辑')
+        setShowMessageMenu(false)
+        setLongPressedMessage(null)
+        return
+      }
+      
+      setEditingMessage(longPressedMessage)
+      setEditingContent(longPressedMessage.content || '')
+      setShowMessageMenu(false)
+      setLongPressedMessage(null)
+    }
+  }
+  
+  // 保存编辑的消息（永久保存）
+  const handleSaveEditedMessage = () => {
+    if (editingMessage && editingContent.trim()) {
+      // 更新消息内容
+      const newMessages = messages.map(msg => 
+        msg.id === editingMessage.id 
+          ? { ...msg, content: editingContent.trim() }
+          : msg
+      )
+      
+      // 立即保存到state和localStorage
+      safeSetMessages(newMessages)
+      
+      // 确保localStorage中的数据已更新
+      if (id) {
+        localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+      }
+      
+      console.log('✏️ 消息已编辑并永久保存（ID:', editingMessage.id, '）')
+      
+      // 重置编辑状态
+      setEditingMessage(null)
+      setEditingContent('')
+    }
+  }
+  
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setEditingMessage(null)
+    setEditingContent('')
   }
 
   // 引用消息
@@ -2651,12 +3010,23 @@ ${emojiInstructions}
       })
       
       console.log('🟢 步骤X: 开始构建apiMessages')
+      
+      // 🚨 限制消息历史数量，防止请求过大导致500错误
+      // 只保留最近的消息，避免聊天历史过长
+      const MAX_HISTORY_MESSAGES = 50 // 最多保留50条历史消息
+      let limitedMessages = recentMessages
+      
+      if (recentMessages.length > MAX_HISTORY_MESSAGES) {
+        console.warn(`⚠️ 消息历史过长 (${recentMessages.length}条)，截取最近${MAX_HISTORY_MESSAGES}条`)
+        limitedMessages = recentMessages.slice(-MAX_HISTORY_MESSAGES)
+      }
+      
       const apiMessages = [
         {
           role: 'system' as const,
           content: fullSystemPrompt
         },
-        ...recentMessages.map((msg, mapIndex) => {
+        ...limitedMessages.map((msg, mapIndex) => {
           console.log(`  🔹 处理消息 ${mapIndex + 1}/${recentMessages.length}: type=${msg.type}, messageType=${msg.messageType}`)
           
           // 优先处理撤回的消息
@@ -3365,7 +3735,7 @@ ${emojiInstructions}
         console.log(`📞 AI发起${isVideo ? '视频' : '语音'}通话请求`)
         
         // 显示来电界面
-        setIsVideoCall(isVideo)
+        setIncomingCallIsVideo(isVideo)
         setShowIncomingCall(true)
         
         // 直接返回，不添加文字消息
@@ -3394,6 +3764,66 @@ ${emojiInstructions}
       // 使用解析后的文字内容（已经清理了所有表情包标记）
       let cleanedResponse = parsedEmoji.textContent
       
+      // 清理AI思维链标签（某些API会输出thinking等标签）
+      const thinkingPattern1 = new RegExp('<' + 'thinking' + '>.*?' + '<' + '/' + 'thinking' + '>', 'gis')
+      const thinkingPattern2 = new RegExp('<' + 'antml:thinking' + '>.*?' + '<' + '/' + 'antml:thinking' + '>', 'gis')
+      cleanedResponse = cleanedResponse.replace(thinkingPattern1, '').replace(thinkingPattern2, '').trim()
+      
+      // 清理英文思维链段落（逐行过滤，保留中文）
+      const thinkingKeywords = [
+        'going through', 'processor', 'circuits', 'spring to mind', 'option a', 'option b', 'option c',
+        'first instinct', 'better to', "here's what", 'i think', 'the plan is', 'let me', 'i need to',
+        'should i', 'how about', 'that means', 'ah yes', 'right,', 'so,', 'okay,', 'alright,',
+        'in character', 'my little', 'the punchline', 'build the suspense', 'perfect for', 'see it playing',
+        'gotta', 'gonna', 'that will', "here's how", 'playing out', 'catch her', 'point out', 'follow that'
+      ]
+      
+      const lines = cleanedResponse.split('\n')
+      const filteredLines = []
+      
+      for (const line of lines) {
+        const trimmed = line.trim()
+        
+        // 空行跳过
+        if (!trimmed) {
+          continue
+        }
+        
+        // 保留：特殊格式（[开头、*开头、Message开头）
+        if (trimmed.startsWith('[') || trimmed.startsWith('*') || trimmed.startsWith('-') || trimmed.startsWith('Message ')) {
+          filteredLines.push(line)
+          continue
+        }
+        
+        // 计算中文比例
+        const chineseChars = (trimmed.match(/[\u4e00-\u9fa5]/g) || []).length
+        const totalChars = trimmed.length
+        const chineseRatio = chineseChars / totalChars
+        
+        // 如果中文占比>30%，保留（这是有意义的中文内容）
+        if (chineseRatio > 0.3) {
+          filteredLines.push(line)
+          continue
+        }
+        
+        // 检查是否为英文思维链
+        const lowerLine = trimmed.toLowerCase()
+        const hasKeyword = thinkingKeywords.some(kw => lowerLine.includes(kw))
+        const englishChars = (trimmed.match(/[a-z]/gi) || []).length
+        const isMainlyEnglish = englishChars > 30 // 超过30个英文字母
+        
+        // 过滤：包含思维链特征词 + 主要是英文
+        if (hasKeyword && isMainlyEnglish) {
+          console.log('🔪 过滤英文思维链:', trimmed.substring(0, 60))
+          continue
+        }
+        
+        // 其他情况保留
+        filteredLines.push(line)
+      }
+      
+      cleanedResponse = filteredLines.join('\n').trim()
+      
       // 清理账单标记（必须在提取账单信息之后）
       cleanedResponse = cleanedResponse.replace(/\[BILL:(expense|income)\|\d+\.?\d*\|\w+\|[^\]]+\]/g, '').trim()
       
@@ -3419,15 +3849,14 @@ ${emojiInstructions}
           timestamp: Date.now()
         }
         
-        // 立即保存系统消息
-        safeSetMessages(prev => {
-          const updated = [...prev, systemMessage]
-          if (id) {
-            safeSetItem(`chat_messages_${id}`, updated)
-            console.log('💾 系统消息已立即保存到 localStorage')
-          }
-          return updated
-        })
+        // 立即保存系统消息并更新currentMessages
+        const updatedWithBlockMsg = [...currentMessages, systemMessage]
+        safeSetMessages(updatedWithBlockMsg)
+        currentMessages = updatedWithBlockMsg
+        if (id) {
+          safeSetItem(`chat_messages_${id}`, updatedWithBlockMsg)
+          console.log('💾 拉黑系统消息已立即保存到 localStorage')
+        }
       }
       
       // 检查AI是否要解除拉黑
@@ -3437,7 +3866,7 @@ ${emojiInstructions}
         blacklistManager.unblockUser(id, 'user')
         cleanedResponse = cleanedResponse.replace(/\[解除拉黑\]/g, '').trim()
         
-        // 添加系统提示
+        // 添加系统提示并更新currentMessages
         const systemMessage: Message = {
           id: Date.now() + 9999,
           type: 'system',
@@ -3446,14 +3875,13 @@ ${emojiInstructions}
           timestamp: Date.now()
         }
         
-        safeSetMessages(prev => {
-          const updated = [...prev, systemMessage]
-          if (id) {
-            safeSetItem(`chat_messages_${id}`, updated)
-            console.log('💾 解除拉黑消息已保存')
-          }
-          return updated
-        })
+        const updatedWithUnblockMsg = [...currentMessages, systemMessage]
+        safeSetMessages(updatedWithUnblockMsg)
+        currentMessages = updatedWithUnblockMsg
+        if (id) {
+          safeSetItem(`chat_messages_${id}`, updatedWithUnblockMsg)
+          console.log('💾 解除拉黑消息已保存')
+        }
       }
       
       // 清理网名、个性签名、备注和头像标记
@@ -4035,6 +4463,7 @@ ${emojiInstructions}
       }
 
       // 处理AI回复 - 支持多条消息（按换行分割）
+      // 获取最新的消息列表（包含前面添加的系统消息）
       let newMessages = [...currentMessages]
       
       // 如果有文字回复
@@ -4190,6 +4619,7 @@ ${emojiInstructions}
                 hour: '2-digit',
                 minute: '2-digit',
               }),
+              timestamp: Date.now() + i, // 添加时间戳，每条消息+1ms避免重复
               narrations: narrations.length > 0 ? narrations : undefined,
               quotedMessage: quotedMsg ? {
                 id: quotedMsg.id,
@@ -4918,7 +5348,7 @@ ${emojiInstructions}
               const systemMessage: Message = {
                 id: Date.now() + Math.random(),
                 type: 'system',
-                content: `📔 你在情侣空间日记本写了一篇日记：${messagePreview}（${currentDate}）`,
+                content: `📔 ${characterName}在日记本写了一篇日记：${messagePreview}（${currentDate}）`,
                 time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now(),
                 messageType: 'system',
@@ -5010,10 +5440,17 @@ ${emojiInstructions}
       console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
       
       // 显示错误消息
+      let errorContent = error.message || 'AI调用失败，请在设置中检查API配置'
+      
+      // 如果是500错误，可能是消息历史过长
+      if (error.message?.includes('500')) {
+        errorContent = `API调用失败 (500) - 可能是消息历史过长导致\n建议：清理部分聊天记录或稍后重试`
+      }
+      
       const errorMessage: Message = {
         id: currentMessages.length + 1,
         type: 'received',
-        content: `[错误] ${error.message || 'AI调用失败，请在设置中检查API配置'}`,
+        content: `[错误] ${errorContent}`,
         time: new Date().toLocaleTimeString('zh-CN', {
           hour: '2-digit',
           minute: '2-digit',
@@ -5041,6 +5478,19 @@ ${emojiInstructions}
               if (aiRepliedCountRef.current > 0) {
                 incrementUnread(id, aiRepliedCountRef.current)
                 console.log('📬 切换聊天后AI回复完成，新增未读消息:', aiRepliedCountRef.current)
+                
+                // 更新聊天列表最后一条消息
+                const lastAIMessage = latestMessages.filter(m => m.type === 'received').pop()
+                if (lastAIMessage && character) {
+                  updateChatListLastMessage(id, lastAIMessage.content, lastAIMessage.timestamp)
+                  // 显示后台通知
+                  showBackgroundChatNotification(
+                    character.name,
+                    character.avatar,
+                    lastAIMessage.content,
+                    id
+                  )
+                }
               }
             } catch (e) {
               console.error('保存消息失败:', e)
@@ -5051,6 +5501,19 @@ ${emojiInstructions}
         else if (!isPageVisibleRef.current && aiRepliedCountRef.current > 0) {
           incrementUnread(id, aiRepliedCountRef.current)
           console.log('📬 后台AI回复完成，新增未读消息:', aiRepliedCountRef.current)
+          
+          // 更新聊天列表最后一条消息
+          const lastAIMessage = messages.filter(m => m.type === 'received').pop()
+          if (lastAIMessage && character) {
+            updateChatListLastMessage(id, lastAIMessage.content, lastAIMessage.timestamp)
+            // 显示后台通知
+            showBackgroundChatNotification(
+              character.name,
+              character.avatar,
+              lastAIMessage.content,
+              id
+            )
+          }
         }
         
         // 重置AI回复计数
@@ -5063,6 +5526,34 @@ ${emojiInstructions}
 
   return (
     <div className="h-screen flex flex-col relative overflow-hidden">
+      {/* 批量删除模式顶部工具栏 */}
+      {isBatchDeleteMode && (
+        <div className="fixed top-0 left-0 right-0 z-[60] bg-white border-b border-gray-200 shadow-lg">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => {
+                setIsBatchDeleteMode(false)
+                setSelectedMessageIds(new Set())
+              }}
+              className="text-sm text-gray-600 active:opacity-60"
+            >
+              取消
+            </button>
+            <span className="text-sm font-medium text-gray-900">
+              已选择 {selectedMessageIds.size} 条
+            </span>
+            <button
+              onClick={handleBatchDelete}
+              className="text-sm text-red-600 font-medium active:opacity-60"
+              disabled={selectedMessageIds.size === 0}
+              style={{ opacity: selectedMessageIds.size === 0 ? 0.4 : 1 }}
+            >
+              删除
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* 壁纸背景层 - 铺满整个页面 */}
       <div 
         className="absolute inset-0 z-0"
@@ -5072,7 +5563,9 @@ ${emojiInstructions}
       {/* 内容层 */}
       <div className="relative z-10 h-full flex flex-col">
         {/* 顶部：StatusBar + 导航栏一体化 */}
-        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}>
+        <div className={`sticky top-0 z-50 ${background ? 'glass-dark' : 'glass-effect'}`}
+          style={{ marginTop: isBatchDeleteMode ? '52px' : '0' }}
+        >
           {showStatusBar && <StatusBar />}
           <div className="px-4 py-3 flex items-center justify-between">
         <button
@@ -5492,6 +5985,19 @@ ${emojiInstructions}
                       message.type === 'sent' ? 'justify-end sent' : 'justify-start received'
                     }`}
                    >
+                   {/* 批量删除模式：复选框（系统消息不显示） */}
+                   {isBatchDeleteMode && message.type !== 'system' && (
+                     <div className="flex items-center mr-2">
+                       <input
+                         type="checkbox"
+                         checked={selectedMessageIds.has(message.id)}
+                         onChange={() => toggleMessageSelection(message.id)}
+                         className="w-5 h-5 rounded border-2 border-gray-300 text-red-600 focus:ring-red-500"
+                         onClick={(e) => e.stopPropagation()}
+                       />
+                     </div>
+                   )}
+                   
                    {/* 对方消息：头像在左，气泡在右 */}
                    {message.type === 'received' && (
                      <div className="flex flex-col items-center mr-2">
@@ -5502,9 +6008,6 @@ ${emojiInstructions}
                            <span className="text-lg">{characterAvatar || '🤖'}</span>
                          )}
                        </div>
-                       {message.timestamp && (
-                         <span className="text-[9px] text-gray-400 mt-0.5">{message.time}</span>
-                       )}
                      </div>
                    )}
                  
@@ -5756,8 +6259,19 @@ ${emojiInstructions}
                             )
                             safeSetItem(`chat_${id}`, JSON.stringify(updatedMessages))
                           }, 100)
-                          // 跳转到一起听聊天
-                          navigate('/music-together-chat')
+                          // 跳转到一起听聊天，传递歌曲信息和角色信息
+                          navigate('/music-together-chat', {
+                            state: {
+                              song: {
+                                title: message.musicInvite!.songTitle,
+                                artist: message.musicInvite!.songArtist,
+                                cover: message.musicInvite!.songCover
+                              },
+                              characterId: id,
+                              characterName: character?.name || '好友',
+                              characterAvatar: character?.avatar
+                            }
+                          })
                         }}
                         onReject={() => {
                           // 拒绝邀请
@@ -5780,15 +6294,31 @@ ${emojiInstructions}
                     </div>
                   ) : message.messageType === 'transfer' && message.transfer ? (
                      <div 
-                       className="message-bubble glass-card rounded-2xl p-4 shadow-lg min-w-[200px]"
+                       className="message-bubble glass-card rounded-2xl shadow-lg min-w-[200px]"
                        style={{
-                         backgroundImage: transferCover ? `url(${transferCover})` : 'none',
-                         backgroundSize: 'cover',
-                         backgroundPosition: 'center',
                          position: 'relative',
-                         overflow: 'visible'  // 让伪元素可以显示在外面
+                         overflow: 'hidden'
                        }}
                      >
+                       {/* 背景层 - 封面图会覆盖气泡底色 */}
+                       {transferCover && (
+                         <div 
+                           style={{
+                             position: 'absolute',
+                             top: 0,
+                             left: 0,
+                             right: 0,
+                             bottom: 0,
+                             backgroundImage: `url(${transferCover})`,
+                             backgroundSize: 'cover',
+                             backgroundPosition: 'center',
+                             zIndex: 0
+                           }}
+                         />
+                       )}
+                       
+                       {/* 内容层 */}
+                       <div style={{ position: 'relative', zIndex: 1, padding: '16px' }}>
                        <div className="flex items-center gap-3 mb-3">
                          <div 
                            className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white text-xl font-bold overflow-hidden"
@@ -5861,6 +6391,7 @@ ${emojiInstructions}
                              )}
                            </div>
                          )}
+                       </div>
                        </div>
                      </div>
                    ) : message.messageType === 'couple_space_invite' && message.coupleSpaceInvite ? (
@@ -6086,9 +6617,6 @@ ${emojiInstructions}
                           <span className="text-lg">👤</span>
                         )}
                       </div>
-                      {message.timestamp && (
-                        <span className="text-[9px] text-gray-400 mt-0.5">{message.time}</span>
-                      )}
                     </div>
                   )}
                 </div>
@@ -6141,6 +6669,38 @@ ${emojiInstructions}
               >
                 ×
               </button>
+            </div>
+          </div>
+        )}
+        
+        {/* 编辑消息区域 */}
+        {editingMessage && (
+          <div className="px-3 pt-2 pb-1 bg-blue-50 border-t border-blue-200">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-medium text-blue-600">✏️ 编辑消息</span>
+            </div>
+            <div className="bg-white rounded-xl p-2 flex items-start gap-2">
+              <textarea
+                value={editingContent}
+                onChange={(e) => setEditingContent(e.target.value)}
+                className="flex-1 min-w-0 bg-transparent border-none outline-none text-sm text-gray-900 resize-none"
+                rows={2}
+                autoFocus
+              />
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={handleSaveEditedMessage}
+                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 active:opacity-60"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded-lg hover:bg-gray-300 active:opacity-60"
+                >
+                  取消
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -6226,17 +6786,35 @@ ${emojiInstructions}
           onSelectLocation={handleSelectLocation}
           onSelectVoiceMessage={handleSelectVoice}
           onSelectXiaohongshu={handleSelectXiaohongshu}
+          onSelectMusicInvite={() => {
+            setShowMenu(false)
+            setShowMusicInviteSelector(true)
+          }}
           onSelectVoiceCall={() => {
             setShowMenu(false)
-            setIsVideoCall(false)
-            setCallStartTime(Date.now())
-            setShowCallScreen(true)
+            if (character) {
+              startCall({
+                id: character.id,
+                name: character.name,
+                avatar: character.avatar,
+                profile: character.description,
+                relationship: character.relationship,
+                favorability: character.favorability
+              }, false)
+            }
           }}
           onSelectVideoCall={() => {
             setShowMenu(false)
-            setIsVideoCall(true)
-            setCallStartTime(Date.now())
-            setShowCallScreen(true)
+            if (character) {
+              startCall({
+                id: character.id,
+                name: character.name,
+                avatar: character.avatar,
+                profile: character.description,
+                relationship: character.relationship,
+                favorability: character.favorability
+              }, true)
+            }
           }}
           onRegenerateAI={() => {
             setShowMenu(false)
@@ -6536,6 +7114,14 @@ ${emojiInstructions}
         />
       )}
 
+      {/* 音乐邀请选择器 */}
+      {showMusicInviteSelector && (
+        <MusicInviteSelector
+          onClose={() => setShowMusicInviteSelector(false)}
+          onSend={handleSendMusicInvite}
+        />
+      )}
+
       {/* 位置详情查看模态框 */}
       {selectedLocationMsg && (
         <>
@@ -6608,112 +7194,6 @@ ${emojiInstructions}
         </>
       )}
 
-      {/* 通话界面 */}
-      {character && (
-        <CallScreen
-          show={showCallScreen}
-          character={{
-            id: character.id,
-            name: character.name,
-            avatar: character.avatar,
-            profile: character.description,
-            relationship: (character as any).relationship || '朋友',
-            favorability: (character as any).favorability || 50
-          }}
-          isVideoCall={isVideoCall}
-          isAITyping={callAITyping}
-          onEnd={() => {
-            const now = new Date()
-            
-            // 保存通话记录到聊天历史
-            if (callMessages.length > 0) {
-              const callDuration = Math.floor((Date.now() - (callStartTime || Date.now())) / 1000)
-              const mins = Math.floor(callDuration / 60)
-              const secs = callDuration % 60
-              const durationText = `${mins}:${secs.toString().padStart(2, '0')}`
-              
-              // 创建通话记录消息
-              const callRecordMsg: Message = {
-                id: Date.now(),
-                type: 'system',
-                content: `${isVideoCall ? '视频' : '语音'}通话 ${durationText}`,
-                time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                timestamp: Date.now(),
-                isCallRecord: true,
-                callDuration: callDuration,
-                callMessages: callMessages
-              }
-              
-              setMessages(prev => [...prev, callRecordMsg])
-              
-              // 将通话内容添加到聊天历史，让AI能记住
-              // 构建详细的通话记录，包含旁白和对话
-              const callDetails = callMessages.map(msg => {
-                if (msg.type === 'narrator') {
-                  return `[${msg.content}]`
-                } else {
-                  return `${msg.type === 'user' ? '用户' : character?.name}: ${msg.content}`
-                }
-              }).join('\n')
-              
-              if (callDetails) {
-                const summaryMsg: Message = {
-                  id: Date.now() + 1,
-                  type: 'system',
-                  content: `━━━ ${isVideoCall ? '视频' : '语音'}通话记录 ━━━
-时间：${now.toLocaleString('zh-CN')}
-时长：${durationText}
-
-${callDetails}
-
-━━━ 通话结束 ━━━
-
-⚠️ 重要提醒：
-- 这是刚才${isVideoCall ? '视频' : '语音'}通话的完整内容
-- 你们刚刚通过${isVideoCall ? '视频' : '语音'}通话聊过这些
-- 你必须记住通话中说过的话和提到的事情
-- 如果通话中提到你在某个地方，那就是你现在真实的位置
-- 如果通话中提到你在做某事，那就是你刚才真实在做的事
-- 继续聊天时要保持连贯性，不要忘记通话内容`,
-                  time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                  timestamp: Date.now(),
-                  isHidden: true // 隐藏显示，但AI能看到
-                }
-                setMessages(prev => [...prev, summaryMsg])
-              }
-            } else {
-              // 没有通话内容，说明用户挂断了（已取消）
-              const cancelledMsg: Message = {
-                id: Date.now(),
-                type: 'system',
-                content: `已取消 ${isVideoCall ? '视频' : '语音'}通话`,
-                time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                timestamp: Date.now()
-              }
-              setMessages(prev => [...prev, cancelledMsg])
-              
-              // 添加隐藏消息让AI知道
-              const aiNoticeMsg: Message = {
-                id: Date.now() + 1,
-                type: 'system',
-                content: `用户向你发起了${isVideoCall ? '视频' : '语音'}通话，但在接通前取消了。`,
-                time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-                timestamp: Date.now(),
-                isHidden: true
-              }
-              setMessages(prev => [...prev, aiNoticeMsg])
-            }
-            
-            setShowCallScreen(false)
-            setCallMessages([])
-            setCallStartTime(null)
-          }}
-          onSendMessage={handleCallSendMessage}
-          onRequestAIReply={handleCallAIReply}
-          messages={callMessages}
-        />
-      )}
-
       {/* 来电界面 */}
       {character && (
         <IncomingCallScreen
@@ -6722,12 +7202,18 @@ ${callDetails}
             name: character.name,
             avatar: character.avatar
           }}
-          isVideoCall={isVideoCall}
+          isVideoCall={incomingCallIsVideo}
           onAccept={() => {
-            // 接听电话，打开通话界面
+            // 接听电话，打开全局通话界面
             setShowIncomingCall(false)
-            setCallStartTime(Date.now())
-            setShowCallScreen(true)
+            startCall({
+              id: character.id,
+              name: character.name,
+              avatar: character.avatar,
+              profile: character.description,
+              relationship: character.relationship,
+              favorability: character.favorability
+            }, incomingCallIsVideo)
           }}
           onReject={() => {
             // 挂断电话
@@ -6738,7 +7224,7 @@ ${callDetails}
             const rejectedCallMsg: Message = {
               id: Date.now(),
               type: 'system',
-              content: `已拒绝 ${isVideoCall ? '视频' : '语音'}通话`,
+              content: `已拒绝 ${incomingCallIsVideo ? '视频' : '语音'}通话`,
               time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
               timestamp: Date.now()
             }
@@ -6749,7 +7235,7 @@ ${callDetails}
             const aiNoticeMsg: Message = {
               id: Date.now() + 1,
               type: 'system',
-              content: `${userName}拒绝了你的${isVideoCall ? '视频' : '语音'}通话请求。`,
+              content: `${userName}拒绝了你的${incomingCallIsVideo ? '视频' : '语音'}通话请求。`,
               time: now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
               timestamp: Date.now(),
               isHidden: true // 隐藏显示，但AI能看到
@@ -6849,6 +7335,26 @@ ${callDetails}
               >
                 删除
               </button>
+              
+              {/* 批量删除 */}
+              <button
+                onClick={enterBatchDeleteMode}
+                className="w-full px-4 py-2.5 hover:bg-black/5 text-left text-sm text-red-600 ios-button transition-all"
+                style={{ border: 'none', background: 'transparent' }}
+              >
+                批量删除
+              </button>
+              
+              {/* 编辑（只对用户发送的文本消息显示） */}
+              {longPressedMessage?.type === 'sent' && (
+                <button
+                  onClick={handleEditMessage}
+                  className="w-full px-4 py-2.5 hover:bg-black/5 text-left text-sm text-gray-900 ios-button transition-all"
+                  style={{ border: 'none', background: 'transparent' }}
+                >
+                  编辑
+                </button>
+              )}
             </div>
           </div>
           

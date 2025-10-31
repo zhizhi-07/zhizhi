@@ -57,7 +57,8 @@ class BackgroundPhoneGenerator {
           duration: 5000,
           onClick: () => {
             // 点击通知跳转到查手机页面
-            window.location.href = '/zhizhi/ai-phone-select'
+            const basePath = import.meta.env.BASE_URL || '/'
+            window.location.href = `${basePath}ai-phone-select`.replace('//', '/')
           }
         }
       )

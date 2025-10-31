@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { SendIcon } from '../components/Icons'
 import { useMusicPlayer } from '../context/MusicPlayerContext'
 import { useApi } from '../context/ApiContext'
@@ -12,11 +12,26 @@ interface Message {
   avatar?: string
 }
 
+interface MusicTogetherState {
+  song: {
+    title: string
+    artist: string
+    cover?: string
+  }
+  characterId: string
+  characterName: string
+  characterAvatar?: string
+}
+
 const MusicTogetherChat = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const musicPlayer = useMusicPlayer()
   const { currentApi } = useApi()
   const [showChat, setShowChat] = useState(true)
+  
+  // 获取传递的参数
+  const inviteData = location.state as MusicTogetherState | null
   
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
@@ -27,6 +42,29 @@ const MusicTogetherChat = () => {
   // 获取当前歌曲信息
   const currentSong = musicPlayer.currentSong
   const currentLyrics = currentSong?.lyrics || ''
+  
+  // 自动播放邀请的歌曲
+  useEffect(() => {
+    if (inviteData?.song && musicPlayer.playlist.length > 0) {
+      // 尝试从播放列表中找到匹配的歌曲
+      const matchedSongIndex = musicPlayer.playlist.findIndex(s => 
+        s.title.toLowerCase().includes(inviteData.song.title.toLowerCase()) ||
+        inviteData.song.title.toLowerCase().includes(s.title.toLowerCase())
+      )
+      
+      if (matchedSongIndex !== -1) {
+        const matchedSong = musicPlayer.playlist[matchedSongIndex]
+        if (musicPlayer.currentSong?.id !== matchedSong.id) {
+          console.log('🎵 找到匹配的歌曲，开始播放:', matchedSong.title)
+          musicPlayer.setCurrentSong(matchedSong, matchedSongIndex)
+          musicPlayer.play()
+        }
+      } else {
+        console.log('⚠️ 未在播放列表中找到歌曲:', inviteData.song.title)
+        // 即使找不到歌曲，也继续显示一起听界面
+      }
+    }
+  }, [inviteData, musicPlayer.playlist])
   
   // 滚动到底部
   const scrollToBottom = () => {
@@ -39,16 +77,18 @@ const MusicTogetherChat = () => {
 
   // 欢迎消息
   useEffect(() => {
-    if (currentSong && messages.length === 0) {
+    if (messages.length === 0) {
+      const songTitle = currentSong?.title || inviteData?.song.title || '这首歌'
+      
       setMessages([{
         id: Date.now(),
         type: 'ai',
-        content: `嘿！我们正在一起听《${currentSong.title}》~ 这首歌怎么样？想聊点什么吗？🎵`,
+        content: `嘿！我们正在一起听《${songTitle}》~ 这首歌怎么样？想聊点什么吗？🎵`,
         timestamp: Date.now(),
-        avatar: '🎵'
+        avatar: inviteData?.characterAvatar || '🎵'
       }])
     }
-  }, [currentSong, messages.length])
+  }, [currentSong, inviteData, messages.length])
 
   // 构建AI上下文
   const buildAiContext = () => {
@@ -229,7 +269,10 @@ ${songLyrics ? `歌词：\n${songLyrics.substring(0, 500)}${songLyrics.length > 
   // 关闭半屏
   const handleClose = () => {
     setShowChat(false)
-    setTimeout(() => navigate(-1), 300)
+    setTimeout(() => {
+      // 返回聊天页面，可以添加系统消息通知对方
+      navigate(-1)
+    }, 300)
   }
 
   if (!showChat) return null
@@ -255,9 +298,11 @@ ${songLyrics ? `歌词：\n${songLyrics.substring(0, 500)}${songLyrics.length > 
         <div className="flex flex-col items-center pt-3 pb-2 border-b border-gray-100">
           <div className="w-12 h-1 bg-gray-300 rounded-full mb-3" />
           <div className="text-center px-4 pb-2">
-            <div className="text-sm font-medium text-gray-900">一起听</div>
+            <div className="text-sm font-medium text-gray-900">
+              {inviteData?.characterName ? `正在和 ${inviteData.characterName} 一起听` : '一起听'}
+            </div>
             <div className="text-xs text-gray-500 truncate mt-0.5">
-              {currentSong?.title} - {currentSong?.artist}
+              {currentSong?.title || inviteData?.song.title} - {currentSong?.artist || inviteData?.song.artist}
             </div>
           </div>
         </div>

@@ -41,7 +41,7 @@ const ChatSettings = () => {
 
   const [proactiveCallsEnabled, setProactiveCallsEnabled] = useState(() => {
     const saved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-    return saved === 'true'
+    return saved === null ? true : saved === 'true'  // 默认开启
   })
 
   const [aiMessageLimit, setAiMessageLimit] = useState(() => {
