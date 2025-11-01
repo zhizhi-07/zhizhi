@@ -4,10 +4,11 @@
  */
 
 const DB_NAME = 'WeChatAppDB'
-const DB_VERSION = 2  // 升级版本以修复object store问题
+const DB_VERSION = 3  // 添加群聊消息存储
 const STORES = {
   MOMENTS: 'moments',
   CHAT_MESSAGES: 'chat_messages',
+  GROUP_MESSAGES: 'group_messages',  // 群聊消息
   EMOJIS: 'emojis',
   SETTINGS: 'settings'
 }
@@ -97,6 +98,13 @@ export async function initDB(): Promise<IDBDatabase> {
         console.log(`✅ 创建 ${STORES.CHAT_MESSAGES} store`)
       }
 
+      // 创建群聊消息存储
+      if (!db.objectStoreNames.contains(STORES.GROUP_MESSAGES)) {
+        const groupMessagesStore = db.createObjectStore(STORES.GROUP_MESSAGES, { keyPath: 'key' })
+        groupMessagesStore.createIndex('groupId', 'groupId', { unique: false })
+        console.log(`✅ 创建 ${STORES.GROUP_MESSAGES} store`)
+      }
+
       // 创建表情包存储
       if (!db.objectStoreNames.contains(STORES.EMOJIS)) {
         const emojisStore = db.createObjectStore(STORES.EMOJIS, { keyPath: 'id' })
@@ -180,7 +188,7 @@ export async function getAllIndexedDBItems<T>(storeName: string): Promise<T[]> {
     console.log(`[IndexedDB] 执行 getAll()...`)
     const request = store.getAll()
     
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       let resolved = false
       
       request.onsuccess = () => {

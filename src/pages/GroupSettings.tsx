@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
@@ -6,6 +6,7 @@ import { useCharacter } from '../context/CharacterContext'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { setIndexedDBItem, STORES } from '../utils/indexedDBStorage'
 
 const GroupSettings = () => {
   const navigate = useNavigate()
@@ -14,6 +15,7 @@ const GroupSettings = () => {
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const { background, getBackgroundStyle } = useBackground()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   
   const group = getGroup(id || '')
   const [groupName, setGroupName] = useState(group?.name || '')
@@ -23,6 +25,9 @@ const GroupSettings = () => {
   // 成员管理弹窗
   const [managingMember, setManagingMember] = useState<{ id: string; name: string } | null>(null)
   const [newTitle, setNewTitle] = useState('')
+  
+  // 头像上传
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   
   // AI自由对话设置
   const [aiChatEnabled, setAiChatEnabled] = useState(() => {
@@ -43,6 +48,39 @@ const GroupSettings = () => {
     localStorage.setItem(`group_ai_chat_enabled_${id}`, String(aiChatEnabled))
     localStorage.setItem(`group_ai_chat_interval_${id}`, String(aiChatInterval))
     alert(aiChatEnabled ? 'AI自由对话已启用' : 'AI自由对话已关闭')
+  }
+  
+  // 处理头像上传
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择图片文件')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('图片大小不能超过5MB')
+      return
+    }
+
+    setIsUploadingAvatar(true)
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      if (group) {
+        updateGroup(group.id, { avatar: base64String })
+        alert('群头像更新成功！')
+      }
+      setIsUploadingAvatar(false)
+    }
+    reader.onerror = () => {
+      alert('图片读取失败')
+      setIsUploadingAvatar(false)
+    }
+    reader.readAsDataURL(file)
   }
 
   if (!group) {
@@ -160,6 +198,46 @@ const GroupSettings = () => {
           </div>
         )}
         
+        {/* 快捷操作：群头像 */}
+        <div className="glass-card rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">👥</span>
+            <h3 className="text-sm font-medium text-gray-800">群头像</h3>
+          </div>
+          <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg">
+            {/* 头像预览 */}
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
+              {group?.avatar && group.avatar.startsWith('data:image') ? (
+                <img src={group.avatar} alt="群头像" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl">{group?.avatar || '👥'}</span>
+              )}
+            </div>
+            
+            {/* 上传按钮 */}
+            <div className="flex-1">
+              <p className="text-sm text-gray-600 mb-1.5">点击上传群聊头像</p>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={isUploadingAvatar || group?.disbanded}
+                  className="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs ios-button disabled:bg-gray-300"
+                >
+                  {isUploadingAvatar ? '上传中...' : '上传头像'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2 px-2">💡 支持 JPG、PNG、GIF 格式，最大 5MB</p>
+        </div>
+
         {/* 基本信息 */}
         <div className="glass-card rounded-xl p-3 mb-3">
           <div className="flex items-center gap-2 mb-2">
@@ -480,6 +558,35 @@ const GroupSettings = () => {
                             }
                             messageList.push(systemMessage)
                             localStorage.setItem(`group_messages_${id}`, JSON.stringify(messageList))
+                            
+                            // 同步到AI的单聊记录，让AI知道这个变化
+                            if (group.members.find(m => m.id === managingMember.id)?.type === 'character') {
+                              const chatKey = `chat_messages_${managingMember.id}`
+                              const chatData = localStorage.getItem(chatKey)
+                              const chatMessages = chatData ? JSON.parse(chatData) : []
+                              
+                              const notifyMessage = {
+                                id: Date.now() + Math.random(),
+                                role: 'system',
+                                content: `[${notificationContent}] - 这是群聊“${group.name}”中发生的变化。`,
+                                timestamp: Date.now(),
+                                isHidden: false
+                              }
+                              
+                              chatMessages.push(notifyMessage)
+                              
+                              // 保存到 IndexedDB
+                              setIndexedDBItem(STORES.CHAT_MESSAGES, {
+                                key: chatKey,
+                                characterId: managingMember.id,
+                                messages: chatMessages
+                              }).catch(() => {
+                                // 降级到 localStorage
+                                localStorage.setItem(chatKey, JSON.stringify(chatMessages))
+                              })
+                              
+                              console.log(`💬 已通知 ${managingMember.name}: ${notificationContent}`)
+                            }
                           }
                         }}
                         className={`relative w-11 h-6 rounded-full transition-colors ${
@@ -546,6 +653,35 @@ const GroupSettings = () => {
                         }
                         messageList.push(systemMessage)
                         localStorage.setItem(`group_messages_${id}`, JSON.stringify(messageList))
+                        
+                        // 同步到AI的单聊记录，让AI知道头衔变化
+                        if (member?.type === 'character') {
+                          const chatKey = `chat_messages_${managingMember.id}`
+                          const chatData = localStorage.getItem(chatKey)
+                          const chatMessages = chatData ? JSON.parse(chatData) : []
+                          
+                          const notifyMessage = {
+                            id: Date.now() + Math.random(),
+                            role: 'system',
+                            content: `[${notificationContent}] - 这是群聊“${group.name}”中发生的变化。`,
+                            timestamp: Date.now(),
+                            isHidden: false
+                          }
+                          
+                          chatMessages.push(notifyMessage)
+                          
+                          // 保存到 IndexedDB
+                          setIndexedDBItem(STORES.CHAT_MESSAGES, {
+                            key: chatKey,
+                            characterId: managingMember.id,
+                            messages: chatMessages
+                          }).catch(() => {
+                            // 降级到 localStorage
+                            localStorage.setItem(chatKey, JSON.stringify(chatMessages))
+                          })
+                          
+                          console.log(`💬 已通知 ${managingMember.name}: ${notificationContent}`)
+                        }
                       }
                       
                       alert('设置成功')

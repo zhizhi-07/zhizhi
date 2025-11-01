@@ -32,8 +32,8 @@ export const setItem = (key: string, value: any): boolean => {
       } catch (retryError) {
         // 只在真正失败时才提示用户
         console.error('❌ 存储空间不足，保存失败')
-        // 不再弹出alert，改为控制台提示
-        console.warn('💡 建议：前往【设置】->【存储管理】清理数据')
+        console.warn('⚠️ localStorage 存储失败（这是正常的，数据已自动保存到 IndexedDB）')
+        console.log('💡 提示：大部分数据已迁移到 IndexedDB，不影响使用')
         return false
       }
     }

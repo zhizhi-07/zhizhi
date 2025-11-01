@@ -105,19 +105,27 @@ const IOSNotification = ({
           {/* 通知内容 */}
           <div className="px-3 pt-2 pb-3">
             <div className="flex items-start gap-3">
-              {/* 应用图标 */}
+              {/* 应用图标/头像 */}
               <div className="flex-shrink-0 mt-0.5">
                 {icon ? (
-                  <img 
-                    src={icon} 
-                    alt={title}
-                    className="w-8 h-8 rounded-lg"
-                  />
+                  // 判断是图片URL还是emoji
+                  icon.startsWith('http') || icon.startsWith('data:') || icon.startsWith('/') ? (
+                    <img 
+                      src={icon} 
+                      alt={title}
+                      className="w-10 h-10 rounded-full object-cover shadow-md"
+                    />
+                  ) : (
+                    // emoji图标
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center shadow-md text-lg">
+                      {icon}
+                    </div>
+                  )
                 ) : (
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                      <line x1="12" y1="18" x2="12" y2="18"></line>
+                  // 默认微信图标
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center shadow-md">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
+                      <path d="M8.5 3C4.91 3 2 5.686 2 9c0 1.846.906 3.471 2.333 4.667L3.5 16.5l3.167-1.5C7.553 15.326 8.48 15.5 9.5 15.5c.166 0 .33-.007.493-.02C9.373 14.457 9 13.264 9 12c0-3.314 2.686-6 6-6 .35 0 .693.03 1.027.088C15.41 4.19 12.286 3 8.5 3zm7.5 6c-2.761 0-5 2.015-5 4.5s2.239 4.5 5 4.5c.827 0 1.607-.15 2.316-.418L21.5 19l-1.167-2.333C21.591 15.471 22 14.028 22 12.5c0-2.485-2.239-4.5-5-4.5z"/>
                     </svg>
                   </div>
                 )}

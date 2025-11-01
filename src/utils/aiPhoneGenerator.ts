@@ -137,8 +137,15 @@ const buildPhoneContentPrompt = (characterId: string, characterName: string) => 
 角色信息：
 ${characterInfo}
 
-最近聊天记录：
+最近聊天记录（仅供参考角色性格和生活状态）：
 ${chatHistory}
+
+🚨 重要规则（必须严格遵守）：
+1. ❌ 不要生成任何与"用户"、"微信用户"或真实用户相关的内容
+2. ❌ 微信聊天记录必须是虚构的NPC（如朋友、同事、家人等），不能包含用户
+3. ❌ 不能编造用户的行为、对话或任何信息
+4. ✅ 只能生成角色自己的手机内容（角色与其他虚构NPC的互动）
+5. ✅ 聊天记录要符合角色性格，但对象必须是虚构的人物
 
 使用文本格式输出，严格按照以下格式，每个分类用===开头，每条记录一行，字段用|||分隔。
 
@@ -153,7 +160,7 @@ ${chatHistory}
 吴婷|||132****9012|||前同事|||现在在深圳
 郑凯|||131****3456|||朋友|||喜欢旅游
 孙莉|||130****7890|||表姐|||在北京定居
-(继续生成到10-15条)
+(继续生成到10-15条，都是虚构NPC，不能包含用户)
 
 ===微信聊天
 李华|||周末打球去不？|||2小时前|||0
@@ -167,7 +174,7 @@ ${chatHistory}
 对话：self|||还在整理，明天能完成|||18:35
 对话：other|||好的，项目报告记得周一交|||18:45
 对话：self|||收到，我会按时交的|||18:50
-(继续生成8-12个聊天，每个5-10条对话)
+(继续生成8-12个聊天，每个5-10条对话。注意：聊天对象必须是虚构NPC，不能是用户！)
 
 ===浏览器历史
 五一旅游攻略|||https://www.example.com/travel|||2小时前|||计划五一假期去哪里玩
@@ -241,11 +248,13 @@ export const generateAIPhoneContent = async (
     console.log('正在生成手机内容...')
     const prompt = buildPhoneContentPrompt(characterId, characterName)
     
+    // 手机内容需要大量token，设置为6000
     const response = await callAI([
       { role: 'user', content: prompt }
-    ], 0.7)
+    ], 1, 6000)  // 1次重试，最多6000 tokens
     
-    console.log('AI响应:', response)
+    console.log('AI响应长度:', response.length)
+    console.log('AI响应前1000字符:', response.substring(0, 1000))
     
     // 使用文本解析器代替JSON解析
     const { parsePhoneContent } = await import('./phoneContentParser')

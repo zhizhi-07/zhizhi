@@ -71,7 +71,7 @@ const defaultApiConfig: ApiConfig = {
 const jiubanApiConfig: ApiConfig = {
   id: 'default-jiuban',
   name: '九班AI (Gemini 2.5 Pro)',
-  baseUrl: 'https://gy.jiubanai.com/v1',
+  baseUrl: 'https://gy.jiubanai.com',
   apiKey: 'sk-NqOuYUHhjx8qWOjZCdA34XTMvJ7PXsxoHRQLNQDg3xyMYfJk',
   model: 'gemini-2.5-pro',
   provider: 'openai', // OpenAI格式的Gemini代理

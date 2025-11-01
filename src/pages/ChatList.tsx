@@ -10,6 +10,7 @@ import { useSettings } from '../context/SettingsContext'
 import { getAiAvatar } from '../utils/avatarUtils'
 import { getUnreadCount } from '../utils/unreadMessages'
 import { isAIReplying } from '../utils/backgroundAI'
+import { setIndexedDBItem, getIndexedDBItem, STORES } from '../utils/indexedDBStorage'
 
 interface Chat {
   id: string
@@ -31,19 +32,134 @@ const ChatList = () => {
   const { groups } = useGroup()
   const { background, getBackgroundStyle } = useBackground()
   const { showStatusBar } = useSettings()
-  const [chats, setChats] = useState<Chat[]>(() => {
-    const saved = localStorage.getItem('chatList')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [chats, setChats] = useState<Chat[]>([])
+  const [chatsLoaded, setChatsLoaded] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [typingStatus, setTypingStatus] = useState<Record<string, boolean>>({})
 
-  // 保存聊天列表到localStorage
+  // 初始化：从 IndexedDB 或 localStorage 加载聊天列表
   useEffect(() => {
-    localStorage.setItem('chatList', JSON.stringify(chats))
-  }, [chats])
+    if (chatsLoaded) return
+    
+    const loadChats = async () => {
+      try {
+        // 先尝试从 IndexedDB 读取
+        const data = await getIndexedDBItem<any>(STORES.SETTINGS, 'chatList')
+        
+        if (data && data.chats) {
+          console.log(`💾 [IndexedDB] 加载了 ${data.chats.length} 个聊天`)
+          setChats(data.chats)
+          setChatsLoaded(true)
+          return
+        }
+        
+        // 如果 IndexedDB 没有，尝试从 localStorage 读取并迁移
+        const localData = localStorage.getItem('chatList')
+        if (localData) {
+          const localChats = JSON.parse(localData)
+          console.log(`💾 [localStorage] 加载了 ${localChats.length} 个聊天，将迁移到 IndexedDB`)
+          setChats(localChats)
+          
+          // 迁移到 IndexedDB
+          await setIndexedDBItem(STORES.SETTINGS, {
+            key: 'chatList',
+            chats: localChats
+          })
+          
+          // 迁移后清理 localStorage
+          localStorage.removeItem('chatList')
+          console.log('✅ chatList 已迁移到 IndexedDB 并清理 localStorage')
+        }
+        
+        setChatsLoaded(true)
+      } catch (error) {
+        console.error('💥 加载聊天列表失败:', error)
+        // 错误时尝试从 localStorage 加载，保留数据
+        try {
+          const fallbackData = localStorage.getItem('chatList')
+          if (fallbackData) {
+            setChats(JSON.parse(fallbackData))
+            console.log('⚠️ 从 localStorage 恢复了聊天列表')
+          }
+        } catch (fallbackError) {
+          console.error('❌ localStorage 恢复也失败了', fallbackError)
+        }
+        setChatsLoaded(true)
+      }
+    }
+    
+    loadChats()
+  }, [chatsLoaded])
+
+  // 监听聊天列表更新事件（来自后台消息）
+  useEffect(() => {
+    if (!chatsLoaded) return
+    
+    const handleStorageChange = async (e: Event) => {
+      // 支持StorageEvent和CustomEvent
+      const storageEvent = e as StorageEvent
+      const customEvent = e as CustomEvent
+      
+      const isStorageEvent = storageEvent.key === 'chatList' && storageEvent.newValue
+      const isCustomEvent = customEvent.detail && customEvent.type === 'chatlist-updated'
+      
+      if (isStorageEvent || isCustomEvent) {
+        try {
+          // 从IndexedDB重新加载聊天列表
+          const data = await getIndexedDBItem<any>(STORES.SETTINGS, 'chatList')
+          if (data && data.chats) {
+            console.log('🔄 检测到聊天列表更新，重新加载')
+            setChats(data.chats)
+          }
+        } catch (error) {
+          console.error('重新加载聊天列表失败:', error)
+        }
+      }
+    }
+    
+    // 监听storage事件（跨标签页）和自定义事件（同页面）
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('chatlist-updated', handleStorageChange)
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('chatlist-updated', handleStorageChange)
+    }
+  }, [chatsLoaded])
+
+  // 安全保存聊天列表到 IndexedDB（带完整错误处理）
+  useEffect(() => {
+    if (!chatsLoaded || chats.length === 0) return
+    
+    const saveChats = async () => {
+      try {
+        // 保存到 IndexedDB
+        await setIndexedDBItem(STORES.SETTINGS, {
+          key: 'chatList',
+          chats: chats
+        })
+        console.log(`💾 [IndexedDB] 已保存 ${chats.length} 个聊天`)
+      } catch (error) {
+        console.error('💥 IndexedDB 保存失败，尝试 localStorage 降级:', error)
+        
+        // 降级：尝试保存到 localStorage（限制数据量）
+        try {
+          // 只保留最近100个聊天
+          const limitedChats = chats.slice(0, 100)
+          localStorage.setItem('chatList', JSON.stringify(limitedChats))
+          console.log('⚠️ 已降级保存到 localStorage（限制100个）')
+        } catch (localError) {
+          console.error('❌ localStorage 也失败，但不删除数据！保留内存中的数据', localError)
+          // 关键：不删除数据，只是无法持久化
+          alert('⚠️ 存储空间不足，聊天列表可能无法保存。请清理浏览器缓存或导出重要数据。')
+        }
+      }
+    }
+    
+    saveChats()
+  }, [chats, chatsLoaded])
 
   // 同步群聊到聊天列表（新增和更新）
   useEffect(() => {
@@ -117,7 +233,7 @@ const ChatList = () => {
       
       chats.forEach(chat => {
         if (chat.type === 'single' && chat.characterId) {
-          // 获取未读消息数
+          // 获取单聊未读消息数
           const unread = getUnreadCount(chat.characterId)
           if (unread > 0) {
             newUnreadCounts[chat.characterId] = unread
@@ -125,6 +241,12 @@ const ChatList = () => {
           
           // 检查AI是否正在回复
           newTypingStatus[chat.characterId] = isAIReplying(chat.characterId)
+        } else if (chat.type === 'group' && chat.groupId) {
+          // 获取群聊未读消息数
+          const unread = getUnreadCount(chat.groupId)
+          if (unread > 0) {
+            newUnreadCounts[chat.groupId] = unread
+          }
         }
       })
       
@@ -356,7 +478,10 @@ const ChatList = () => {
                   
                   {/* 显示未读消息数（实时） */}
                   {(() => {
-                    const unreadCount = chat.characterId ? unreadCounts[chat.characterId] : (chat.unread || 0)
+                    // 根据聊天类型获取未读消息数
+                    const unreadCount = chat.type === 'group' 
+                      ? (chat.groupId ? unreadCounts[chat.groupId] : 0)
+                      : (chat.characterId ? unreadCounts[chat.characterId] : 0)
                     return unreadCount > 0 ? (
                       <span
                         className={`ml-2 px-2 min-w-[20px] h-5 rounded-full text-xs text-white flex items-center justify-center ${

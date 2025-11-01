@@ -19,6 +19,7 @@ import { UserProvider } from './context/UserContext'
 import { CharacterProvider } from './context/CharacterContext'
 import { MomentsProvider } from './context/MomentsContext'
 import './utils/clearAvatarCache' // 导入清理工具，使其在控制台可用
+import './utils/emergencyCleanup' // 导入紧急清理工具
 import { ApiProvider } from './context/ApiContext'
 import { RedEnvelopeProvider } from './context/RedEnvelopeContext'
 import { ThemeProvider } from './context/ThemeContext'
@@ -179,6 +180,7 @@ const LifeSettings = lazy(() => import('./pages/LifeSettings'))
 const StorageMigration = lazy(() => import('./pages/StorageMigration'))
 const MiniPrograms = lazy(() => import('./pages/MiniPrograms'))
 const SettingsNew = lazy(() => import('./pages/SettingsNew'))
+const SoundUploadSettings = lazy(() => import('./pages/SoundUploadSettings'))
 const About = lazy(() => import('./pages/About'))
 
 // 论坛功能
@@ -328,6 +330,7 @@ function App() {
                                     <Route path="/chat/:id" element={<PageWrapper><ChatDetail /></PageWrapper>} />
                                     <Route path="/settings" element={<PageWrapper><Settings /></PageWrapper>} />
                                     <Route path="/settings-new" element={<PageWrapper><SettingsNew /></PageWrapper>} />
+                                    <Route path="/settings/sound-upload" element={<PageWrapper><SoundUploadSettings /></PageWrapper>} />
                                     <Route path="/profile/:id" element={<PageWrapper><Profile /></PageWrapper>} />
                                     <Route path="/edit-profile" element={<PageWrapper><EditProfile /></PageWrapper>} />
                                     <Route path="/users" element={<PageWrapper><UserList /></PageWrapper>} />

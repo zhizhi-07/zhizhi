@@ -20,7 +20,8 @@ import {
   AddIcon,
   ImageIcon
 } from '../components/Icons'
-import type { ForumTab } from '../types/forum'
+import type { ForumTab, ForumPost } from '../types/forum'
+import '../utils/forumDebug' // 加载调试工具
 
 // ==================== 主组件 ====================
 

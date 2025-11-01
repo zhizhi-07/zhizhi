@@ -4,34 +4,64 @@
  * 后台聊天时同步最后一条消息和显示通知
  */
 
+import { setIndexedDBItem, getIndexedDBItem, STORES } from './indexedDBStorage'
+
 /**
  * 更新聊天列表的最后一条消息
  */
-export function updateChatListLastMessage(
+export async function updateChatListLastMessage(
   characterId: string,
   lastMessage: string,
   timestamp?: number
 ) {
   try {
-    const chatListStr = localStorage.getItem('chatList')
-    if (!chatListStr) return
+    // 先尝试从 IndexedDB 读取
+    const data = await getIndexedDBItem<any>(STORES.SETTINGS, 'chatList')
+    let chatList: any[] = []
     
-    const chatList = JSON.parse(chatListStr)
+    if (data && data.chats) {
+      chatList = data.chats
+    } else {
+      // 如果 IndexedDB 没有，尝试从 localStorage 读取
+      const chatListStr = localStorage.getItem('chatList')
+      if (chatListStr) {
+        chatList = JSON.parse(chatListStr)
+      } else {
+        return // 没有聊天列表，直接返回
+      }
+    }
+    
     const chatIndex = chatList.findIndex((c: any) => c.characterId === characterId)
     
     if (chatIndex >= 0) {
       chatList[chatIndex].lastMessage = lastMessage
+      chatList[chatIndex].time = new Date().toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
       if (timestamp) {
         chatList[chatIndex].timestamp = timestamp
       }
       
+      // 保存到 IndexedDB
+      await setIndexedDBItem(STORES.SETTINGS, {
+        key: 'chatList',
+        chats: chatList
+      })
+      
+      // 也更新 localStorage 以保证兼容性
       localStorage.setItem('chatList', JSON.stringify(chatList))
       
-      // 触发存储事件，通知聊天列表页面更新
+      // 触发存储事件，通知聊天列表页面更新（跨标签页）
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'chatList',
         newValue: JSON.stringify(chatList),
         url: window.location.href
+      }))
+      
+      // 触发自定义事件，通知同一页面内的聊天列表更新
+      window.dispatchEvent(new CustomEvent('chatlist-updated', {
+        detail: { characterId, lastMessage }
       }))
       
       console.log(`✅ 已更新聊天列表最后一条消息: ${characterId}`, lastMessage)
@@ -61,7 +91,7 @@ export function showBackgroundChatNotification(
   
   // 🔧 修复：始终显示自定义通知（更可靠）
   // 系统通知在移动端和某些浏览器上不稳定，统一使用自定义通知
-  showCustomNotification(characterName, message, characterId)
+  showCustomNotification(characterName, message, characterId, characterAvatar)
   
   // 同时尝试显示系统通知（如果有权限）
   if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
@@ -81,14 +111,16 @@ export function showBackgroundChatNotification(
 /**
  * 显示自定义通知（使用IOSNotification）
  */
-function showCustomNotification(characterName: string, message: string, characterId: string) {
+function showCustomNotification(characterName: string, message: string, characterId: string, characterAvatar?: string) {
   // 触发自定义事件，让App.tsx中的通知组件捕获
   const event = new CustomEvent('background-chat-message', {
     detail: {
       title: characterName,
       message: message,
       characterId: characterId,
-      type: 'chat'
+      chatId: characterId,
+      type: 'single',
+      avatar: characterAvatar
     }
   })
   

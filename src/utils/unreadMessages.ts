@@ -1,12 +1,13 @@
 /**
  * 未读消息管理系统
- * 跟踪每个聊天的未读消息数量
+ * 跟踪每个聊天的未读消息数量（支持单聊和群聊）
  */
 
 interface UnreadData {
-  characterId: string
+  chatId: string  // 单聊使用characterId，群聊使用groupId
   count: number
   lastUpdate: number
+  type?: 'single' | 'group'  // 聊天类型
 }
 
 const STORAGE_KEY = 'unread_messages'
@@ -36,62 +37,73 @@ function saveUnreadData(data: Map<string, UnreadData>) {
 
 /**
  * 增加未读消息数
+ * @param chatId 聊天ID（单聊用characterId，群聊用groupId）
+ * @param count 增加的未读数量
+ * @param type 聊天类型
  */
-export function incrementUnread(characterId: string, count: number = 1) {
+export function incrementUnread(chatId: string, count: number = 1, type: 'single' | 'group' = 'single') {
   const data = getUnreadData()
-  const current = data.get(characterId)
+  const current = data.get(chatId)
   
   if (current) {
     current.count += count
     current.lastUpdate = Date.now()
   } else {
-    data.set(characterId, {
-      characterId,
+    data.set(chatId, {
+      chatId,
       count,
-      lastUpdate: Date.now()
+      lastUpdate: Date.now(),
+      type
     })
   }
   
   saveUnreadData(data)
   
   // 更新聊天列表
-  updateChatListUnread(characterId, current ? current.count : count)
+  updateChatListUnread(chatId, current ? current.count : count, type)
   
-  console.log(`📬 未读消息 +${count}: ${characterId}, 总计: ${current ? current.count : count}`)
+  console.log(`📬 [${type}] 未读消息 +${count}: ${chatId}, 总计: ${current ? current.count : count}`)
 }
 
 /**
  * 清除未读消息
+ * @param chatId 聊天ID（单聊用characterId，群聊用groupId）
+ * @param type 聊天类型
  */
-export function clearUnread(characterId: string) {
+export function clearUnread(chatId: string, type: 'single' | 'group' = 'single') {
   const data = getUnreadData()
-  data.delete(characterId)
+  data.delete(chatId)
   saveUnreadData(data)
   
   // 更新聊天列表
-  updateChatListUnread(characterId, 0)
+  updateChatListUnread(chatId, 0, type)
   
-  console.log(`✅ 已清除未读消息: ${characterId}`)
+  console.log(`✅ [${type}] 已清除未读消息: ${chatId}`)
 }
 
 /**
  * 获取未读消息数
+ * @param chatId 聊天ID（单聊用characterId，群聊用groupId）
  */
-export function getUnreadCount(characterId: string): number {
+export function getUnreadCount(chatId: string): number {
   const data = getUnreadData()
-  return data.get(characterId)?.count || 0
+  return data.get(chatId)?.count || 0
 }
 
 /**
  * 更新聊天列表中的未读数
  */
-function updateChatListUnread(characterId: string, count: number) {
+function updateChatListUnread(chatId: string, count: number, type: 'single' | 'group' = 'single') {
   try {
     const chatListStr = localStorage.getItem('chatList')
     if (!chatListStr) return
     
     const chatList = JSON.parse(chatListStr)
-    const chatIndex = chatList.findIndex((c: any) => c.characterId === characterId)
+    
+    // 根据类型查找聊天
+    const chatIndex = type === 'group' 
+      ? chatList.findIndex((c: any) => c.groupId === chatId)
+      : chatList.findIndex((c: any) => c.characterId === chatId)
     
     if (chatIndex >= 0) {
       chatList[chatIndex].unread = count > 0 ? count : undefined

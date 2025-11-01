@@ -23,6 +23,8 @@ import {
   type GroupMemberProfile,
   type GroupChatMessage as ScriptMessage
 } from '../utils/groupSocialDirector'
+import { setIndexedDBItem, getIndexedDBItem, STORES } from '../utils/indexedDBStorage'
+import { clearUnread, incrementUnread } from '../utils/unreadMessages'
 
 interface GroupMessage {
   id: number
@@ -58,13 +60,8 @@ const GroupChatDetail = () => {
   // 使用 groups 依赖确保实时更新
   // 当groups变化时，group也会更新（用于退群后刷新成员列表）
   const group = groups?.length >= 0 ? getGroup(id || '') : null
-  const [messages, setMessages] = useState<GroupMessage[]>(() => {
-    if (id) {
-      const saved = localStorage.getItem(`group_messages_${id}`)
-      return saved ? JSON.parse(saved) : []
-    }
-    return []
-  })
+  const [messages, setMessages] = useState<GroupMessage[]>([])
+  const [messagesLoaded, setMessagesLoaded] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [isAiTyping, setIsAiTyping] = useState(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -79,11 +76,132 @@ const GroupChatDetail = () => {
   const inputRef = useRef<HTMLInputElement>(null)
   const lastTriggeredMessageIdRef = useRef<number | null>(null)  // 记录上次触发AI回复的消息ID，避免重复触发
   const { createRedEnvelope, getRedEnvelope, receiveRedEnvelope, hasReceived } = useGroupRedEnvelope()
+  const isInCurrentChatRef = useRef<boolean>(true)  // 跟踪用户是否在当前群聊页面
 
-  // 保存消息到localStorage
+  // 清除未读消息（进入群聊时）
   useEffect(() => {
-    if (id) {
-      localStorage.setItem(`group_messages_${id}`, JSON.stringify(messages))
+    if (!id) return
+    
+    // 清除未读消息
+    clearUnread(id, 'group')
+    
+    // 标记在当前群聊页面
+    isInCurrentChatRef.current = true
+    
+    // 监听路径变化（用户离开页面时）
+    const handleBeforeUnload = () => {
+      isInCurrentChatRef.current = false
+    }
+    
+    // 监听页面可见性变化（标签页切换时）
+    const handleVisibilityChange = () => {
+      const isVisible = !document.hidden
+      if (isVisible && id && window.location.pathname === `/group/${id}`) {
+        // 页面可见且在当前群聊，清除未读
+        clearUnread(id, 'group')
+        isInCurrentChatRef.current = true
+      } else {
+        // 页面不可见或不在当前群聊
+        isInCurrentChatRef.current = false
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      isInCurrentChatRef.current = false
+    }
+  }, [id])
+  
+  // 初始化：从 IndexedDB 或 localStorage 加载消息
+  useEffect(() => {
+    if (!id) return
+    
+    // 重置加载状态
+    setMessagesLoaded(false)
+    
+    const loadMessages = async () => {
+      try {
+        // 先尝试从 IndexedDB 读取
+        const data = await getIndexedDBItem<any>(STORES.GROUP_MESSAGES, `group_messages_${id}`)
+        
+        if (data && data.messages) {
+          console.log(`💾 [IndexedDB] 加载了 ${data.messages.length} 条群聊消息`)
+          setMessages(data.messages)
+          setMessagesLoaded(true)
+          return
+        }
+        
+        // 如果 IndexedDB 没有，尝试从 localStorage 读取
+        const localData = localStorage.getItem(`group_messages_${id}`)
+        if (localData) {
+          const localMessages = JSON.parse(localData)
+          console.log(`💾 [localStorage] 加载了 ${localMessages.length} 条消息，将迁移到 IndexedDB`)
+          setMessages(localMessages)
+          
+          // 迁移到 IndexedDB
+          await setIndexedDBItem(STORES.GROUP_MESSAGES, {
+            key: `group_messages_${id}`,
+            groupId: id,
+            messages: localMessages,
+            lastUpdated: Date.now()
+          })
+          
+          // 迁移后清理 localStorage
+          localStorage.removeItem(`group_messages_${id}`)
+          console.log('✅ 已迁移到 IndexedDB 并清理 localStorage')
+        }
+        
+        setMessagesLoaded(true)
+      } catch (error) {
+        console.error('💥 加载消息失败:', error)
+        setMessagesLoaded(true)
+      }
+    }
+    
+    loadMessages()
+  }, [id])
+
+  // 消息存储限制配置
+  const MAX_MESSAGES = 2000  // IndexedDB 可以存更多消息
+
+  // 使用 IndexedDB 保存消息（大容量存储）
+  const safelySaveMessages = async (key: string, msgs: any[]) => {
+    try {
+      // 限制消息数量，只保留最近的消息
+      const limitedMessages = msgs.length > MAX_MESSAGES 
+        ? msgs.slice(-MAX_MESSAGES) 
+        : msgs
+      
+      // 保存到 IndexedDB
+      await setIndexedDBItem(STORES.GROUP_MESSAGES, {
+        key,
+        groupId: id,
+        messages: limitedMessages,
+        lastUpdated: Date.now()
+      })
+      
+      console.log(`💾 [IndexedDB] 已保存 ${limitedMessages.length} 条群聊消息`)
+    } catch (error) {
+      console.error('💥 IndexedDB 保存失败，降级到 localStorage:', error)
+      
+      // 降级方案：使用 localStorage（限制更少消息）
+      try {
+        const reducedMessages = msgs.slice(-200)  // localStorage 只保留 200 条
+        localStorage.setItem(key, JSON.stringify(reducedMessages))
+      } catch (localError) {
+        console.error('❌ localStorage 也失败了:', localError)
+      }
+    }
+  }
+
+  // 保存消息到 IndexedDB
+  useEffect(() => {
+    if (id && messages.length > 0) {
+      safelySaveMessages(`group_messages_${id}`, messages)
     }
   }, [messages, id])
 
@@ -338,7 +456,7 @@ const GroupChatDetail = () => {
   }
 
   // 💾 同步群聊消息到AI角色的单聊记录（隐藏消息，用于记忆）
-  const syncGroupChatToAIMemory = (
+  const syncGroupChatToAIMemory = async (
     senderId: string,
     senderName: string,
     content: string,
@@ -349,11 +467,24 @@ const GroupChatDetail = () => {
     // 获取所有AI成员
     const aiMembers = group.members.filter(m => m.type === 'character')
     
-    aiMembers.forEach(member => {
+    // 使用 Promise.all 并行同步
+    await Promise.all(aiMembers.map(async (member) => {
       try {
         const chatKey = `chat_messages_${member.id}`
-        const chatMessages = localStorage.getItem(chatKey)
-        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        // 从 IndexedDB 或 localStorage 读取
+        let messages: any[] = []
+        const indexedData = await getIndexedDBItem<any>(STORES.CHAT_MESSAGES, chatKey)
+        
+        if (indexedData && indexedData.messages) {
+          messages = indexedData.messages
+        } else {
+          // 降级到 localStorage
+          const localData = localStorage.getItem(chatKey)
+          if (localData) {
+            messages = JSON.parse(localData)
+          }
+        }
         
         // 获取群成员总数（用于上下文）
         const totalMembers = group.members.length
@@ -379,13 +510,19 @@ const GroupChatDetail = () => {
         }
         
         messages.push(hiddenMessage)
-        localStorage.setItem(chatKey, JSON.stringify(messages))
+        
+        // 保存到 IndexedDB
+        await setIndexedDBItem(STORES.CHAT_MESSAGES, {
+          key: chatKey,
+          characterId: member.id,
+          messages
+        })
         
         console.log(`💾 [${group.name}] 已同步到 ${member.name}:`, systemContent.substring(0, 50))
       } catch (error) {
         console.error(`[${group.name}] 同步到 ${member.name} 失败:`, error)
       }
-    })
+    }))
   }
 
   // 处理输入变化，检测@
@@ -463,7 +600,7 @@ const GroupChatDetail = () => {
   }
 
   // 判断是否应该显示时间戳（消息间隔超过5分钟才显示）
-  const shouldShowTimestamp = (currentIndex: number) => {
+  const shouldShowTimestamp = (_currentIndex: number) => {
     // 测试：暂时总是显示时间戳
     return true
     
@@ -885,6 +1022,24 @@ const GroupChatDetail = () => {
           
           setMessages(prev => [...prev, newMessage])
           
+          // 如果用户不在当前页面，增加未读并发送通知
+          // 判断：1. 页面不可见（切换标签页）或 2. 路径不匹配（离开了群聊页面）
+          const isInCurrentChat = !document.hidden && window.location.pathname === `/group/${id}`
+          if (!isInCurrentChat && id && messageData.senderType === 'character' && !isPrivateMessageNotice) {
+            incrementUnread(id, 1, 'group')
+            
+            // 发送通知事件
+            window.dispatchEvent(new CustomEvent('background-chat-message', {
+              detail: {
+                title: group.name,
+                message: `${messageData.senderName}: ${messageData.content}`,
+                chatId: id,
+                type: 'group',
+                avatar: messageData.senderAvatar  // 传递发送者头像
+              }
+            }))
+          }
+          
           // 💾 同步AI消息到所有AI的记忆
           syncGroupChatToAIMemory(
             messageData.senderId,
@@ -1153,6 +1308,23 @@ const GroupChatDetail = () => {
                   messageType: 'text'
                 }
                 setMessages(prev => [...prev, textMessage])
+                
+                // 如果用户不在当前页面，增加未读并发送通知
+                const isInCurrentChat = !document.hidden && window.location.pathname === `/group/${id}`
+                if (!isInCurrentChat && id) {
+                  incrementUnread(id, 1, 'group')
+                  
+                  // 发送通知事件
+                  window.dispatchEvent(new CustomEvent('background-chat-message', {
+                    detail: {
+                      title: group.name,
+                      message: `${reply.characterName}: ${parsed.textContent}`,
+                      chatId: id,
+                      type: 'group',
+                      avatar: reply.characterAvatar  // 传递发送者头像
+                    }
+                  }))
+                }
               }
               
               // 再发送表情包（如果有）
@@ -1176,6 +1348,23 @@ const GroupChatDetail = () => {
                   emojiIndex
                 }
                 setMessages(prev => [...prev, emojiMessage])
+                
+                // 如果用户不在当前页面，增加未读并发送通知
+                const isInCurrentChat = !document.hidden && window.location.pathname === `/group/${id}`
+                if (!isInCurrentChat && id) {
+                  incrementUnread(id, 1, 'group')
+                  
+                  // 发送通知事件
+                  window.dispatchEvent(new CustomEvent('background-chat-message', {
+                    detail: {
+                      title: group.name,
+                      message: `${reply.characterName}: [表情]`,
+                      chatId: id,
+                      type: 'group',
+                      avatar: reply.characterAvatar  // 传递发送者头像
+                    }
+                  }))
+                }
               }
               
               // 只有最后一个AI的最后一条消息才更新群聊最后消息
@@ -1666,7 +1855,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                     }}
                     className={`px-3 py-2 rounded-xl shadow-sm text-sm cursor-pointer ${
                       isUser
-                        ? 'bg-wechat-primary text-white rounded-tr-sm'
+                        ? 'bg-blue-500 text-white rounded-tr-sm'
                         : 'glass-card text-gray-900 rounded-tl-sm'
                     }`}
                   >
@@ -1694,8 +1883,12 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
           {/* AI输入中提示 */}
           {isAiTyping && (
             <div className="flex gap-3 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md">
-                <span className="text-lg">🤖</span>
+              <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center shadow-md overflow-hidden">
+                {group?.avatar && group.avatar.startsWith('data:image') ? (
+                  <img src={group.avatar} alt="群头像" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg">{group?.avatar || '👥'}</span>
+                )}
               </div>
               <div className="glass-card px-3 py-2 rounded-xl rounded-tl-sm">
                 <div className="flex gap-1">
@@ -1806,7 +1999,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                 onClick={handleSend}
                 disabled={isAiTyping || group?.disbanded}
                 className={`p-2 rounded-full transition-colors ${
-                  group?.disbanded ? 'bg-gray-300 text-gray-500' : 'bg-wechat-primary text-white'
+                  group?.disbanded ? 'bg-gray-300 text-gray-500' : 'bg-blue-500 text-white'
                 }`}
               >
                 <SendIcon size={20} />

@@ -19,6 +19,7 @@ import {
 } from '../utils/forumAI'
 import { getMemesForAI } from '../utils/memeManager'
 import { notifyForumInitStart, notifyForumInitProgress, notifyForumInitComplete } from '../utils/forumNotifications'
+import '../utils/forumDebug' // 加载调试工具
 
 const ForumInitialize = () => {
   const navigate = useNavigate()
@@ -143,31 +144,41 @@ const ForumInitialize = () => {
 ${hotTopics.trim() ? `热点关注：${hotTopics.trim()}` : ''}
 帖子风格：${postStyle}
 
-${postStyle === '抽象' ? `\n常用网络梗库（1200+条，可自然使用）：\n${allMemes}\n` : ''}
+${postStyle === '抽象' ? `\n常用网络梗库（部分）：\n${allMemes.slice(0, 200)}\n` : ''}
 
 AI角色信息：
 ${characterInfo}
 
-请生成内容，格式（用|分隔，每行一个）：
+⚠️ 输出格式要求（非常重要）：
+- 每行一条数据，用竖线 | 分隔字段
+- 不要添加markdown代码块标记（不要用\`\`\`）
+- 不要添加任何解释说明文字
+- 直接输出数据行
 
+格式说明：
 角色|原名|论坛昵称|个性签名|头像emoji
 话题|话题名|话题描述|标签1,标签2
 帖子|话题名|作者原名|帖子内容|标签1,标签2
 用户|user_id|用户名|头像emoji|个人简介
 
-示例：
+示例输出（请严格按此格式）：
 角色|${selectedCharacters[0]?.name || '小雪'}|雪の物语|喜欢二次元的普通人|❄️
 话题|游戏讨论|分享游戏心得和攻略|游戏,娱乐
+话题|科技前沿|探讨最新科技动态|科技,AI
+话题|美食分享|记录美食生活点滴|美食,生活
 帖子|游戏讨论|${selectedCharacters[0]?.name || '小雪'}|今天抽到了喜欢的角色~好开心|游戏
 用户|user1|张浩宇|😊|游戏爱好者
+用户|user2|李思琪|🌸|美食博主
 
-要求：
+生成要求：
 1. 为每个AI角色生成1条"角色"行（包含论坛昵称和签名）
-2. 生成5-8个话题
-3. 每个AI角色发2-3条帖子（使用原名）
-4. 生成20-30个活跃NPC用户
-5. 每个话题下5-8条帖子
-6. 直接输出，不要代码块标记`
+2. 生成6-8个"话题"行
+3. 每个AI角色发2-3条"帖子"行（使用原名作为作者）
+4. 生成20-30个"用户"行（NPC用户）
+5. 确保每个话题都有5-8条帖子
+6. 帖子内容50-150字
+
+⚠️ 再次强调：直接输出数据行，不要有任何其他文字或markdown标记！`
 
       console.log('🎯 发送prompt:', prompt)
       setProgress({ current: 1, total: 3, message: '正在调用AI生成内容...' })
@@ -193,13 +204,18 @@ ${characterInfo}
       }
       
       const data = await response.json()
-      const result = data.choices?.[0]?.message?.content || ''
+      let result = data.choices?.[0]?.message?.content || ''
       
-      console.log('📦 AI返回:', result)
+      console.log('📦 AI返回原始内容长度:', result.length)
+      console.log('📦 AI返回前500字符:', result.substring(0, 500))
+      
+      // 清理AI返回的内容（去除可能的markdown代码块）
+      result = result.replace(/```[\w]*\n?/g, '').trim()
+      
       setProgress({ current: 2, total: 3, message: '正在解析生成的内容...' })
       
       // 解析结果
-      const lines = result.split('\n').map((l: string) => l.trim()).filter((l: string) => l)
+      const lines = result.split('\n').map((l: string) => l.trim()).filter((l: string) => l && !l.startsWith('#'))
       
       const aiCharacters: any[] = [] // AI角色的论坛信息
       const topics: any[] = []
@@ -252,6 +268,13 @@ ${characterInfo}
         posts: posts.length, 
         users: users.length 
       })
+      
+      // 验证数据
+      if (topics.length === 0 || posts.length === 0) {
+        console.error('❌ 生成的数据不足:', { topics: topics.length, posts: posts.length })
+        console.error('📝 AI原始返回:', result)
+        throw new Error(`生成失败：话题${topics.length}个，帖子${posts.length}个。AI返回的格式可能不正确，请重试。`)
+      }
       
       // 分配帖子到话题并创建完整结构
       const allForumPosts: any[] = [] // 收集所有帖子用于保存到forumStorage
@@ -313,6 +336,19 @@ ${characterInfo}
         topic.users = users.slice(0, 15) // 每个话题分配15个用户
       })
       
+      // 最终验证
+      if (allForumPosts.length === 0) {
+        console.error('❌ 没有生成任何帖子！')
+        throw new Error('生成失败：没有生成任何帖子，请重试。')
+      }
+      
+      console.log(`💾 准备保存 ${allForumPosts.length} 个帖子到forum_posts`)
+      console.log('📊 帖子详情:', allForumPosts.slice(0, 3).map(p => ({
+        id: p.id,
+        author: p.authorName,
+        content: p.content.substring(0, 50)
+      })))
+      
       // 保存话题列表到localStorage
       localStorage.setItem('forum_topics_list', JSON.stringify(topics))
       
@@ -322,7 +358,7 @@ ${characterInfo}
       // 标记论坛已初始化
       localStorage.setItem('forum_initialized', 'true')
       
-      console.log(`💾 保存了 ${allForumPosts.length} 个帖子到forum_posts`)
+      console.log(`✅ 成功保存了 ${allForumPosts.length} 个帖子`)
       
       // 保存角色映射（使用AI生成的论坛昵称和签名）
       const forumProfiles = selectedCharacters.map(c => {
@@ -405,7 +441,15 @@ ${characterInfo}
         <div className="bg-orange-50 border-l-4 border-orange-400 p-4 m-4">
           <p className="text-[14px] text-gray-700 leading-relaxed">
             选择要加入论坛的角色，他们将根据自己的性格生成论坛昵称和签名
-          </p>
+          </p>  钱钱钱钱钱1·11  
+
+
+
+
+
+
+
+          
         </div>
 
         {/* 统计和全选 */}

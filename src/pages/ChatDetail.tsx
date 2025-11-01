@@ -14,6 +14,7 @@ import MusicDetailModal from '../components/MusicDetailModal'
 // import { buildPromptFromTemplate } from '../utils/promptTemplate' // 文件不存在，已注释
 import { setItem as safeSetItem } from '../utils/storage'
 import { getCoupleSpaceContentSummary } from '../utils/coupleSpaceContentUtils'
+import { setIndexedDBItem, getIndexedDBItem, STORES } from '../utils/indexedDBStorage'
 import ChatMenu from '../components/ChatMenu'
 import IncomingCallScreen from '../components/IncomingCallScreen'
 import RedEnvelopeSender from '../components/RedEnvelopeSender'
@@ -27,6 +28,7 @@ import TransferSender from '../components/TransferSender'
 import IntimatePaySender from '../components/IntimatePaySender'
 import EmojiPanel from '../components/EmojiPanel'
 import FlipPhotoCard from '../components/FlipPhotoCard'
+import GroupInviteCard from '../components/GroupInviteCard'
 import { Emoji } from '../utils/emojiStorage'
 import { retrieveMemes, getRandomMemes } from '../utils/memesRetrieval'
 import HtmlRenderer from '../components/offline/HtmlRenderer'
@@ -653,7 +655,39 @@ const ChatDetail = () => {
       isMountedRef.current = false
     }
   }, [id])
-  
+
+  // 实时监听AI消息，立即触发通知和未读消息（和群聊逻辑一致）
+  useEffect(() => {
+    if (!id || !character || messages.length === 0) return
+    
+    const lastMessage = messages[messages.length - 1]
+    
+    // 只处理AI发送的消息
+    if (lastMessage && lastMessage.type === 'received') {
+      // 判断用户是否在当前聊天页面
+      const isInCurrentChat = !document.hidden && window.location.pathname === `/chat/${id}`
+      
+      // 如果不在当前页面，立即增加未读并发送通知
+      if (!isInCurrentChat) {
+        incrementUnread(id, 1, 'single')
+        
+        // 发送通知事件
+        window.dispatchEvent(new CustomEvent('background-chat-message', {
+          detail: {
+            title: character.name,
+            message: lastMessage.content || '[消息]',
+            chatId: id,
+            type: 'single',
+            avatar: character.avatar
+          }
+        }))
+        
+        // 更新聊天列表
+        updateChatListLastMessage(id, lastMessage.content, lastMessage.timestamp)
+      }
+    }
+  }, [messages, id, character])
+
   // 🔍 首次进入聊天时自动识别AI头像（只识别一次，除非头像变了）
   useEffect(() => {
     if (!character?.id || !character?.avatar || !character.avatar.startsWith('data:image')) {
@@ -808,7 +842,13 @@ const ChatDetail = () => {
                 time: lastMessage.time
               }
               
-              localStorage.setItem('chatList', JSON.stringify(chats))
+              // 安全保存到 IndexedDB
+              setIndexedDBItem(STORES.SETTINGS, {
+                key: 'chatList',
+                chats: chats
+              }).catch(error => {
+                console.error('❌ 更新 chatList 失败:', error)
+              })
             }
           }
         }
@@ -992,7 +1032,13 @@ ${character.description || ''}
                     lastMessage: aiMessage.content || '',
                     time: aiMessage.time
                   }
-                  localStorage.setItem('chatList', JSON.stringify(chats))
+                  // 安全保存到 IndexedDB
+                  setIndexedDBItem(STORES.SETTINGS, {
+                    key: 'chatList',
+                    chats: chats
+                  }).catch(error => {
+                    console.error('❌ 更新 chatList 失败:', error)
+                  })
                   console.log(`📝 聊天列表已更新: ${aiMessage.content.substring(0, 20)}...`)
                 }
               }
@@ -1626,28 +1672,42 @@ ${willAccept ?
                 musicInvite: { 
                   ...msg.musicInvite!, 
                   status: willAccept ? 'accepted' : 'rejected' 
-                } 
               }
-            : msg
-        ))
-        
-        // 如果接受，自动跳转到一起听页面
-        if (willAccept) {
-          setTimeout(() => {
-            navigate('/music-together-chat', {
-              state: {
-                song: {
-                  title: songTitle,
-                  artist: songArtist
-                },
-                characterId: id,
-                characterName: character.name,
-                characterAvatar: character.avatar
-              }
-            })
-          }, 800)
+            }
+          : msg
+      ))
+
+      // 如果接受，添加系统提示并自动跳转到一起听页面
+      if (willAccept) {
+        // 添加系统消息提示
+        const systemMsg: Message = {
+          id: Date.now() + 1,
+          type: 'system',
+          content: `${character.name} 接受了你的邀请，正在进入一起听...`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now() + 1,
+          messageType: 'system'
         }
-      }, 500)
+        setMessages(prev => [...prev, systemMsg])
+        
+        setTimeout(() => {
+          navigate('/music-together-chat', {
+            state: {
+              song: {
+                title: songTitle,
+                artist: songArtist
+              },
+              characterId: id,
+              characterName: character.name,
+              characterAvatar: character.avatar
+            }
+          })
+        }, 1200)
+      }
+    }, 500)
       
     } catch (error) {
       console.error('AI响应音乐邀请失败:', error)
@@ -2927,11 +2987,17 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
       }
       
       // 构建世界书上下文（获取详细统计）
-      const recentMessagesText = recentMessages.map(m => m.content || '').join('\n')
-      const lorebookResult = lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
-      const lorebookContext = lorebookResult.context ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📚 世界书设定\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${lorebookResult.context}\n\n` : ''
-      setLorebookEntries(lorebookResult.triggeredEntries)
-      console.log('📚 世界书上下文:', lorebookResult.context ? `已加载 ${lorebookResult.triggeredEntries.length} 个条目` : '未触发')
+      let lorebookContext = ''
+      if (character?.id) {
+        const recentMessagesText = recentMessages.map(m => m.content || '').join('\n')
+        const lorebookResult = lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
+        lorebookContext = lorebookResult.context ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📚 世界书设定\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${lorebookResult.context}\n\n` : ''
+        setLorebookEntries(lorebookResult.triggeredEntries)
+        console.log('📚 世界书上下文:', lorebookResult.context ? `已加载 ${lorebookResult.triggeredEntries.length} 个条目` : '未触发')
+      } else {
+        console.warn('⚠️ character 未定义，跳过世界书加载')
+        setLorebookEntries([])
+      }
       
       // 构建系统提示词
       let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + groupChatContext + lorebookContext + `
@@ -5504,60 +5570,9 @@ ${emojiInstructions}
       if (id) {
         markAIReplyComplete(id)
         
-        // 如果组件已卸载（用户切换到其他聊天），保存所有消息到localStorage并增加未读
-        if (!isMountedRef.current) {
-          console.log('📦 组件已卸载，保存最终消息状态到 localStorage')
-          const savedMessages = localStorage.getItem(`chat_messages_${id}`)
-          if (savedMessages) {
-            try {
-              // 重新读取最新的消息（可能在AI回复过程中已经被修改）
-              const latestMessages = JSON.parse(savedMessages) as Message[]
-              localStorage.setItem(`chat_messages_${id}`, JSON.stringify(latestMessages))
-              
-              // 增加未读消息数
-              if (aiRepliedCountRef.current > 0) {
-                incrementUnread(id, aiRepliedCountRef.current)
-                console.log('📬 切换聊天后AI回复完成，新增未读消息:', aiRepliedCountRef.current)
-                
-                // 更新聊天列表最后一条消息
-                const lastAIMessage = latestMessages.filter(m => m.type === 'received').pop()
-                if (lastAIMessage && character) {
-                  updateChatListLastMessage(id, lastAIMessage.content, lastAIMessage.timestamp)
-                  // 显示后台通知
-                  showBackgroundChatNotification(
-                    character.name,
-                    character.avatar,
-                    lastAIMessage.content,
-                    id
-                  )
-                }
-              }
-            } catch (e) {
-              console.error('保存消息失败:', e)
-            }
-          }
-        }
-        // 如果组件还在但页面不可见（用户切到其他标签页），也增加未读消息数
-        else if (!isPageVisibleRef.current && aiRepliedCountRef.current > 0) {
-          incrementUnread(id, aiRepliedCountRef.current)
-          console.log('📬 后台AI回复完成，新增未读消息:', aiRepliedCountRef.current)
-          
-          // 更新聊天列表最后一条消息
-          const lastAIMessage = messages.filter(m => m.type === 'received').pop()
-          if (lastAIMessage && character) {
-            updateChatListLastMessage(id, lastAIMessage.content, lastAIMessage.timestamp)
-            // 显示后台通知
-            showBackgroundChatNotification(
-              character.name,
-              character.avatar,
-              lastAIMessage.content,
-              id
-            )
-          }
-        }
-        
-        // 重置AI回复计数
-        aiRepliedCountRef.current = 0
+        // 注意：未读消息和通知现在由实时监听处理，不再在这里统一处理
+        // 这样和群聊保持一致，每条消息立即触发
+        console.log('✅ AI回复流程完成')
       }
       
       console.log('🏁 AI回复流程结束\n')
@@ -5911,8 +5926,31 @@ ${emojiInstructions}
                    )
                  }
                  
-                 // 普通系统消息
-                 return (
+                 // 群聊邀请卡片
+                if (message.groupInvite) {
+                  return (
+                    <div key={message.id}>
+                      {/* 时间分隔线 */}
+                      {showTimeDivider && message.timestamp && (
+                        <div className="flex justify-center mb-4">
+                          <div className="bg-gray-200/60 px-3 py-1 rounded-full">
+                            <span className="text-xs text-gray-500">{formatTimestamp(message.timestamp)}</span>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <GroupInviteCard
+                        groupId={message.groupInvite.groupId}
+                        groupName={message.groupInvite.groupName}
+                        memberNames={message.groupInvite.memberNames}
+                        inviterName={message.groupInvite.inviterName}
+                      />
+                    </div>
+                  )
+                }
+                
+                // 普通系统消息
+                return (
                    <div key={message.id}>
                      {/* 时间分隔线 */}
                      {showTimeDivider && message.timestamp && (
@@ -6286,7 +6324,9 @@ ${emojiInstructions}
                         songArtist={message.musicInvite.songArtist}
                         songCover={message.musicInvite.songCover}
                         status={message.musicInvite.status}
+                        isSent={message.type === 'sent'}
                         onAccept={() => {
+                          console.log('🎵 用户点击接受邀请:', message.musicInvite?.songTitle)
                           // 接受邀请
                           setMessages(prev => prev.map(msg => 
                             msg.id === message.id 
@@ -6303,6 +6343,11 @@ ${emojiInstructions}
                             safeSetItem(`chat_${id}`, JSON.stringify(updatedMessages))
                           }, 100)
                           // 跳转到一起听聊天，传递歌曲信息和角色信息
+                          console.log('🎵 准备跳转到一起听页面，传递信息:', {
+                            song: message.musicInvite?.songTitle,
+                            characterId: id,
+                            characterName: character?.name
+                          })
                           navigate('/music-together-chat', {
                             state: {
                               song: {

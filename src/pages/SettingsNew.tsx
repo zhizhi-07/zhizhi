@@ -3,7 +3,7 @@ import { useState, useRef } from 'react'
 import StatusBar from '../components/StatusBar'
 import { useUser } from '../context/UserContext'
 import { 
-  BackIcon, SearchIcon, BluetoothIcon,
+  BackIcon, SearchIcon,
   SignalIcon, BellIcon, VolumeIcon, MoonIcon, SettingsIcon,
   SunIcon, LockIcon, ShieldIcon, ImageIcon, KeyIcon
 } from '../components/Icons'
@@ -75,7 +75,7 @@ const SettingsNew = () => {
       id: 'group1',
       items: [
         { id: 'api', title: 'API 设置', icon: KeyIcon, iconColor: 'bg-orange-500', route: '/wechat/api-list' },
-        { id: 'bluetooth', title: '蓝牙', icon: BluetoothIcon, iconColor: 'bg-blue-500', value: '开', route: '/settings/bluetooth' },
+        { id: 'sound-upload', title: '声音上传', icon: VolumeIcon, iconColor: 'bg-gradient-to-br from-blue-400 to-purple-400', route: '/settings/sound-upload' },
         { id: 'cellular', title: '蜂窝网络', icon: SignalIcon, iconColor: 'bg-green-500', route: '/settings/cellular' },
         { id: 'hotspot', title: '个人热点', icon: SignalIcon, iconColor: 'bg-green-500', value: '关', route: '/settings/hotspot' },
       ]
@@ -110,9 +110,9 @@ const SettingsNew = () => {
   ]
 
   return (
-    <div className="h-screen w-full bg-[#f5f7fa] flex flex-col">
+    <div className="h-screen w-full bg-gradient-to-br from-white via-blue-50/30 to-purple-50/20 flex flex-col">
       {/* 状态栏 + 导航栏一体 */}
-      <div className="glass-card border-b border-white/30">
+      <div className="backdrop-blur-xl bg-white/80 border-b border-white/50 shadow-sm">
         {/* 状态栏 */}
         <StatusBar />
         
@@ -134,7 +134,7 @@ const SettingsNew = () => {
         {/* 用户信息卡片 */}
         <div className="px-4 py-4">
           <div 
-            className="glass-card rounded-2xl p-4 shadow-lg border border-white/30 active:scale-95 transition-transform cursor-pointer"
+            className="backdrop-blur-xl bg-white/70 rounded-2xl p-4 shadow-lg border border-white/50 active:scale-95 transition-transform cursor-pointer"
             onClick={() => navigate(`/profile/${currentUser?.id || 'default'}`)}
           >
             <div className="flex items-center gap-3">
@@ -172,7 +172,7 @@ const SettingsNew = () => {
         {/* 设置分组列表 */}
         {settingGroups.map((group) => (
           <div key={group.id} className="px-4 mb-4">
-            <div className="glass-card rounded-2xl shadow-lg border border-white/30 overflow-hidden">
+            <div className="backdrop-blur-xl bg-white/70 rounded-2xl shadow-lg border border-white/50 overflow-hidden">
               {group.items.map((item, index) => (
                 <div key={item.id}>
                   <div

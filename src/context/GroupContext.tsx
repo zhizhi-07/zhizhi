@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { setItem as safeSetItem } from '../utils/storage'
+import { setIndexedDBItem, getIndexedDBItem, STORES } from '../utils/indexedDBStorage'
 
 export interface GroupMember {
   id: string                    // 成员ID（characterId或userId）
@@ -53,14 +53,60 @@ interface GroupContextType {
 const GroupContext = createContext<GroupContextType | undefined>(undefined)
 
 export const GroupProvider = ({ children }: { children: ReactNode }) => {
-  const [groups, setGroups] = useState<Group[]>(() => {
-    const saved = localStorage.getItem('groups')
-    return saved ? JSON.parse(saved) : []
-  })
+  const [groups, setGroups] = useState<Group[]>([])
+  const [groupsLoaded, setGroupsLoaded] = useState(false)
 
+  // 初始化：从 IndexedDB 加载群聊数据
   useEffect(() => {
-    safeSetItem('groups', groups)
-  }, [groups])
+    const loadGroups = async () => {
+      try {
+        const data = await getIndexedDBItem<any>(STORES.SETTINGS, 'groups')
+        if (data && data.groups) {
+          console.log(`💾 [IndexedDB] 加载了 ${data.groups.length} 个群聊`)
+          setGroups(data.groups)
+        } else {
+          // 如果 IndexedDB 没有，尝试从 localStorage 迁移
+          const saved = localStorage.getItem('groups')
+          if (saved) {
+            const localGroups = JSON.parse(saved)
+            console.log(`💾 [localStorage] 加载了 ${localGroups.length} 个群聊，将迁移到 IndexedDB`)
+            setGroups(localGroups)
+            // 迁移到 IndexedDB
+            await setIndexedDBItem(STORES.SETTINGS, {
+              key: 'groups',
+              groups: localGroups
+            })
+            // 迁移后清理 localStorage
+            localStorage.removeItem('groups')
+            console.log('✅ groups 已迁移到 IndexedDB')
+          }
+        }
+      } catch (error) {
+        console.error('加载群聊数据失败:', error)
+      } finally {
+        setGroupsLoaded(true)
+      }
+    }
+    loadGroups()
+  }, [])
+
+  // 保存群聊数据到 IndexedDB
+  useEffect(() => {
+    if (!groupsLoaded) return
+    
+    const saveGroups = async () => {
+      try {
+        await setIndexedDBItem(STORES.SETTINGS, {
+          key: 'groups',
+          groups: groups
+        })
+        console.log(`💾 [IndexedDB] 已保存 ${groups.length} 个群聊`)
+      } catch (error) {
+        console.error('保存群聊数据失败:', error)
+      }
+    }
+    saveGroups()
+  }, [groups, groupsLoaded])
 
   const addGroup = (groupData: Omit<Group, 'id' | 'createdAt'>) => {
     const newGroup: Group = {

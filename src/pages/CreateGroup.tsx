@@ -104,7 +104,13 @@ const CreateGroup = () => {
           role: 'system',
           content: `[系统通知] 你被用户拉进了群聊"${groupName}"。群成员有：${memberNames}`,
           timestamp: Date.now(),
-          isHidden: false  // 可见，让AI明确知道进群了
+          isHidden: false,  // 可见，让AI明确知道进群了
+          groupInvite: {  // 群聊邀请卡片数据
+            groupId: groupId,
+            groupName: groupName,
+            memberNames: members.filter(m => m.id !== characterId).map(m => m.name),
+            inviterName: '用户'
+          }
         }
         
         messages.push(systemMessage)

@@ -11,7 +11,9 @@ import IOSNotification from './IOSNotification'
 interface BackgroundChatNotification {
   title: string
   message: string
-  characterId: string
+  chatId: string  // 单聊用characterId，群聊用groupId
+  type: 'single' | 'group'  // 聊天类型
+  avatar?: string  // 头像图片
 }
 
 const BackgroundChatNotificationManager = () => {
@@ -22,8 +24,11 @@ const BackgroundChatNotificationManager = () => {
   useEffect(() => {
     // 监听后台聊天消息事件
     const handleBackgroundChat = (event: CustomEvent) => {
-      const { title, message, characterId } = event.detail
-      setNotification({ title, message, characterId })
+      const { title, message, chatId, characterId, type = 'single', avatar } = event.detail
+      // 兼容旧版本，如果没有chatId但有characterId，则使用characterId
+      const finalChatId = chatId || characterId
+      const finalType = type || 'single'
+      setNotification({ title, message, chatId: finalChatId, type: finalType, avatar })
       setShowNotification(true)
     }
 
@@ -44,8 +49,12 @@ const BackgroundChatNotificationManager = () => {
   const handleClick = () => {
     if (!notification) return
     
-    // 跳转到对应的聊天页面
-    navigate(`/chat/${notification.characterId}`)
+    // 根据类型跳转到对应的聊天页面
+    if (notification.type === 'group') {
+      navigate(`/group/${notification.chatId}`)
+    } else {
+      navigate(`/chat/${notification.chatId}`)
+    }
   }
 
   // 如果没有通知，不渲染任何内容
@@ -53,15 +62,20 @@ const BackgroundChatNotificationManager = () => {
     return null
   }
 
+  // 统一显示格式：标题是"微信"，副标题是角色名或群名
+  const displayTitle = '微信'
+  const subtitle = notification.title
+  
   return (
     <IOSNotification
       show={showNotification}
-      title={notification.title}
+      title={displayTitle}
+      subtitle={subtitle}
       message={notification.message}
-      icon="💬"
+      icon={notification.avatar || "💬"}
       onClose={handleClose}
       onClick={handleClick}
-      duration={5000}
+      duration={6000}
     />
   )
 }
