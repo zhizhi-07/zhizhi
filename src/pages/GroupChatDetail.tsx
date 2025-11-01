@@ -15,7 +15,6 @@ import { useGroupRedEnvelope } from '../context/GroupRedEnvelopeContext'
 import { parseAIEmojiResponse } from '../utils/emojiParser'
 import { getEmojis, Emoji } from '../utils/emojiStorage'
 import EmojiPanel from '../components/EmojiPanel'
-import { generateGroupAIChat } from '../utils/groupAIChat'
 import { 
   generateGroupChatScript, 
   executeGroupChatScript, 
@@ -38,6 +37,13 @@ interface GroupMessage {
   messageType?: 'text' | 'system' | 'redenvelope' | 'emoji'
   redEnvelopeId?: string
   emojiIndex?: number
+  isRecalled?: boolean  // 是否已撤回
+  recalledContent?: string  // 撤回前的原始内容
+  quotedMessage?: {  // 引用的消息
+    id: number
+    content: string
+    senderName: string
+  }
 }
 
 const GroupChatDetail = () => {
@@ -68,8 +74,10 @@ const GroupChatDetail = () => {
   const [mentionSearch, setMentionSearch] = useState('')
   const [cursorPosition, setCursorPosition] = useState(0)
   const [showEmojiPanel, setShowEmojiPanel] = useState(false)
+  const [quotedMessage, setQuotedMessage] = useState<GroupMessage | null>(null)  // 引用的消息
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const lastTriggeredMessageIdRef = useRef<number | null>(null)  // 记录上次触发AI回复的消息ID，避免重复触发
   const { createRedEnvelope, getRedEnvelope, receiveRedEnvelope, hasReceived } = useGroupRedEnvelope()
 
   // 保存消息到localStorage
@@ -88,21 +96,66 @@ const GroupChatDetail = () => {
     scrollToBottom()
   }, [messages])
 
-  // 🤖 AI自由对话系统 - 使用剧本导演
+  // 🤖 AI自由对话系统 - 事件驱动（当有新消息时才可能触发）
   useEffect(() => {
     if (!id || !group || isAiTyping) return
+    
+    // ⚠️ 已解散的群聊不触发AI自由对话
+    if (group.disbanded) return
 
     // 检查是否开启AI自由对话
     const aiChatEnabled = localStorage.getItem(`group_ai_chat_enabled_${id}`) === 'true'
     if (!aiChatEnabled) return
 
-    // 获取对话间隔（秒）
-    const intervalSeconds = parseInt(localStorage.getItem(`group_ai_chat_interval_${id}`) || '30')
-    const intervalMs = intervalSeconds * 1000
+    // 只有当消息数量变化时才触发（说明有新消息）
+    if (messages.length === 0) return
+    
+    // 获取最后一条消息
+    const lastMessage = messages[messages.length - 1]
+    
+    // 如果最后一条消息是系统消息，不触发
+    if (lastMessage.messageType === 'system') return
+    
+    // 如果最后一条消息是AI消息，不触发
+    if (lastMessage.senderType === 'character') return
+    
+    // 只有用户的文本消息、红包、表情包才可能触发AI回应
+    if (lastMessage.senderType !== 'user') return
+    
+    // 如果这条消息已经触发过了，不再触发（避免重复）
+    if (lastTriggeredMessageIdRef.current === lastMessage.id) {
+      return
+    }
+    
+    // 根据消息类型智能调整触发概率
+    let triggerProbability = 0.25  // 默认25%
+    
+    // 红包消息，概率更高（50%）
+    if (lastMessage.messageType === 'redenvelope') {
+      triggerProbability = 0.5
+    }
+    // 检查是否@了某个AI
+    else if (group && lastMessage.content) {
+      const aiMembers = group.members.filter(m => m.type === 'character')
+      const mentionedAI = aiMembers.some(ai => lastMessage.content.includes(`@${ai.name}`))
+      if (mentionedAI) {
+        triggerProbability = 0.7  // @了AI，70%概率回复
+      }
+    }
+    
+    const shouldTrigger = Math.random() < triggerProbability
+    if (!shouldTrigger) {
+      console.log(`🤖 AI看到了消息，但决定不回复（${Math.round(triggerProbability * 100)}%概率，保持自然）`)
+      lastTriggeredMessageIdRef.current = lastMessage.id  // 记录这条消息，避免下次再判断
+      return
+    }
+    
+    console.log(`🤖 AI看到了新消息，准备回应...（${Math.round(triggerProbability * 100)}%概率触发）`)
+    lastTriggeredMessageIdRef.current = lastMessage.id  // 记录这条消息ID
 
-    console.log(`🤖 AI自由对话已启用，间隔: ${intervalSeconds}秒`)
-
-    const timer = setInterval(async () => {
+    // 延迟2-5秒后触发（模拟AI看到消息后思考的时间）
+    const delay = 2000 + Math.random() * 3000
+    const timer = setTimeout(async () => {
       // 再次检查是否还开启（用户可能关闭了）
       const stillEnabled = localStorage.getItem(`group_ai_chat_enabled_${id}`) === 'true'
       if (!stillEnabled || isAiTyping) return
@@ -168,6 +221,10 @@ const GroupChatDetail = () => {
           // 消息回调
           (messageData) => {
             const now = Date.now()
+            
+            // 判断是否是私聊提示消息（显示为灰色居中的系统消息）
+            const isPrivateMessageNotice = messageData.content.includes('私聊了你')
+            
             const newMessage: GroupMessage = {
               id: now + Math.random() * 1000,
               groupId: id,
@@ -181,7 +238,7 @@ const GroupChatDetail = () => {
                 minute: '2-digit',
               }),
               timestamp: now,
-              messageType: 'text'
+              messageType: isPrivateMessageNotice ? 'system' : 'text'
             }
             
             setMessages(prev => [...prev, newMessage])
@@ -223,17 +280,29 @@ const GroupChatDetail = () => {
           },
           // 撤回消息回调
           (actorId, actorName) => {
+            console.log(`🔙 处理撤回: ${actorName} (${actorId})`)
+            
             setMessages(prev => {
               const lastMessageIndex = [...prev]
                 .reverse()
-                .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system')
+                .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system' && !msg.isRecalled)
               
               if (lastMessageIndex !== -1) {
                 const actualIndex = prev.length - 1 - lastMessageIndex
-                const newMessages = [...prev]
-                newMessages.splice(actualIndex, 1)
-                return newMessages
+                
+                // 修改消息为已撤回状态，而不是删除
+                return prev.map((msg, index) => 
+                  index === actualIndex ? {
+                    ...msg,
+                    isRecalled: true,
+                    recalledContent: msg.content,
+                    content: `${actorName} 撤回了一条消息`,
+                    messageType: 'system' as const
+                  } : msg
+                )
               }
+              
+              console.log(`⚠️ 没有找到 ${actorName} 的消息可撤回`)
               return prev
             })
           }
@@ -245,13 +314,15 @@ const GroupChatDetail = () => {
       } finally {
         setIsAiTyping(false)
       }
-    }, intervalMs)
+    }, delay)
 
     return () => {
-      clearInterval(timer)
-      console.log('🤖 AI自由对话定时器已清理')
+      clearTimeout(timer)
+      console.log('🤖 AI自由对话延迟触发已清理')
     }
-  }, [id, group, messages, isAiTyping, getCharacter, updateGroup, currentUser])
+    
+    // 依赖 messages.length，只有当消息数量变化时才重新执行
+  }, [messages.length, id, group, isAiTyping, getCharacter, updateGroup, currentUser])
 
   // 更新群聊最后消息
   const updateGroupLastMessage = (content: string) => {
@@ -284,35 +355,35 @@ const GroupChatDetail = () => {
         const chatMessages = localStorage.getItem(chatKey)
         const messages = chatMessages ? JSON.parse(chatMessages) : []
         
-        // 构建隐藏的系统消息
+        // 获取群成员总数（用于上下文）
+        const totalMembers = group.members.length
+        
+        // 构建隐藏的系统消息，包含群ID和成员数
         let systemContent = ''
         if (messageType === 'user') {
-          systemContent = `💬 群聊[${group.name}]: 用户说: ${content}`
+          systemContent = `💬 群聊[${group.name}|${totalMembers}人]: 用户说: ${content}`
         } else if (messageType === 'ai' && senderId === member.id) {
-          systemContent = `💬 群聊[${group.name}]: 我说: ${content}`
+          systemContent = `💬 群聊[${group.name}|${totalMembers}人]: 我说: ${content}`
         } else {
-          systemContent = `💬 群聊[${group.name}]: ${senderName}说: ${content}`
+          systemContent = `💬 群聊[${group.name}|${totalMembers}人]: ${senderName}说: ${content}`
         }
         
         const hiddenMessage = {
           id: Date.now() + Math.random(),
-          type: 'system',
+          role: 'system',  // 改为role，与单聊格式统一
           content: systemContent,
-          time: new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
           timestamp: Date.now(),
-          messageType: 'system',
-          isHidden: true  // 标记为隐藏，仅用于AI记忆
+          isHidden: true,  // 标记为隐藏，仅用于AI记忆
+          groupId: group.id,  // 添加群ID
+          groupName: group.name  // 添加群名
         }
         
         messages.push(hiddenMessage)
         localStorage.setItem(chatKey, JSON.stringify(messages))
         
-        console.log(`💾 已同步到 ${member.name} 的记忆:`, systemContent.substring(0, 50))
+        console.log(`💾 [${group.name}] 已同步到 ${member.name}:`, systemContent.substring(0, 50))
       } catch (error) {
-        console.error(`同步到 ${member.name} 失败:`, error)
+        console.error(`[${group.name}] 同步到 ${member.name} 失败:`, error)
       }
     })
   }
@@ -393,28 +464,31 @@ const GroupChatDetail = () => {
 
   // 判断是否应该显示时间戳（消息间隔超过5分钟才显示）
   const shouldShowTimestamp = (currentIndex: number) => {
-    if (currentIndex === 0) return true // 第一条消息总是显示
+    // 测试：暂时总是显示时间戳
+    return true
     
-    const currentMessage = messages[currentIndex]
-    const previousMessage = messages[currentIndex - 1]
+    // if (currentIndex === 0) return true // 第一条消息总是显示
     
-    // 如果上一条是系统消息，跳过检查
-    if (previousMessage.messageType === 'system') {
-      // 继续往前找非系统消息
-      for (let i = currentIndex - 1; i >= 0; i--) {
-        if (messages[i].messageType !== 'system') {
-          const timeDiff = currentMessage.timestamp - messages[i].timestamp
-          return timeDiff >= 300000 // 5分钟 = 300000毫秒
-        }
-      }
-      return true
-    }
+    // const currentMessage = messages[currentIndex]
+    // const previousMessage = messages[currentIndex - 1]
     
-    // 计算时间差（毫秒）
-    const timeDiff = currentMessage.timestamp - previousMessage.timestamp
+    // // 如果上一条是系统消息，跳过检查
+    // if (previousMessage.messageType === 'system') {
+    //   // 继续往前找非系统消息
+    //   for (let i = currentIndex - 1; i >= 0; i--) {
+    //     if (messages[i].messageType !== 'system') {
+    //       const timeDiff = currentMessage.timestamp - messages[i].timestamp
+    //       return timeDiff >= 300000 // 5分钟 = 300000毫秒
+    //     }
+    //   }
+    //   return true
+    // }
     
-    // 如果间隔大于等于5分钟，显示时间戳
-    return timeDiff >= 300000 // 5分钟 = 300000毫秒
+    // // 计算时间差（毫秒）
+    // const timeDiff = currentMessage.timestamp - previousMessage.timestamp
+    
+    // // 如果间隔大于等于5分钟，显示时间戳
+    // return timeDiff >= 300000 // 5分钟 = 300000毫秒
   }
 
   // 渲染带@高亮的消息内容
@@ -522,7 +596,13 @@ const GroupChatDetail = () => {
         minute: '2-digit',
       }),
       timestamp: Date.now(),
-      messageType: 'text'
+      messageType: 'text',
+      // 如果有引用消息，添加到消息中
+      quotedMessage: quotedMessage ? {
+        id: quotedMessage.id,
+        content: quotedMessage.recalledContent || quotedMessage.content,
+        senderName: quotedMessage.senderName
+      } : undefined
     }
 
     console.log('💬 用户消息:', userMessage.content)
@@ -533,6 +613,7 @@ const GroupChatDetail = () => {
     syncGroupChatToAIMemory('user', currentUser?.name || '我', userMessage.content, 'user')
     
     setInputValue('')
+    setQuotedMessage(null)  // 清空引用消息
     
     // ✅ 不再自动触发AI回复！
     // 用户需要点击纸飞机按钮才能让AI回复
@@ -782,6 +863,10 @@ const GroupChatDetail = () => {
         // 消息回调
         (messageData) => {
           const now = Date.now()
+          
+          // 判断是否是私聊提示消息（显示为灰色居中的系统消息）
+          const isPrivateMessageNotice = messageData.content.includes('私聊了你')
+          
           const newMessage: GroupMessage = {
             id: now + Math.random() * 1000,
             groupId: id,
@@ -795,7 +880,7 @@ const GroupChatDetail = () => {
               minute: '2-digit',
             }),
             timestamp: now,
-            messageType: 'text'
+            messageType: isPrivateMessageNotice ? 'system' : 'text'
           }
           
           setMessages(prev => [...prev, newMessage])
@@ -847,16 +932,26 @@ const GroupChatDetail = () => {
         (actorId, actorName) => {
           console.log(`🔙 处理撤回: ${actorName} (${actorId})`)
           
-          // 找到该角色的最后一条消息并删除
+          // 修改该角色的最后一条消息为已撤回状态
           setMessages(prev => {
             const lastMessageIndex = [...prev]
               .reverse()
-              .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system')
+              .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system' && !msg.isRecalled)
             
             if (lastMessageIndex !== -1) {
               const actualIndex = prev.length - 1 - lastMessageIndex
-              const newMessages = [...prev]
-              newMessages.splice(actualIndex, 1)
+              
+              // 修改消息为已撤回状态，而不是删除
+              const newMessages = prev.map((msg, index) => 
+                index === actualIndex ? {
+                  ...msg,
+                  isRecalled: true,
+                  recalledContent: msg.content,
+                  content: `${actorName} 撤回了一条消息`,
+                  messageType: 'system' as const
+                } : msg
+              )
+              
               console.log(`✅ 已撤回 ${actorName} 的消息`)
               return newMessages
             }
@@ -1381,8 +1476,21 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
 
         {/* 消息列表 */}
         <div className="flex-1 overflow-y-auto hide-scrollbar px-4 py-4">
+          {/* 群解散提示 */}
+          {group.disbanded && (
+            <div className="mb-4 glass-card rounded-2xl p-4 border-l-4 border-red-500">
+              <div className="flex items-start gap-2">
+                <span className="text-red-600 text-lg">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-1">群聊已解散</h4>
+                  <p className="text-sm text-gray-700">你已解散该群聊，无法再发送消息，但可以查看历史聊天记录。</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 群公告 */}
-          {group.description && (
+          {group.description && !group.disbanded && (
             <div className="mb-4 glass-card rounded-2xl p-4 border-l-4 border-yellow-500">
               <div className="flex items-start gap-2">
                 <span className="text-yellow-600 text-lg">📢</span>
@@ -1394,7 +1502,7 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             </div>
           )}
 
-          {messages.length === 0 && !group.description && (
+          {messages.length === 0 && !group.description && !group.disbanded && (
             <div className="text-center py-10">
               <p className="text-gray-400 text-sm">开始群聊吧</p>
             </div>
@@ -1549,12 +1657,31 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
 
                   {/* 消息气泡 */}
                   <div
-                    className={`px-3 py-2 rounded-xl shadow-sm text-sm ${
+                    onClick={() => {
+                      // 点击消息可以引用（非系统消息）
+                      if (!isSystem && !message.isRecalled) {
+                        setQuotedMessage(message)
+                        inputRef.current?.focus()
+                      }
+                    }}
+                    className={`px-3 py-2 rounded-xl shadow-sm text-sm cursor-pointer ${
                       isUser
                         ? 'bg-wechat-primary text-white rounded-tr-sm'
                         : 'glass-card text-gray-900 rounded-tl-sm'
                     }`}
                   >
+                    {/* 引用消息显示 */}
+                    {message.quotedMessage && (
+                      <div className={`mb-2 pb-2 border-b ${isUser ? 'border-white/30' : 'border-gray-200'}`}>
+                        <div className={`text-[11px] ${isUser ? 'text-white/70' : 'text-gray-500'}`}>
+                          {message.quotedMessage.senderName}:
+                        </div>
+                        <div className={`text-xs ${isUser ? 'text-white/90' : 'text-gray-600'} truncate`}>
+                          {message.quotedMessage.content}
+                        </div>
+                      </div>
+                    )}
+                    
                     <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">
                       {renderMessageContent(message.content)}
                     </p>
@@ -1584,8 +1711,30 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
         </div>
 
         {/* 输入框 */}
-        <div className={`border-t border-white/20 p-4 ${background ? 'glass-dark' : 'glass-effect'}`}>
-          <div className="flex items-center gap-3">
+        <div className={`border-t border-white/20 ${background ? 'glass-dark' : 'glass-effect'}`}>
+          {/* 引用消息显示区域 */}
+          {quotedMessage && (
+            <div className="px-4 pt-3 pb-1">
+              <div className="bg-gray-100 rounded-xl p-2 flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-gray-700 mb-0.5">
+                    {quotedMessage.senderName}
+                  </div>
+                  <div className="text-xs text-gray-600 truncate">
+                    {quotedMessage.content}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setQuotedMessage(null)}
+                  className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-400 hover:text-gray-600 ios-button"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center gap-3 p-4">
             <button 
               onClick={() => setShowAddMenu(!showAddMenu)}
               className="ios-button text-gray-700"
@@ -1599,10 +1748,10 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
                 type="text"
                 value={inputValue}
                 onChange={handleInputChange}
-                onKeyPress={(e) => e.key === 'Enter' && !isAiTyping && (inputValue.trim() ? handleSend() : handleAIReply())}
-                placeholder="发送消息..."
+                onKeyPress={(e) => e.key === 'Enter' && !isAiTyping && !group?.disbanded && (inputValue.trim() ? handleSend() : handleAIReply())}
+                placeholder={group?.disbanded ? "群聊已解散" : "发送消息..."}
                 className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-wechat-primary bg-white"
-                disabled={isAiTyping}
+                disabled={isAiTyping || group?.disbanded}
               />
 
               {/* @成员列表 */}
@@ -1655,17 +1804,21 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
             {inputValue.trim() ? (
               <button
                 onClick={handleSend}
-                disabled={isAiTyping}
-                className="p-2 rounded-full bg-wechat-primary text-white transition-colors"
+                disabled={isAiTyping || group?.disbanded}
+                className={`p-2 rounded-full transition-colors ${
+                  group?.disbanded ? 'bg-gray-300 text-gray-500' : 'bg-wechat-primary text-white'
+                }`}
               >
                 <SendIcon size={20} />
               </button>
             ) : (
               <button
                 onClick={handleAIReply}
-                disabled={isAiTyping}
-                className="p-2 rounded-full transition-colors text-gray-700 hover:text-gray-900"
-                title="让AI主动说话"
+                disabled={isAiTyping || group?.disbanded}
+                className={`p-2 rounded-full transition-colors ${
+                  group?.disbanded ? 'text-gray-400' : 'text-gray-700 hover:text-gray-900'
+                }`}
+                title={group?.disbanded ? "群聊已解散" : "让AI主动说话"}
               >
                 <SendIcon size={20} />
               </button>

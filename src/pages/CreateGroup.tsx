@@ -83,6 +83,39 @@ const CreateGroup = () => {
       }
     })
 
+    // 📢 通知所有AI角色：你被拉进了新群
+    selectedMembers.forEach(characterId => {
+      try {
+        const character = characters.find(c => c.id === characterId)
+        if (!character) return
+        
+        const chatKey = `chat_messages_${characterId}`
+        const chatMessages = localStorage.getItem(chatKey)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        // 获取群成员名单
+        const memberNames = members
+          .filter(m => m.id !== characterId)
+          .map(m => m.name)
+          .join('、')
+        
+        const systemMessage = {
+          id: Date.now() + Math.random(),
+          role: 'system',
+          content: `[系统通知] 你被用户拉进了群聊"${groupName}"。群成员有：${memberNames}`,
+          timestamp: Date.now(),
+          isHidden: false  // 可见，让AI明确知道进群了
+        }
+        
+        messages.push(systemMessage)
+        localStorage.setItem(chatKey, JSON.stringify(messages))
+        
+        console.log(`📢 已通知 ${character.name} 进入群聊"${groupName}"`)
+      } catch (error) {
+        console.error(`通知 ${characterId} 失败:`, error)
+      }
+    })
+
     // 跳转到群聊详情（使用replace避免返回到创建页面）
     navigate(`/group/${groupId}`, { replace: true })
   }

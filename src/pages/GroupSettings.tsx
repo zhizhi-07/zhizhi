@@ -69,22 +69,55 @@ const GroupSettings = () => {
     alert('群公告已更新')
   }
 
-  // 移除成员
-  const handleRemoveMember = (memberId: string, memberName: string) => {
-    if (confirm(`确定要移除 ${memberName} 吗？`)) {
-      removeMember(group.id, memberId)
-      alert(`已移除 ${memberName}`)
-    }
-  }
-
-
   // 解散群聊
   const handleDeleteGroup = () => {
     setShowDeleteConfirm(false)
-    // 删除群聊消息
-    localStorage.removeItem(`group_messages_${group.id}`)
-    // 删除群聊
+    
+    if (!group) return
+    
+    // 发送群聊系统消息
+    const messages = localStorage.getItem(`group_messages_${group.id}`)
+    const messageList = messages ? JSON.parse(messages) : []
+    
+    const now = Date.now()
+    const systemMessage = {
+      id: now + Math.random(),
+      groupId: group.id,
+      senderId: 'system',
+      senderType: 'user',
+      senderName: '系统',
+      senderAvatar: '',
+      content: '群聊已被群主解散',
+      time: new Date(now).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      timestamp: now,
+      messageType: 'system'
+    }
+    messageList.push(systemMessage)
+    localStorage.setItem(`group_messages_${group.id}`, JSON.stringify(messageList))
+    
+    // 通知所有AI成员
+    group.members.forEach(member => {
+      if (member.type === 'character') {
+        const chatMessages = localStorage.getItem(`messages_${member.id}`)
+        const chatList = chatMessages ? JSON.parse(chatMessages) : []
+        
+        const disbandMessage = {
+          id: Date.now() + Math.random(),
+          role: 'system',
+          content: `[系统通知] 群聊"${group.name}"已被群主解散`,
+          timestamp: Date.now()
+        }
+        chatList.push(disbandMessage)
+        localStorage.setItem(`messages_${member.id}`, JSON.stringify(chatList))
+      }
+    })
+    
+    // 标记为已解散（不删除消息，保留聊天记录）
     deleteGroup(group.id)
+    
     // 返回首页
     navigate('/', { replace: true })
   }
@@ -113,6 +146,20 @@ const GroupSettings = () => {
 
         {/* 设置内容 */}
         <div className="flex-1 overflow-y-auto hide-scrollbar p-3">
+        
+        {/* 解散提示 */}
+        {group.disbanded && (
+          <div className="glass-card rounded-xl p-3 mb-3 border-l-4 border-red-500">
+            <div className="flex items-start gap-2">
+              <span className="text-red-600 text-lg">⚠️</span>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-gray-900 mb-1">群聊已解散</h4>
+                <p className="text-sm text-gray-700">此群聊已解散，无法修改设置。</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* 基本信息 */}
         <div className="glass-card rounded-xl p-3 mb-3">
           <div className="flex items-center gap-2 mb-2">
@@ -126,11 +173,13 @@ const GroupSettings = () => {
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="请输入群名称"
               maxLength={20}
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-wechat-primary bg-white"
+              disabled={group.disbanded}
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-wechat-primary bg-white disabled:bg-gray-100 disabled:text-gray-500"
             />
             <button
               onClick={handleSaveName}
-              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button whitespace-nowrap"
+              disabled={group.disbanded}
+              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button whitespace-nowrap disabled:bg-gray-300 disabled:text-gray-500"
             >
               保存
             </button>
@@ -149,13 +198,15 @@ const GroupSettings = () => {
             placeholder="请输入群公告"
             maxLength={200}
             rows={3}
+            disabled={group.disbanded}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-wechat-primary bg-white resize-none mb-2"
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">{announcement.length}/200</span>
             <button
               onClick={handleSaveAnnouncement}
-              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button"
+              disabled={group.disbanded}
+              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button disabled:bg-gray-300 disabled:text-gray-500"
             >
               保存
             </button>
@@ -291,7 +342,7 @@ const GroupSettings = () => {
                   </div>
 
                   {/* 操作按钮 */}
-                  {!isUser && canManage(group.id, 'user', member.id) && (
+                  {!isUser && canManage(group.id, 'user', member.id) && !group.disbanded && (
                     <button
                       onClick={() => {
                         setManagingMember({ id: member.id, name: member.name })
@@ -309,14 +360,16 @@ const GroupSettings = () => {
         </div>
 
         {/* 危险操作 */}
-        <div className="glass-card rounded-xl p-2.5 mb-3">
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="w-full py-2 text-sm text-red-600 font-medium rounded-lg hover:bg-red-50 ios-button"
-          >
-            🗑️ 解散群聊
-          </button>
-        </div>
+        {!group.disbanded && (
+          <div className="glass-card rounded-xl p-2.5 mb-3">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full py-2 text-sm text-red-600 font-medium rounded-lg hover:bg-red-50 ios-button"
+            >
+              🗑️ 解散群聊
+            </button>
+          </div>
+        )}
         </div>
         </div>
       </div>
@@ -332,7 +385,7 @@ const GroupSettings = () => {
             <div className="glass-card rounded-2xl p-6 max-w-sm w-full">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">解散群聊</h3>
               <p className="text-gray-600 mb-6">
-                解散后，所有群成员将被移除，群聊记录将被清空，此操作不可恢复。
+                解散后，群聊将被标记为已解散状态，无法发送新消息，但可以查看历史记录。所有AI成员将收到解散通知。
               </p>
               <div className="flex gap-3">
                 <button
@@ -409,19 +462,20 @@ const GroupSettings = () => {
                               ? `群主设置 ${managingMember.name} 为管理员 🛡️`
                               : `群主取消了 ${managingMember.name} 的管理员身份`
                             
+                            const now = Date.now()
                             const systemMessage = {
-                              id: Date.now(),
+                              id: now + Math.random(),
                               groupId: id,
                               senderId: 'system',
                               senderType: 'user',
                               senderName: '系统',
                               senderAvatar: '',
                               content: notificationContent,
-                              time: new Date().toLocaleTimeString('zh-CN', {
+                              time: new Date(now).toLocaleTimeString('zh-CN', {
                                 hour: '2-digit',
                                 minute: '2-digit',
                               }),
-                              timestamp: Date.now(),
+                              timestamp: now,
                               messageType: 'system'
                             }
                             messageList.push(systemMessage)
@@ -474,19 +528,20 @@ const GroupSettings = () => {
                       }
                       
                       if (notificationContent) {
+                        const now = Date.now()
                         const systemMessage = {
-                          id: Date.now(),
+                          id: now + Math.random(),
                           groupId: id,
                           senderId: 'system',
                           senderType: 'user',
                           senderName: '系统',
                           senderAvatar: '',
                           content: notificationContent,
-                          time: new Date().toLocaleTimeString('zh-CN', {
+                          time: new Date(now).toLocaleTimeString('zh-CN', {
                             hour: '2-digit',
                             minute: '2-digit',
                           }),
-                          timestamp: Date.now(),
+                          timestamp: now,
                           messageType: 'system'
                         }
                         messageList.push(systemMessage)
@@ -503,8 +558,50 @@ const GroupSettings = () => {
                 </button>
                 <button
                   onClick={() => {
-                    if (id && managingMember && confirm(`确定要移除 ${managingMember.name} 吗？`)) {
+                    if (id && managingMember && group && confirm(`确定要移除 ${managingMember.name} 吗？`)) {
+                      const member = group.members.find(m => m.id === managingMember.id)
+                      
+                      // 移除成员
                       removeMember(id, managingMember.id)
+                      
+                      // 发送群聊系统消息
+                      const messages = localStorage.getItem(`group_messages_${id}`)
+                      const messageList = messages ? JSON.parse(messages) : []
+                      
+                      const now = Date.now()
+                      const systemMessage = {
+                        id: now + Math.random(),
+                        groupId: id,
+                        senderId: 'system',
+                        senderType: 'user',
+                        senderName: '系统',
+                        senderAvatar: '',
+                        content: `${managingMember.name} 被移出了群聊`,
+                        time: new Date(now).toLocaleTimeString('zh-CN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }),
+                        timestamp: now,
+                        messageType: 'system'
+                      }
+                      messageList.push(systemMessage)
+                      localStorage.setItem(`group_messages_${id}`, JSON.stringify(messageList))
+                      
+                      // 如果是AI角色，同步到单聊记录
+                      if (member?.type === 'character') {
+                        const chatMessages = localStorage.getItem(`messages_${managingMember.id}`)
+                        const chatList = chatMessages ? JSON.parse(chatMessages) : []
+                        
+                        const kickMessage = {
+                          id: Date.now() + 1,
+                          role: 'system',
+                          content: `[系统通知] 你被移出了群聊"${group.name}"`,
+                          timestamp: Date.now()
+                        }
+                        chatList.push(kickMessage)
+                        localStorage.setItem(`messages_${managingMember.id}`, JSON.stringify(chatList))
+                      }
+                      
                       setManagingMember(null)
                     }
                   }}

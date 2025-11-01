@@ -1161,6 +1161,40 @@ ${character.description || ''}
     }
   }, [location.state?.sendCoupleSpaceInvite, id, character, currentUser])
 
+  // 判断是否应该显示时间戳（消息间隔超过5分钟才显示）
+  const shouldShowTimestamp = (currentIndex: number) => {
+    // 测试：暂时总是显示时间戳
+    return true
+    
+    // if (currentIndex === 0) return true // 第一条消息总是显示
+    
+    // const currentMessage = messages[currentIndex]
+    // if (!currentMessage.timestamp) return false // 如果没有时间戳，不显示
+    
+    // const previousMessage = messages[currentIndex - 1]
+    
+    // // 如果上一条是系统消息，跳过检查
+    // if (previousMessage.messageType === 'system') {
+    //   // 继续往前找非系统消息
+    //   for (let i = currentIndex - 1; i >= 0; i--) {
+    //     if (messages[i].messageType !== 'system' && messages[i].timestamp) {
+    //       const timeDiff = currentMessage.timestamp - messages[i].timestamp
+    //       return timeDiff >= 300000 // 5分钟 = 300000毫秒
+    //     }
+    //   }
+    //   return true
+    // }
+    
+    // // 如果前一条消息没有时间戳，显示当前消息的时间戳
+    // if (!previousMessage.timestamp) return true
+    
+    // // 计算时间差（毫秒）
+    // const timeDiff = currentMessage.timestamp - previousMessage.timestamp
+    
+    // // 如果间隔大于等于5分钟，显示时间戳
+    // return timeDiff >= 300000 // 5分钟 = 300000毫秒
+  }
+
   const handleSend = async () => {
     if (inputValue.trim() && !isAiTyping) {
       const now = Date.now()
@@ -2875,6 +2909,23 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         userCoupleSpaceContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ 重要提示：用户情侣空间状态\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n用户已经和其他人建立了情侣空间（公开状态）。\n\n这意味着：\n- 你不能向用户发送情侣空间邀请\n- 如果用户向你发送情侣空间邀请，你可以接受或拒绝\n- 你知道用户已经有情侣空间了，可以在对话中自然提及\n\n`
       }
       
+      // 📢 添加群聊上下文提示
+      let groupChatContext = ''
+      const groupMessages = recentMessages.filter(m => m.isHidden && m.content?.includes('群聊'))
+      if (groupMessages.length > 0) {
+        // 统计不同的群
+        const groupNames = new Set<string>()
+        groupMessages.forEach(msg => {
+          const match = msg.content?.match(/群聊\[([^\]|]+)/)
+          if (match) groupNames.add(match[1])
+        })
+        
+        if (groupNames.size > 0) {
+          groupChatContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 群聊上下文提示\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n你现在在 ${groupNames.size} 个群聊中：${Array.from(groupNames).map(n => `"${n}"`).join('、')}\n\n聊天记录中标注了"💬 群聊[群名]"的消息来自群聊，不是私聊。\n- 不同群的消息是分开的，注意区分\n- 你可以在私聊中提到群聊里发生的事\n- 群聊和私聊是两个不同的场景\n\n`
+          console.log(`💬 AI知道自己在 ${groupNames.size} 个群:`, Array.from(groupNames).join('、'))
+        }
+      }
+      
       // 构建世界书上下文（获取详细统计）
       const recentMessagesText = recentMessages.map(m => m.content || '').join('\n')
       const lorebookResult = lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
@@ -2883,7 +2934,7 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
       console.log('📚 世界书上下文:', lorebookResult.context ? `已加载 ${lorebookResult.triggeredEntries.length} 个条目` : '未触发')
       
       // 构建系统提示词
-      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + lorebookContext + `
+      let fullSystemPrompt = systemPrompt + blacklistContext + timeIntervalContext + momentsContextText + intimatePayContext + memoryContext + userCoupleSpaceContext + groupChatContext + lorebookContext + `
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📱 回复方式
@@ -5725,6 +5776,7 @@ ${emojiInstructions}
                const actualIndex = messages.length - displayCount + index
                const prevMessage = actualIndex > 0 ? messages[actualIndex - 1] : null
                const showTimeDivider = shouldShowTimeDivider(message, prevMessage)
+               const showTimestamp = shouldShowTimestamp(actualIndex)
                
                // 隐藏的消息不显示，但会被AI看到
                if (message.isHidden) {
@@ -5989,7 +6041,7 @@ ${emojiInstructions}
                    
                    {/* 对方消息：头像在左，气泡在右 */}
                    {message.type === 'received' && (
-                     <div className="flex flex-col items-center mr-2">
+                     <div className="flex flex-col items-center gap-0.5 mr-2">
                        <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
                          {isCharacterCustomAvatar ? (
                            <img src={characterAvatar} alt="角色头像" className="w-full h-full object-cover" />
@@ -5997,6 +6049,8 @@ ${emojiInstructions}
                            <span className="text-lg">{characterAvatar || '🤖'}</span>
                          )}
                        </div>
+                       {/* 时间显示在头像下方 */}
+                       {showTimestamp && <span className="text-[9px] text-gray-400">{message.time}</span>}
                      </div>
                    )}
                  
@@ -6597,17 +6651,19 @@ ${emojiInstructions}
                  })()}
                  </div>
                    {/* 自己消息：气泡在左，头像在右 */}
-                  {message.type === 'sent' && (
-                    <div className="flex flex-col items-center ml-2">
-                      <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
-                        {isUserCustomAvatar ? (
-                          <img src={userAvatar} alt="我的头像" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-lg">👤</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                 {message.type === 'sent' && (
+                   <div className="flex flex-col items-center gap-0.5 ml-2">
+                     <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-md overflow-hidden">
+                       {isUserCustomAvatar ? (
+                         <img src={userAvatar} alt="我的头像" className="w-full h-full object-cover" />
+                       ) : (
+                         <span className="text-lg">👤</span>
+                       )}
+                     </div>
+                     {/* 时间显示在头像下方 */}
+                     {showTimestamp && <span className="text-[9px] text-gray-400">{message.time}</span>}
+                   </div>
+                 )}
                 </div>
                 </div>
                </div>

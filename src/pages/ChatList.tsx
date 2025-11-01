@@ -78,8 +78,11 @@ const ChatList = () => {
               existing.time !== groupChat.time ||
               existing.memberCount !== groupChat.memberCount) {
             updated[existingIndex] = groupChat
-            // 将更新的群聊移到顶部
-            updated = [groupChat, ...updated.filter((_, i) => i !== existingIndex)]
+            // 如果是已解散的群聊，不移到顶部，保持在原位
+            if (!group.disbanded) {
+              // 将更新的群聊移到顶部
+              updated = [groupChat, ...updated.filter((_, i) => i !== existingIndex)]
+            }
             hasChanges = true
           }
         } else {
@@ -87,6 +90,19 @@ const ChatList = () => {
           updated = [groupChat, ...updated]
           hasChanges = true
         }
+      })
+
+      // 排序：解散的群聊排在最后
+      updated.sort((a, b) => {
+        const aGroup = groups.find(g => g.id === a.groupId)
+        const bGroup = groups.find(g => g.id === b.groupId)
+        
+        const aDisbanded = aGroup?.disbanded ?? false
+        const bDisbanded = bGroup?.disbanded ?? false
+        
+        if (aDisbanded && !bDisbanded) return 1  // a解散，b未解散，a排后面
+        if (!aDisbanded && bDisbanded) return -1 // a未解散，b解散，a排前面
+        return 0 // 保持原有顺序
       })
 
       return hasChanges ? updated : prev
@@ -331,7 +347,10 @@ const ChatList = () => {
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 truncate flex-1">
-                      {chat.lastMessage}
+                      {/* 过滤掉朋友圈同步消息（以💬、👍、🎙️开头的系统消息） */}
+                      {chat.lastMessage && (chat.lastMessage.startsWith('💬 我') || chat.lastMessage.startsWith('👍 我') || chat.lastMessage.startsWith('🎙️'))
+                        ? '开始聊天吧'
+                        : chat.lastMessage}
                     </p>
                   )}
                   

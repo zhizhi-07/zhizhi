@@ -25,6 +25,7 @@ export interface Group {
   lastMessage?: string          // 最后一条消息
   lastMessageTime?: string      // 最后消息时间
   unread?: number               // 未读消息数
+  disbanded?: boolean           // 是否已解散
   settings: {
     allowMemberInvite: boolean  // 是否允许成员邀请
     muteAll: boolean            // 全员禁言
@@ -85,9 +86,10 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const deleteGroup = (id: string) => {
-    setGroups(prev => prev.filter(g => g.id !== id))
-    // 同时删除群聊消息
-    localStorage.removeItem(`group_messages_${id}`)
+    // 不删除群聊，只标记为已解散
+    setGroups(prev => prev.map(g => 
+      g.id === id ? { ...g, disbanded: true } : g
+    ))
   }
 
   const getGroup = (id: string) => {
@@ -166,12 +168,15 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
     const group = groups.find(g => g.id === groupId)
     if (!group) return false
     
+    // 不能管理自己
+    if (operatorId === targetId) return false
+    
     const operator = group.members.find(m => m.id === operatorId)
     const target = group.members.find(m => m.id === targetId)
     
     if (!operator || !target) return false
     
-    // 群主可以管理所有人
+    // 群主可以管理所有人（除了自己）
     if (operator.role === 'owner') return true
     
     // 管理员可以管理普通成员，但不能管理群主和其他管理员

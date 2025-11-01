@@ -13,7 +13,6 @@ export const useMomentsSocial = () => {
   const { currentUser } = useUser()
   const prevMomentsRef = useRef(moments)
   const processedMomentsRef = useRef(new Set<string>())
-  const lastScriptTimeRef = useRef<{ [key: string]: number }>({}) // 记录每条朋友圈最后生成剧本的时间
   
   // 🚨 紧急停止开关：如果设置为true，完全停止AI互动
   const emergencyStop = localStorage.getItem('emergency_stop_ai_moments') === 'true'
@@ -30,12 +29,32 @@ export const useMomentsSocial = () => {
     
     try {
       const messages = JSON.parse(saved)
-      // 简化：直接返回最近20条消息的内容摘要
-      return '关系摘要：' + messages.slice(-20).map((m: any) => m.content).join('; ')
+      const character = getCharacter(characterId)
+      if (!character) return '未知角色。'
+      
+      // 过滤掉系统消息（如朋友圈同步消息），只保留真实对话
+      const realMessages = messages.filter((m: any) => 
+        m.type !== 'system' && m.messageType !== 'system'
+      )
+      
+      // 获取最近30条真实对话
+      const recentMessages = realMessages.slice(-30)
+      
+      if (recentMessages.length === 0) {
+        return `与 ${authorName} 之间还没有实际对话，只有系统消息。`
+      }
+      
+      // 格式化为对话形式
+      const formatted = recentMessages.map((msg: any) => {
+        const speaker = msg.type === 'sent' ? authorName : character.name
+        return `${speaker}: ${msg.content}`
+      }).join('\n')
+      
+      return `最近的聊天记录（共${recentMessages.length}条）：\n${formatted}`
     } catch (e) {
       return '聊天记录解析失败。'
     }
-  }, [])
+  }, [getCharacter])
 
   useEffect(() => {
     const prevMoments = prevMomentsRef.current
@@ -85,49 +104,51 @@ export const useMomentsSocial = () => {
         }, 2000 + Math.random() * 3000) // 2-5秒后AI开始有反应
       }
       
-      // 处理新评论（评论区有新互动时，重新编排剧本）
+      // 评论变化处理：只对用户的新评论做出反应
       if (hasNewComments) {
-        // 防抖：避免短时间内重复生成剧本
-        const lastScriptTime = lastScriptTimeRef.current[currentMoment.id] || 0
-        const timeSinceLastScript = Date.now() - lastScriptTime
-        const MIN_INTERVAL = 10000 // 最少间隔10秒
-        
-        if (timeSinceLastScript < MIN_INTERVAL) {
-          console.log(`⏸️ 朋友圈 ${currentMoment.id} 在 ${Math.floor(timeSinceLastScript/1000)}秒前刚生成过剧本，跳过`)
-          return
-        }
-        
-        console.log(`💬 检测到朋友圈有新评论，AI电影编剧重新编排剧本...`)
-        lastScriptTimeRef.current[currentMoment.id] = Date.now()
-        
-        const authorIsAI = characters.some(c => c.id === currentMoment.userId)
-        const momentAuthor = authorIsAI 
-          ? getCharacter(currentMoment.userId)
-          : (currentUser ? { id: currentUser.id, name: currentUser.name } : null)
-        
-        if (!momentAuthor) {
-          console.error('❌ 找不到朋友圈发布者信息')
-          return
-        }
-        
-        // 延迟执行，让评论先显示出来
-        setTimeout(async () => {
-          const script = await generateMovieScript(
-            currentMoment,
-            characters,
-            momentAuthor,
-            (charId) => getChatHistory(charId, momentAuthor.name)
+        // 检查是否有用户的新评论（非AI评论）
+        const prevMoment = prevMoments.find(m => m.id === currentMoment.id)
+        if (prevMoment) {
+          const newComments = currentMoment.comments.slice(prevMoment.comments.length)
+          const hasUserComment = newComments.some(comment => 
+            !characters.some(char => char.id === comment.userId)
           )
           
-          if (script) {
-            executeMovieScript(
-              script,
-              currentMoment,
-              momentsAPI,
-              charactersAPI
-            )
+          if (hasUserComment) {
+            console.log(`💬 检测到用户的新评论，AI电影编剧重新编排剧本...`)
+            
+            const authorIsAI = characters.some(c => c.id === currentMoment.userId)
+            const momentAuthor = authorIsAI 
+              ? getCharacter(currentMoment.userId)
+              : (currentUser ? { id: currentUser.id, name: currentUser.name } : null)
+            
+            if (!momentAuthor) {
+              console.error('❌ 找不到朋友圈发布者信息')
+              return
+            }
+            
+            // 延迟执行，让评论先显示出来
+            setTimeout(async () => {
+              const script = await generateMovieScript(
+                currentMoment,
+                characters,
+                momentAuthor,
+                (charId) => getChatHistory(charId, momentAuthor.name)
+              )
+              
+              if (script) {
+                executeMovieScript(
+                  script,
+                  currentMoment,
+                  momentsAPI,
+                  charactersAPI
+                )
+              }
+            }, 1500 + Math.random() * 2000) // 1.5-3.5秒后AI开始反应
+          } else {
+            console.log(`💬 检测到新评论（AI自己的对话，无需重新生成）`)
           }
-        }, 1500 + Math.random() * 2000) // 1.5-3.5秒后AI开始反应
+        }
       }
     })
     
