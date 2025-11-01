@@ -50,49 +50,31 @@ export function showBackgroundChatNotification(
   message: string,
   characterId: string
 ) {
-  // 检查是否在聊天详情页
-  const isInChatDetail = window.location.pathname.includes(`/chat/${characterId}`)
+  // 检查是否在聊天详情页（只有完全匹配才跳过）
+  const currentPath = window.location.pathname
+  const isInCurrentChat = currentPath === `/chat/${characterId}`
   
-  // 如果在当前聊天页面，不显示通知
-  if (isInChatDetail) {
-    console.log('📵 当前在聊天页面，跳过通知')
+  // 如果在当前聊天页面且页面可见，不显示通知
+  if (isInCurrentChat && document.visibilityState === 'visible') {
     return
   }
   
-  // 使用现有的通知系统显示通知
-  if (typeof window !== 'undefined' && 'Notification' in window) {
-    // 先检查通知权限
-    if (Notification.permission === 'granted') {
-      try {
-        new Notification(`${characterName}`, {
-          body: message,
-          icon: characterAvatar,
-          tag: characterId, // 防止重复通知
-          requireInteraction: false
-        })
-      } catch (e) {
-        console.error('显示系统通知失败:', e)
-        // 降级到自定义通知
-        showCustomNotification(characterName, message, characterId)
-      }
-    } else if (Notification.permission !== 'denied') {
-      // 请求权限
-      Notification.requestPermission().then(permission => {
-        if (permission === 'granted') {
-          new Notification(`${characterName}`, {
-            body: message,
-            icon: characterAvatar,
-            tag: characterId
-          })
-        }
+  // 🔧 修复：始终显示自定义通知（更可靠）
+  // 系统通知在移动端和某些浏览器上不稳定，统一使用自定义通知
+  showCustomNotification(characterName, message, characterId)
+  
+  // 同时尝试显示系统通知（如果有权限）
+  if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(`${characterName}`, {
+        body: message,
+        icon: characterAvatar,
+        tag: characterId,
+        requireInteraction: false
       })
-    } else {
-      // 没有权限，使用自定义通知
-      showCustomNotification(characterName, message, characterId)
+    } catch (e) {
+      // 静默失败
     }
-  } else {
-    // 浏览器不支持通知API，使用自定义通知
-    showCustomNotification(characterName, message, characterId)
   }
 }
 
@@ -109,7 +91,6 @@ function showCustomNotification(characterName: string, message: string, characte
       type: 'chat'
     }
   })
-  window.dispatchEvent(event)
   
-  console.log('📬 已触发自定义通知:', characterName, message)
+  window.dispatchEvent(event)
 }

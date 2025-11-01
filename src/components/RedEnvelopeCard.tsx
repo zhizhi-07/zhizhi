@@ -50,10 +50,16 @@ const RedEnvelopeCard = ({ redEnvelope, onClick, coverImage, iconImage }: RedEnv
       )}
       
       {/* 内容层 */}
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-around', height: '100%' }}>
+        {/* 状态标签在右上角（绝对定位） */}
+        {statusTag}
+        
+        {/* 祝福语在上方 */}
         <div className="red-packet-content">
           <div className="red-packet-blessing">{redEnvelope.blessing}</div>
         </div>
+        
+        {/* "领"字图标在下方 */}
         <div 
           className="red-packet-icon"
           style={{
@@ -65,7 +71,6 @@ const RedEnvelopeCard = ({ redEnvelope, onClick, coverImage, iconImage }: RedEnv
         >
           领
         </div>
-        {statusTag}
       </div>
     </div>
   )

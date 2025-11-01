@@ -258,8 +258,7 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
   
   if (baseUrl.includes('generativelanguage.googleapis.com') || 
       baseUrl.includes('zhizhi.2373922440jhj.workers.dev') ||
-      baseUrl.includes('netlify/functions/gemini-proxy') ||
-      baseUrl.includes('hiapi.online')) {
+      baseUrl.includes('netlify/functions/gemini-proxy')) {
     // Google Gemini 官方 API 或反代
     actualProvider = 'google'
   } else if (baseUrl.includes('api.openai.com')) {
@@ -268,6 +267,9 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
     actualProvider = 'claude'
   } else if (baseUrl.includes('api.siliconflow.cn')) {
     actualProvider = 'siliconflow'
+  } else if (baseUrl.includes('hiapi.online') || baseUrl.includes('jiubanai.com')) {
+    // OpenAI格式的Gemini代理（HiAPI、九班AI等）
+    actualProvider = 'openai'
   }
   
   settings.provider = actualProvider

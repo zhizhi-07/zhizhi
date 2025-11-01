@@ -8,6 +8,7 @@ export interface GroupMember {
   avatar: string                // 成员头像
   nickname?: string             // 群昵称
   role: 'owner' | 'admin' | 'member'  // 角色
+  title?: string                // 头衔（自定义称号）
   joinedAt: string              // 加入时间
   muted?: boolean               // 是否被禁言
 }
@@ -43,6 +44,9 @@ interface GroupContextType {
   addMember: (groupId: string, member: Omit<GroupMember, 'joinedAt' | 'role'>) => void
   removeMember: (groupId: string, memberId: string) => void
   updateMember: (groupId: string, memberId: string, updates: Partial<GroupMember>) => void
+  setAdmin: (groupId: string, memberId: string, isAdmin: boolean) => void
+  setTitle: (groupId: string, memberId: string, title: string) => void
+  canManage: (groupId: string, operatorId: string, targetId: string) => boolean
 }
 
 const GroupContext = createContext<GroupContextType | undefined>(undefined)
@@ -131,6 +135,51 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
     }))
   }
 
+  // 设置管理员
+  const setAdmin = (groupId: string, memberId: string, isAdmin: boolean) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id === groupId) {
+        const updatedMembers = g.members.map(m => 
+          m.id === memberId ? { ...m, role: isAdmin ? 'admin' as const : 'member' as const } : m
+        )
+        const updatedAdmins = isAdmin 
+          ? [...g.admins, memberId].filter((id, index, self) => self.indexOf(id) === index)
+          : g.admins.filter(id => id !== memberId)
+        
+        return {
+          ...g,
+          members: updatedMembers,
+          admins: updatedAdmins
+        }
+      }
+      return g
+    }))
+  }
+
+  // 设置头衔
+  const setTitle = (groupId: string, memberId: string, title: string) => {
+    updateMember(groupId, memberId, { title: title || undefined })
+  }
+
+  // 权限检查：能否管理某个成员
+  const canManage = (groupId: string, operatorId: string, targetId: string): boolean => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return false
+    
+    const operator = group.members.find(m => m.id === operatorId)
+    const target = group.members.find(m => m.id === targetId)
+    
+    if (!operator || !target) return false
+    
+    // 群主可以管理所有人
+    if (operator.role === 'owner') return true
+    
+    // 管理员可以管理普通成员，但不能管理群主和其他管理员
+    if (operator.role === 'admin' && target.role === 'member') return true
+    
+    return false
+  }
+
   return (
     <GroupContext.Provider value={{ 
       groups, 
@@ -140,7 +189,10 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
       getGroup,
       addMember,
       removeMember,
-      updateMember
+      updateMember,
+      setAdmin,
+      setTitle,
+      canManage
     }}>
       {children}
     </GroupContext.Provider>

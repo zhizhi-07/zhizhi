@@ -35,7 +35,7 @@ const SendTransfer = () => {
       {/* 顶部标题栏 */}
       <div className="px-4 py-3 flex items-center justify-between bg-white border-b border-gray-200">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/chat/${chatId}`, { replace: true })}
           className="text-gray-700 text-base"
         >
           取消

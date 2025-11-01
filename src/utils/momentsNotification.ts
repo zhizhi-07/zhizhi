@@ -5,13 +5,14 @@
 
 export interface MomentNotification {
   id: string
-  type: 'like' | 'comment' | 'new_moment'
+  type: 'like' | 'comment' | 'reply' | 'new_moment'
   momentId: string
   momentContent: string
   fromUserId: string
   fromUserName: string
   fromUserAvatar: string
   comment?: string
+  replyToUser?: string  // 回复谁的评论
   timestamp: number
   read: boolean
 }

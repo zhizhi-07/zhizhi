@@ -48,6 +48,27 @@ export const useAiMoments = (characterId: string) => {
         console.log(`✅ ${character.name} 发布了朋友圈: ${content}`)
         console.log(`🔔 触发其他AI查看 ${character.name} 的朋友圈`)
         
+        // 添加系统消息到聊天记录，让用户知道AI发布了朋友圈
+        const chatMessages = localStorage.getItem(`chat_messages_${character.id}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        const systemMessage = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: `📸 ${character.name} 发布了朋友圈：${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: false  // 用户可见
+        }
+        
+        messages.push(systemMessage)
+        localStorage.setItem(`chat_messages_${character.id}`, JSON.stringify(messages))
+        console.log(`💾 已向用户发送 ${character.name} 发布朋友圈的系统提示`)
+        
         // AI发布朋友圈后，其他AI也会看到并可能互动
         // 这个会由useMomentsSocial Hook自动处理
       } else {

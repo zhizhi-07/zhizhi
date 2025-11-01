@@ -303,7 +303,7 @@ class LorebookManager {
       
       if (currentTokens + estimatedTokens <= maxTokens) {
         selected.push(entry)
-        triggeredEntries.push({ name: entry.key, tokens: estimatedTokens })
+        triggeredEntries.push({ name: entry.name, tokens: estimatedTokens })
         currentTokens += estimatedTokens
       }
     }

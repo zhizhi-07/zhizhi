@@ -7,7 +7,6 @@ import { ImageViewer } from '../components/ImageViewer'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { useCharacter } from '../context/CharacterContext'
-import { triggerAIReactToComment } from '../utils/aiMomentsSocial'
 import { getUnreadNotificationCount } from '../utils/momentsNotification'
 
 const Moments = () => {
@@ -15,7 +14,7 @@ const Moments = () => {
   const { currentUser } = useUser()
   const { moments, likeMoment, unlikeMoment, addComment } = useMoments()
   const { showStatusBar } = useSettings()
-  const { getCharacter, characters } = useCharacter()
+  const { getCharacter } = useCharacter()
   const [showCommentInput, setShowCommentInput] = useState<string | null>(null)
   const [commentText, setCommentText] = useState('')
   const [replyToUser, setReplyToUser] = useState<string>('')
@@ -112,32 +111,6 @@ const Moments = () => {
     // 找到这条朋友圈
     const moment = moments.find(m => m.id === momentId)
     
-    // 如果评论的是别人的朋友圈，同步到对方的聊天记录
-    if (moment && moment.userId !== currentUser.id) {
-      const targetCharacter = getCharacter(moment.userId)
-      if (targetCharacter) {
-        const chatMessages = localStorage.getItem(`chat_messages_${moment.userId}`)
-        const messages = chatMessages ? JSON.parse(chatMessages) : []
-        
-        const commentNotification = {
-          id: Date.now() + Math.random(),
-          type: 'system',
-          content: `💬 ${currentUser.name} 评论了你的朋友圈：${finalComment}`,
-          time: new Date().toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          timestamp: Date.now(),
-          messageType: 'system',
-          isHidden: false
-        }
-        
-        messages.push(commentNotification)
-        localStorage.setItem(`chat_messages_${moment.userId}`, JSON.stringify(messages))
-        console.log(`💾 评论已同步到 ${targetCharacter.name} 的聊天记录`)
-      }
-    }
-    
     // 如果是回复AI角色的评论，同步到该角色的聊天记录并触发AI反应
     if (replyToUserId && replyToUserId !== currentUser.id) {
       const character = getCharacter(replyToUserId)
@@ -156,35 +129,41 @@ const Moments = () => {
           }),
           timestamp: Date.now(),
           messageType: 'system',
-          isHidden: false
+          isHidden: true  // 隐藏，用户不可见
         }
         
         messages.push(replyNotification)
         localStorage.setItem(`chat_messages_${replyToUserId}`, JSON.stringify(messages))
         console.log(`💾 回复已同步到 ${character.name} 的聊天记录`)
         
-        // 触发AI的反应（让AI决定回复评论还是私信）
-        if (moment) {
-          console.log(`🔔 用户回复了 ${character.name} 的评论，触发AI反应...`)
-          
-          setTimeout(() => {
-            triggerAIReactToComment(
-              momentId,
-              moment,
-              currentUser.name,
-              characters,
-              (characterId: string) => {
-                const msgs = localStorage.getItem(`chat_messages_${characterId}`)
-                return msgs ? JSON.parse(msgs).slice(-10).map((msg: any) => ({
-                  role: msg.type === 'sent' ? 'user' as const : 'assistant' as const,
-                  content: msg.content
-                })) : []
-              },
-              likeMoment,
-              addComment
-            )
-          }, 2000) // 延迟2秒，让用户看到自己的评论
+        // AI反应已由社交总监系统统一处理（通过useMomentsSocial监听评论变化）
+        // 旧的triggerAIReactToComment系统已禁用，避免冲突
+        console.log(`💬 ${character.name} 收到回复通知，社交总监将决定是否安排AI互动`)
+      }
+    } 
+    // 如果不是回复评论，而是直接评论别人的朋友圈，同步到朋友圈作者的聊天记录
+    else if (moment && moment.userId !== currentUser.id) {
+      const targetCharacter = getCharacter(moment.userId)
+      if (targetCharacter) {
+        const chatMessages = localStorage.getItem(`chat_messages_${moment.userId}`)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        const commentNotification = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: `💬 ${currentUser.name} 评论了你的朋友圈：${finalComment}`,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: true  // 隐藏，用户不可见
         }
+        
+        messages.push(commentNotification)
+        localStorage.setItem(`chat_messages_${moment.userId}`, JSON.stringify(messages))
+        console.log(`💾 评论已同步到 ${targetCharacter.name} 的聊天记录`)
       }
     }
     
@@ -480,7 +459,10 @@ const Moments = () => {
                             回复 <span className="text-blue-600 font-medium">@{replyToUser}</span>
                           </span>
                           <button
-                            onClick={() => setReplyToUser('')}
+                            onClick={() => {
+                              setReplyToUser('')
+                              setReplyToUserId('')
+                            }}
                             className="text-gray-400 hover:text-gray-600 text-xs"
                           >
                             ✕

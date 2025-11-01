@@ -95,7 +95,7 @@ const StatusBarCustomize = () => {
       <div className="bg-white border-b border-gray-200">
         <div className="px-4 py-3 flex items-center justify-between">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/settings', { replace: true })}
             className="ios-button text-gray-700 hover:text-gray-900"
           >
             <BackIcon size={24} />

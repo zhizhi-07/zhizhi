@@ -24,7 +24,7 @@ const UserList = () => {
       {/* 顶部标题栏 */}
       <div className="glass-effect px-4 py-3 flex items-center justify-between border-b border-gray-200/50">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/desktop', { replace: true })}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
         >
           <BackIcon size={24} />

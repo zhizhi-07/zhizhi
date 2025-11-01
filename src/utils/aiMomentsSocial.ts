@@ -451,15 +451,21 @@ export const triggerAIReactToComment = async (
           console.log(`💬 ${result.characterName} 回复了: ${result.comment}`)
           existingComments.push(result.comment.toLowerCase().trim())
           
+          // 检查是否是回复别人的评论（包含@用户名）
+          const mentionMatch = result.comment.match(/@(\S+)/)
+          const isReply = !!mentionMatch
+          const replyToUser = mentionMatch ? mentionMatch[1] : undefined
+          
           // 添加通知
           addMomentNotification({
-            type: 'comment',
+            type: isReply ? 'reply' : 'comment',
             momentId: momentId,
             momentContent: moment.content,
             fromUserId: result.characterId,
             fromUserName: result.characterName,
             fromUserAvatar: character.avatar,
-            comment: result.comment
+            comment: result.comment,
+            replyToUser: replyToUser
           })
         }
       }

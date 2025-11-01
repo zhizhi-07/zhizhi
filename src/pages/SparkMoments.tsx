@@ -105,7 +105,7 @@ const SparkMoments = () => {
       {/* 顶部导航栏 */}
       <div className="glass-effect px-4 py-3 border-b border-gray-200/50 flex items-center">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/desktop', { replace: true })}
           className="w-8 h-8 flex items-center justify-center ios-button"
         >
           <span className="text-blue-500 text-xl">‹</span>

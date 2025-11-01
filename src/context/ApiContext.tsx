@@ -35,7 +35,7 @@ const hiApiConfig: ApiConfig = {
   baseUrl: 'https://hiapi.online/v1',
   apiKey: 'sk-D3TeNLaMBIYW9QN4AguxWucHo4zTWRhcr4V1EZ3OaVTPSjSB',
   model: 'gemini-2.5-pro',
-  provider: 'google',
+  provider: 'openai', // OpenAI格式的Gemini代理
   temperature: 0.7,
   maxTokens: 2000,
   createdAt: new Date().toISOString()
@@ -48,7 +48,7 @@ const geminiProxyConfig: ApiConfig = {
   baseUrl: 'https://zhizhi-ai.netlify.app/.netlify/functions/gemini-proxy',
   apiKey: 'not-needed', // Gemini 反代不需要 API Key
   model: 'gemini-2.5-pro',
-  provider: 'google',
+  provider: 'google', // 真正的Google API格式
   temperature: 0.7,
   maxTokens: 2000,
   createdAt: new Date().toISOString()
@@ -74,7 +74,7 @@ const jiubanApiConfig: ApiConfig = {
   baseUrl: 'https://gy.jiubanai.com/v1',
   apiKey: 'sk-NqOuYUHhjx8qWOjZCdA34XTMvJ7PXsxoHRQLNQDg3xyMYfJk',
   model: 'gemini-2.5-pro',
-  provider: 'google',
+  provider: 'openai', // OpenAI格式的Gemini代理
   temperature: 0.7,
   maxTokens: 2000,
   createdAt: new Date().toISOString()

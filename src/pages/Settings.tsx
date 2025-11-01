@@ -252,7 +252,7 @@ const Settings = () => {
         {showStatusBar && <StatusBar />}
         <div className="px-4 py-3 flex items-center justify-between">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/desktop', { replace: true })}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
         >
           <BackIcon size={24} />

@@ -48,7 +48,10 @@ const BackgroundChatNotificationManager = () => {
     navigate(`/chat/${notification.characterId}`)
   }
 
-  if (!notification) return null
+  // 如果没有通知，不渲染任何内容
+  if (!notification) {
+    return null
+  }
 
   return (
     <IOSNotification

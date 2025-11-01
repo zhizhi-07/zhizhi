@@ -346,7 +346,7 @@ const MusicPlayer = () => {
       {/* 顶部导航栏 */}
       <div className="relative z-10 px-4 py-3 flex items-center justify-between border-b border-gray-100">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/desktop', { replace: true })}
           className="w-10 h-10 flex items-center justify-center ios-button"
         >
           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

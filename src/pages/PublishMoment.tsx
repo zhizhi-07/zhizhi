@@ -6,12 +6,11 @@ import { BackIcon, ImageIcon } from '../components/Icons'
 import { useUser } from '../context/UserContext'
 import { useMoments } from '../context/MomentsContext'
 import { useCharacter } from '../context/CharacterContext'
-import { batchAIInteractWithMoment } from '../utils/aiMomentsSocial'
 
 const PublishMoment = () => {
   const navigate = useNavigate()
   const { currentUser } = useUser()
-  const { addMoment, likeMoment, addComment } = useMoments()
+  const { addMoment } = useMoments()
   const { showStatusBar } = useSettings()
   const { characters } = useCharacter()
   const [content, setContent] = useState('')
@@ -29,170 +28,7 @@ const PublishMoment = () => {
   const [visibility, setVisibility] = useState<'public' | 'private' | 'partial'>('public')
   const [visibleTo, setVisibleTo] = useState<string[]>([])
 
-  // 触发AI角色查看朋友圈（批量处理，只调用一次API）
-  const triggerAIInteractions = async (momentId: string, momentData: any) => {
-    // 获取所有启用了AI朋友圈功能的角色
-    let enabledCharacters = characters.filter(char => {
-      const enabled = localStorage.getItem(`ai_moments_enabled_${char.id}`)
-      return enabled === 'true'
-    })
-    
-    // 根据可见性设置过滤角色
-    if (momentData.visibility === 'private') {
-      console.log('🔒 朋友圈设置为私密，AI角色无法查看')
-      return
-    } else if (momentData.visibility === 'partial') {
-      // 只有在可见列表中的角色才能看到
-      enabledCharacters = enabledCharacters.filter(char => 
-        momentData.visibleTo.includes(char.id)
-      )
-      console.log(`👥 朋友圈部分可见，${enabledCharacters.length} 个角色可以查看`)
-    }
-
-    if (enabledCharacters.length === 0) {
-      console.log('📭 没有角色可以查看此朋友圈')
-      return
-    }
-
-    console.log(`🎬 批量处理 ${enabledCharacters.length} 个AI角色的决策（只调用1次API）`)
-    
-    try {
-      // 准备所有角色的数据
-      const charactersData = enabledCharacters.map(character => {
-        const chatMessages = localStorage.getItem(`chat_messages_${character.id}`)
-        const recentMessages = chatMessages 
-          ? JSON.parse(chatMessages).slice(-10).map((msg: any) => ({
-              role: msg.type === 'sent' ? 'user' as const : 'assistant' as const,
-              content: msg.content
-            }))
-          : []
-
-        return {
-          id: character.id,
-          name: character.name,
-          description: character.description || '',
-          recentMessages
-        }
-      })
-
-      // 批量调用AI（只调用一次API）
-      const results = await batchAIInteractWithMoment(
-        charactersData,
-        {
-          id: momentId,
-          userId: momentData.userId,
-          userName: momentData.userName,
-          userAvatar: momentData.userAvatar,
-          content: momentData.content,
-          images: momentData.images,
-          likes: [],
-          comments: [],
-          location: momentData.location,
-          createdAt: new Date().toISOString()
-        }
-      )
-
-      // 处理结果（支持多动作）
-      const existingComments: string[] = []
-      
-      results.forEach(result => {
-        const character = enabledCharacters.find(c => c.id === result.characterId)
-        if (!character) return
-
-        console.log(`💭 ${result.characterName} 的决定: ${result.actions.join('+')} ${result.reason || ''}`)
-
-        // 处理点赞
-        if (result.actions.includes('like')) {
-          console.log(`👍 ${result.characterName} 决定点赞，正在执行...`)
-          likeMoment(momentId, result.characterId, result.characterName, character.avatar)
-          console.log(`✅ ${result.characterName} 点赞成功！`)
-          
-          // 同步点赞到聊天记录
-          const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
-          const messages = chatMessages ? JSON.parse(chatMessages) : []
-          const likeMessage = {
-            id: Date.now() + Math.random(),
-            type: 'system',
-            content: `👍 ${result.characterName} 给你的朋友圈点赞了`,
-            time: new Date().toLocaleTimeString('zh-CN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            timestamp: Date.now(),
-            messageType: 'system',
-            isHidden: false
-          }
-          messages.push(likeMessage)
-          localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
-        }
-        
-        // 处理评论
-        if (result.actions.includes('comment') && result.comment) {
-          // 检查是否与已有评论重复
-          const cleanComment = result.comment.replace(/@\S+\s*/g, '').toLowerCase().trim()
-          const isDuplicate = existingComments.some(existing => {
-            const cleanExisting = existing.replace(/@\S+\s*/g, '').toLowerCase().trim()
-            return cleanExisting === cleanComment
-          })
-          
-          if (isDuplicate) {
-            console.log(`🔁 ${result.characterName} 的评论与已有评论重复，跳过: ${result.comment}`)
-          } else {
-            addComment(momentId, result.characterId, result.characterName, character.avatar, result.comment)
-            console.log(`💬 ${result.characterName} 评论了: ${result.comment}`)
-            existingComments.push(result.comment.toLowerCase().trim())
-            
-            // 同步评论到聊天记录
-            const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
-            const messages = chatMessages ? JSON.parse(chatMessages) : []
-            const commentMessage = {
-              id: Date.now() + Math.random(),
-              type: 'received',
-              content: `💬 ${result.characterName} 评论了你的朋友圈：${result.comment}`,
-              time: new Date().toLocaleTimeString('zh-CN', {
-                hour: '2-digit',
-                minute: '2-digit',
-              }),
-              timestamp: Date.now(),
-              messageType: 'text',
-              blocked: false
-            }
-            messages.push(commentMessage)
-            localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
-            console.log(`💾 ${result.characterName} 的评论已同步到聊天记录`)
-          }
-        }
-        
-        // 处理私信
-        if (result.actions.includes('message') && result.message) {
-          const chatMessages = localStorage.getItem(`chat_messages_${result.characterId}`)
-          const messages = chatMessages ? JSON.parse(chatMessages) : []
-          const privateMessage = {
-            id: Date.now() + Math.random(),
-            type: 'received',
-            content: result.message,
-            time: new Date().toLocaleTimeString('zh-CN', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            timestamp: Date.now(),
-            messageType: 'text',
-            blocked: false
-          }
-          messages.push(privateMessage)
-          localStorage.setItem(`chat_messages_${result.characterId}`, JSON.stringify(messages))
-          console.log(`💬 ${result.characterName} 发送私信: ${result.message}`)
-        }
-        
-        // 跳过
-        if (result.actions.includes('skip') || result.actions.length === 0) {
-          console.log(`😶 ${result.characterName} 选择跳过`)
-        }
-      })
-    } catch (error) {
-      console.error(`❌ 批量AI互动失败:`, error)
-    }
-  }
+  // 旧的AI互动系统已删除，现在由AI社交总监（useMomentsSocial）统一处理
 
   // 处理图片上传
   const handleImageUpload = () => {
@@ -320,10 +156,8 @@ const PublishMoment = () => {
       }
     })
 
-    // 延迟触发AI互动，确保朋友圈已经添加到列表中，并且localStorage已更新
-    setTimeout(() => {
-      triggerAIInteractions(momentId, momentData)
-    }, 500)
+    // AI互动现在由AI社交总监系统（useMomentsSocial）统一处理
+    console.log('✅ 朋友圈已发布，AI社交总监将自动安排互动')
 
     navigate('/moments', { replace: true })
   }

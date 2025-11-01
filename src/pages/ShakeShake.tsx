@@ -373,7 +373,7 @@ const ShakeShake = () => {
       
       {/* 顶部导航 */}
       <div className="glass-effect px-5 py-4 border-b border-gray-200/50 flex items-center">
-        <button onClick={() => navigate(-1)} className="text-gray-600 mr-3">
+        <button onClick={() => navigate('/desktop', { replace: true })} className="text-gray-600 mr-3">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M15 18l-6-6 6-6"/>
           </svg>

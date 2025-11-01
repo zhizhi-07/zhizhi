@@ -39,11 +39,6 @@ const ChatSettings = () => {
     return saved === 'true'
   })
 
-  const [proactiveCallsEnabled, setProactiveCallsEnabled] = useState(() => {
-    const saved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-    return saved === null ? true : saved === 'true'  // 默认开启
-  })
-
   const [aiMessageLimit, setAiMessageLimit] = useState(() => {
     const saved = localStorage.getItem('ai_message_limit')
     return saved ? parseInt(saved) : 15
@@ -368,16 +363,6 @@ const ChatSettings = () => {
     }
   }
 
-  // 切换AI主动打电话功能
-  const handleToggleProactiveCalls = () => {
-    const newValue = !proactiveCallsEnabled
-    setProactiveCallsEnabled(newValue)
-    if (id) {
-      localStorage.setItem(`proactive_calls_enabled_${id}`, String(newValue))
-      // 触发storage事件，通知ChatDetail页面
-      window.dispatchEvent(new Event('storage'))
-    }
-  }
 
   // 更新AI消息数量限制
   const handleUpdateMessageLimit = (value: number) => {
@@ -476,7 +461,7 @@ const ChatSettings = () => {
         {showStatusBar && <StatusBar />}
         <div className="px-4 py-3 flex items-center justify-between">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/chat/${id}`, { replace: true })}
           className="ios-button text-gray-700 hover:text-gray-900 -ml-2"
         >
           <BackIcon size={24} />
@@ -954,40 +939,6 @@ const ChatSettings = () => {
                 <div 
                   className={`w-5 h-5 bg-white rounded-full mt-1 transition-all shadow-md ${
                     aiProactiveEnabled ? 'ml-6' : 'ml-1'
-                  }`}
-                />
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* AI主动打电话功能 */}
-        <div className="mb-3">
-          <div className="px-4 py-2">
-            <span className="text-sm text-gray-600 font-medium">AI主动打电话</span>
-            <p className="text-xs text-gray-400 mt-1">允许AI主动发起语音或视频通话</p>
-          </div>
-          <div className="glass-card rounded-2xl overflow-hidden">
-            <button
-              onClick={handleToggleProactiveCalls}
-              className="w-full px-4 py-4 flex items-center justify-between ios-button"
-            >
-              <div className="flex items-center gap-3">
-                <div className="text-left">
-                  <div className="font-medium text-gray-900">启用主动打电话</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {proactiveCallsEnabled ? '已开启 - AI可以主动发起通话' : '已关闭'}
-                  </div>
-                </div>
-              </div>
-              <div 
-                className={`w-12 h-7 rounded-full transition-all ${
-                  proactiveCallsEnabled ? 'bg-wechat-primary' : 'bg-gray-300'
-                }`}
-              >
-                <div 
-                  className={`w-5 h-5 bg-white rounded-full mt-1 transition-all shadow-md ${
-                    proactiveCallsEnabled ? 'ml-6' : 'ml-1'
                   }`}
                 />
               </div>

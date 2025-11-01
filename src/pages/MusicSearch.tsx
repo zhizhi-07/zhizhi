@@ -214,7 +214,7 @@ const MusicSearch = () => {
       <div className="bg-white px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2 flex-nowrap">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/music-player', { replace: true })}
             className="w-10 h-10 flex items-center justify-center ios-button flex-shrink-0"
           >
             <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">

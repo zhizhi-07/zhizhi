@@ -6,6 +6,8 @@ export interface Message {
   timestamp?: number
   isRecalled?: boolean
   recalledContent?: string
+  recallReason?: string
+  originalType?: 'received' | 'sent'
   quotedMessage?: {
     id: number
     content: string
@@ -47,6 +49,7 @@ export interface Message {
     characterId: string
     characterName: string
     status: 'pending' | 'accepted' | 'rejected'
+    note?: string  // 备注（可选）
   }
   blocked?: boolean  // 是否被拉黑（AI消息显示警告图标）
 }

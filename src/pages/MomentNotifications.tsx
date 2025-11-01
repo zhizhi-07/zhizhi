@@ -3,20 +3,30 @@ import { useNavigate } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
+import { useCharacter } from '../context/CharacterContext'
 import { getMomentNotifications, markAllNotificationsAsRead, type MomentNotification } from '../utils/momentsNotification'
 
 const MomentNotifications = () => {
   const navigate = useNavigate()
   const { showStatusBar } = useSettings()
+  const { characters } = useCharacter()
   const [notifications, setNotifications] = useState<MomentNotification[]>([])
 
   useEffect(() => {
-    // 加载通知
-    setNotifications(getMomentNotifications())
+    // 加载通知，只显示来自AI角色的通知（过滤掉用户自己的操作）
+    const allNotifications = getMomentNotifications()
+    const aiCharacterIds = characters.map(c => c.id)
+    
+    // 只保留来自AI角色的通知
+    const filteredNotifications = allNotifications.filter(notification => 
+      aiCharacterIds.includes(notification.fromUserId)
+    )
+    
+    setNotifications(filteredNotifications)
     
     // 标记所有通知为已读
     markAllNotificationsAsRead()
-  }, [])
+  }, [characters])
 
   const formatTime = (timestamp: number) => {
     const now = Date.now()
@@ -40,6 +50,8 @@ const MomentNotifications = () => {
         return '赞了你的朋友圈'
       case 'comment':
         return '评论了你的朋友圈'
+      case 'reply':
+        return notification.replyToUser ? `回复了你的评论` : '回复了评论'
       case 'new_moment':
         return '发布了新的朋友圈'
       default:
@@ -55,7 +67,7 @@ const MomentNotifications = () => {
       <div className="glass-morphism">
         <div className="px-4 py-3 flex items-center">
           <button 
-            onClick={() => navigate(-1)}
+            onClick={() => navigate('/moments', { replace: true })}
             className="w-10 h-10 rounded-full glass-effect flex items-center justify-center ios-button"
           >
             <BackIcon size={20} className="text-gray-700" />

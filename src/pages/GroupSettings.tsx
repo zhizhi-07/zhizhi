@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { BackIcon, ImageIcon } from '../components/Icons'
+import { BackIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
 import { useCharacter } from '../context/CharacterContext'
 import { useBackground } from '../context/BackgroundContext'
@@ -10,7 +10,7 @@ import { useSettings } from '../context/SettingsContext'
 const GroupSettings = () => {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { getGroup, updateGroup, deleteGroup, removeMember } = useGroup()
+  const { getGroup, updateGroup, deleteGroup, removeMember, setAdmin, setTitle, canManage } = useGroup()
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const { background, getBackgroundStyle } = useBackground()
@@ -19,6 +19,10 @@ const GroupSettings = () => {
   const [groupName, setGroupName] = useState(group?.name || '')
   const [announcement, setAnnouncement] = useState(group?.description || '')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  
+  // 成员管理弹窗
+  const [managingMember, setManagingMember] = useState<{ id: string; name: string } | null>(null)
+  const [newTitle, setNewTitle] = useState('')
   
   // AI自由对话设置
   const [aiChatEnabled, setAiChatEnabled] = useState(() => {
@@ -108,45 +112,50 @@ const GroupSettings = () => {
           </div>
 
         {/* 设置内容 */}
-        <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
-        {/* 群名称 */}
-        <div className="glass-card rounded-2xl p-5 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">群名称</h3>
-          <input
-            type="text"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            placeholder="请输入群名称"
-            maxLength={20}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-wechat-primary bg-white mb-3"
-          />
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">{groupName.length}/20</span>
+        <div className="flex-1 overflow-y-auto hide-scrollbar p-3">
+        {/* 基本信息 */}
+        <div className="glass-card rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">📝</span>
+            <h3 className="text-sm font-medium text-gray-800">群名称</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              placeholder="请输入群名称"
+              maxLength={20}
+              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-wechat-primary bg-white"
+            />
             <button
               onClick={handleSaveName}
-              className="px-4 py-2 bg-wechat-primary text-white rounded-full text-sm ios-button"
+              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button whitespace-nowrap"
             >
               保存
             </button>
           </div>
+          <span className="text-xs text-gray-400 mt-1 block">{groupName.length}/20</span>
         </div>
 
-        {/* 群公告 */}
-        <div className="glass-card rounded-2xl p-5 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">群公告</h3>
+        <div className="glass-card rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">📢</span>
+            <h3 className="text-sm font-medium text-gray-800">群公告</h3>
+          </div>
           <textarea
             value={announcement}
             onChange={(e) => setAnnouncement(e.target.value)}
             placeholder="请输入群公告"
             maxLength={200}
-            rows={4}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-wechat-primary bg-white mb-3 resize-none"
+            rows={3}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-wechat-primary bg-white resize-none mb-2"
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400">{announcement.length}/200</span>
             <button
               onClick={handleSaveAnnouncement}
-              className="px-4 py-2 bg-wechat-primary text-white rounded-full text-sm ios-button"
+              className="px-3 py-2 bg-wechat-primary text-white rounded-lg text-xs ios-button"
             >
               保存
             </button>
@@ -154,25 +163,26 @@ const GroupSettings = () => {
         </div>
 
         {/* AI自由对话设置 */}
-        <div className="glass-card rounded-2xl p-5 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-4">🤖 AI自由对话</h3>
+        <div className="glass-card rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">🤖</span>
+            <h3 className="text-sm font-medium text-gray-800">AI自由对话</h3>
+          </div>
           
           {/* 开关 */}
-          <div className="flex items-center justify-between mb-4 p-3 bg-white rounded-xl">
-            <div className="flex-1">
-              <p className="font-medium text-gray-900">启用AI自由对话</p>
-              <p className="text-xs text-gray-500 mt-1">
-                开启后，AI成员会在群里自由聊天互动
-              </p>
+          <div className="flex items-center justify-between p-2.5 bg-white rounded-lg mb-2">
+            <div className="flex-1 pr-2">
+              <p className="text-sm font-medium text-gray-900">启用自由对话</p>
+              <p className="text-xs text-gray-500 mt-0.5">AI会自动聊天互动</p>
             </div>
             <button
               onClick={() => setAiChatEnabled(!aiChatEnabled)}
-              className={`relative w-12 h-7 rounded-full transition-colors ${
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
                 aiChatEnabled ? 'bg-green-500' : 'bg-gray-300'
               }`}
             >
               <span
-                className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
                   aiChatEnabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
@@ -181,10 +191,10 @@ const GroupSettings = () => {
           
           {/* 对话间隔设置 */}
           {aiChatEnabled && (
-            <div className="p-3 bg-white rounded-xl mb-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700">对话间隔</label>
-                <span className="text-sm text-gray-500">{aiChatInterval}秒</span>
+            <div className="p-2.5 bg-white rounded-lg mb-2">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-gray-700">对话间隔</label>
+                <span className="text-xs font-medium text-green-600">{aiChatInterval}秒</span>
               </div>
               <input
                 type="range"
@@ -193,36 +203,41 @@ const GroupSettings = () => {
                 step="10"
                 value={aiChatInterval}
                 onChange={(e) => setAiChatInterval(parseInt(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
               />
               <div className="flex justify-between text-xs text-gray-400 mt-1">
-                <span>活跃(10s)</span>
-                <span>正常(60s)</span>
-                <span>安静(120s)</span>
+                <span>活跃</span>
+                <span>正常</span>
+                <span>安静</span>
               </div>
             </div>
           )}
           
           <button
             onClick={handleSaveAiChatSettings}
-            className="w-full py-2.5 bg-green-500 text-white rounded-xl text-sm font-medium ios-button"
+            className="w-full py-2 bg-green-500 text-white rounded-lg text-xs font-medium ios-button"
           >
             保存设置
           </button>
           
-          <div className="mt-3 p-3 bg-blue-50 rounded-xl">
-            <p className="text-xs text-blue-700 leading-relaxed">
-              💡 <strong>说明：</strong>AI自由对话功能会让群内的AI成员自动发起话题、互相聊天。对话频率由间隔时间控制，间隔越短对话越频繁。
-            </p>
-          </div>
+          {aiChatEnabled && (
+            <div className="mt-2 p-2 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-600 leading-relaxed">
+                💡 AI会定时在群里发起话题和互动
+              </p>
+            </div>
+          )}
         </div>
 
         {/* 群成员 */}
-        <div className="glass-card rounded-2xl p-5 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">
-            群成员 ({group.members.length})
-          </h3>
-          <div className="space-y-2">
+        <div className="glass-card rounded-xl p-3 mb-3">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-base">👥</span>
+            <h3 className="text-sm font-medium text-gray-800">
+              群成员 <span className="text-gray-400">({group.members.length})</span>
+            </h3>
+          </div>
+          <div className="space-y-1.5">
             {group.members.map(member => {
               const isOwner = member.id === group.owner
               const isUser = member.type === 'user'
@@ -232,46 +247,59 @@ const GroupSettings = () => {
               return (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between gap-3 p-3 bg-white rounded-xl"
+                  className="flex items-center justify-between gap-2 p-2 bg-white rounded-lg"
                 >
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {/* 头像 */}
-                    <div className="w-12 h-12 rounded-xl bg-gray-200 flex items-center justify-center shadow-md overflow-hidden flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0">
                       {isCustomAvatar ? (
                         <img src={member.avatar} alt={member.name} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-2xl">{member.avatar || '🤖'}</span>
+                        <span className="text-xl">{member.avatar || '🤖'}</span>
                       )}
                     </div>
                     
                     {/* 信息 */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900">{member.name}</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900 truncate">{member.name}</span>
                         {isOwner && (
-                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-md whitespace-nowrap">
-                            群主
+                          <span className="text-xs px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded whitespace-nowrap">
+                            👑 群主
+                          </span>
+                        )}
+                        {!isOwner && member.role === 'admin' && (
+                          <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded whitespace-nowrap">
+                            🛡️ 管理员
+                          </span>
+                        )}
+                        {member.title && (
+                          <span className="text-xs px-1.5 py-0.5 bg-pink-100 text-pink-700 rounded whitespace-nowrap">
+                            ✨ {member.title}
                           </span>
                         )}
                         {isUser && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md whitespace-nowrap">
+                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded whitespace-nowrap">
                             我
                           </span>
                         )}
                       </div>
                       {character?.signature && (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{character.signature}</p>
+                        <p className="text-xs text-gray-400 truncate">{character.signature}</p>
                       )}
                     </div>
                   </div>
 
                   {/* 操作按钮 */}
-                  {!isUser && !isOwner && (
+                  {!isUser && canManage(group.id, 'user', member.id) && (
                     <button
-                      onClick={() => handleRemoveMember(member.id, member.name)}
-                      className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-lg ios-button flex-shrink-0 whitespace-nowrap"
+                      onClick={() => {
+                        setManagingMember({ id: member.id, name: member.name })
+                        setNewTitle(member.title || '')
+                      }}
+                      className="px-2.5 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded ios-button flex-shrink-0"
                     >
-                      移除
+                      管理
                     </button>
                   )}
                 </div>
@@ -281,12 +309,12 @@ const GroupSettings = () => {
         </div>
 
         {/* 危险操作 */}
-        <div className="glass-card rounded-2xl p-4 mb-4">
+        <div className="glass-card rounded-xl p-2.5 mb-3">
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="w-full py-2 text-sm text-red-600 font-medium rounded-lg hover:bg-red-50 ios-button"
           >
-            解散群聊
+            🗑️ 解散群聊
           </button>
         </div>
         </div>
@@ -318,6 +346,171 @@ const GroupSettings = () => {
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl ios-button"
                 >
                   确认解散
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 成员管理弹窗 */}
+      {managingMember && group && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setManagingMember(null)}
+          />
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="glass-card rounded-2xl p-5 max-w-sm w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                管理 {managingMember.name}
+              </h3>
+              
+              {/* 头衔设置 */}
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-700 block mb-2">
+                  ✨ 设置头衔
+                </label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="输入头衔（留空则删除）"
+                  maxLength={10}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">{newTitle.length}/10</p>
+              </div>
+
+              {/* 管理员设置 */}
+              {(() => {
+                const member = group.members.find(m => m.id === managingMember.id)
+                const isAdmin = member?.role === 'admin'
+                const isOwner = member?.role === 'owner'
+                const currentUserIsOwner = group.members.find(m => m.type === 'user')?.role === 'owner'
+
+                return !isOwner && currentUserIsOwner && (
+                  <div className="mb-4 p-3 bg-purple-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">🛡️ 设为管理员</p>
+                        <p className="text-xs text-gray-500 mt-0.5">管理员可以管理普通成员</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (id && managingMember && group) {
+                            setAdmin(id, managingMember.id, !isAdmin)
+                            
+                            // 发送系统消息到群聊
+                            const messages = localStorage.getItem(`group_messages_${id}`)
+                            const messageList = messages ? JSON.parse(messages) : []
+                            
+                            const notificationContent = !isAdmin
+                              ? `群主设置 ${managingMember.name} 为管理员 🛡️`
+                              : `群主取消了 ${managingMember.name} 的管理员身份`
+                            
+                            const systemMessage = {
+                              id: Date.now(),
+                              groupId: id,
+                              senderId: 'system',
+                              senderType: 'user',
+                              senderName: '系统',
+                              senderAvatar: '',
+                              content: notificationContent,
+                              time: new Date().toLocaleTimeString('zh-CN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              }),
+                              timestamp: Date.now(),
+                              messageType: 'system'
+                            }
+                            messageList.push(systemMessage)
+                            localStorage.setItem(`group_messages_${id}`, JSON.stringify(messageList))
+                          }
+                        }}
+                        className={`relative w-11 h-6 rounded-full transition-colors ${
+                          isAdmin ? 'bg-purple-500' : 'bg-gray-300'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                            isAdmin ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* 操作按钮 */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setManagingMember(null)}
+                  className="flex-1 py-2.5 border border-gray-300 rounded-lg text-gray-700 text-sm ios-button"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    if (id && managingMember && group) {
+                      const member = group.members.find(m => m.id === managingMember.id)
+                      const oldTitle = member?.title || ''
+                      
+                      // 保存头衔
+                      setTitle(id, managingMember.id, newTitle)
+                      
+                      // 发送系统消息到群聊
+                      const messages = localStorage.getItem(`group_messages_${id}`)
+                      const messageList = messages ? JSON.parse(messages) : []
+                      
+                      let notificationContent = ''
+                      if (newTitle && !oldTitle) {
+                        notificationContent = `群主给 ${managingMember.name} 设置了头衔：✨${newTitle}`
+                      } else if (newTitle && oldTitle) {
+                        notificationContent = `群主修改了 ${managingMember.name} 的头衔：✨${newTitle}`
+                      } else if (!newTitle && oldTitle) {
+                        notificationContent = `群主取消了 ${managingMember.name} 的头衔`
+                      }
+                      
+                      if (notificationContent) {
+                        const systemMessage = {
+                          id: Date.now(),
+                          groupId: id,
+                          senderId: 'system',
+                          senderType: 'user',
+                          senderName: '系统',
+                          senderAvatar: '',
+                          content: notificationContent,
+                          time: new Date().toLocaleTimeString('zh-CN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }),
+                          timestamp: Date.now(),
+                          messageType: 'system'
+                        }
+                        messageList.push(systemMessage)
+                        localStorage.setItem(`group_messages_${id}`, JSON.stringify(messageList))
+                      }
+                      
+                      alert('设置成功')
+                      setManagingMember(null)
+                    }
+                  }}
+                  className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm ios-button"
+                >
+                  保存
+                </button>
+                <button
+                  onClick={() => {
+                    if (id && managingMember && confirm(`确定要移除 ${managingMember.name} 吗？`)) {
+                      removeMember(id, managingMember.id)
+                      setManagingMember(null)
+                    }
+                  }}
+                  className="px-4 py-2.5 bg-red-600 text-white rounded-lg text-sm ios-button"
+                >
+                  移除
                 </button>
               </div>
             </div>

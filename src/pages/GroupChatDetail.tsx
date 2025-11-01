@@ -16,6 +16,14 @@ import { parseAIEmojiResponse } from '../utils/emojiParser'
 import { getEmojis, Emoji } from '../utils/emojiStorage'
 import EmojiPanel from '../components/EmojiPanel'
 import { generateGroupAIChat } from '../utils/groupAIChat'
+import { 
+  generateGroupChatScript, 
+  executeGroupChatScript, 
+  analyzeCharacterRelationships,
+  generateTriggerContext,
+  type GroupMemberProfile,
+  type GroupChatMessage as ScriptMessage
+} from '../utils/groupSocialDirector'
 
 interface GroupMessage {
   id: number
@@ -35,13 +43,15 @@ interface GroupMessage {
 const GroupChatDetail = () => {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { getGroup, updateGroup } = useGroup()
+  const { getGroup, updateGroup, groups } = useGroup()
   const { showStatusBar } = useSettings()
   const { getCharacter } = useCharacter()
   const { currentUser } = useUser()
   const { background, getBackgroundStyle } = useBackground()
   
-  const group = getGroup(id || '')
+  // 使用 groups 依赖确保实时更新
+  // 当groups变化时，group也会更新（用于退群后刷新成员列表）
+  const group = groups?.length >= 0 ? getGroup(id || '') : null
   const [messages, setMessages] = useState<GroupMessage[]>(() => {
     if (id) {
       const saved = localStorage.getItem(`group_messages_${id}`)
@@ -78,7 +88,7 @@ const GroupChatDetail = () => {
     scrollToBottom()
   }, [messages])
 
-  // 🤖 AI自由对话系统
+  // 🤖 AI自由对话系统 - 使用剧本导演
   useEffect(() => {
     if (!id || !group || isAiTyping) return
 
@@ -99,53 +109,137 @@ const GroupChatDetail = () => {
 
       try {
         setIsAiTyping(true)
-        console.log('🤖 触发AI自由对话...')
+        console.log('🤖 触发AI自由对话 - 使用剧本导演模式')
 
-        // 准备AI成员数据
-        const characterDescriptions = new Map<string, string>()
-        group.members
-          .filter(m => m.type === 'character')
-          .forEach(m => {
-            const char = getCharacter(m.id)
-            if (char) {
-              characterDescriptions.set(m.id, char.description || '')
-            }
-          })
+        // 1. 准备成员信息（包含身份和头衔）
+        const memberProfiles: GroupMemberProfile[] = group.members.map(member => {
+          const character = member.type === 'character' ? getCharacter(member.id) : null
+          return {
+            id: member.id,
+            name: member.name,
+            avatar: member.avatar,
+            type: member.type,
+            description: character?.description || character?.signature || '',
+            role: member.role,
+            title: member.title
+          }
+        })
 
-        // 调用AI决定是否发言
-        const result = await generateGroupAIChat(
-          id,
-          group.members,
-          messages,
-          characterDescriptions
+        // 2. 分析角色关系
+        const scriptMessages: ScriptMessage[] = messages.map(msg => ({
+          id: msg.id,
+          senderId: msg.senderId,
+          senderName: msg.senderName,
+          senderType: msg.senderType,
+          content: msg.content,
+          time: msg.time,
+          timestamp: msg.timestamp
+        }))
+
+        const relationships = analyzeCharacterRelationships(
+          memberProfiles,
+          scriptMessages,
+          { id: currentUser?.id || 'user', name: currentUser?.name || '我' }
         )
 
-        if (result && result.shouldSpeak) {
-          // 找到发言的角色
-          const speaker = group.members.find(m => m.id === result.speakerId)
-          if (speaker) {
-            // 添加AI消息
-            const aiMessage: GroupMessage = {
-              id: Date.now(),
+        // 3. 生成触发上下文 - 主动触发
+        const triggerContext = generateTriggerContext('active_trigger')
+
+        // 4. 生成剧本
+        const script = await generateGroupChatScript(
+          memberProfiles,
+          relationships,
+          scriptMessages,
+          { id: currentUser?.id || 'user', name: currentUser?.name || '我' },
+          triggerContext
+        )
+
+        if (!script) {
+          console.log('❌ AI自由对话：剧本生成失败')
+          setIsAiTyping(false)
+          return
+        }
+
+        // 5. 执行剧本
+        await executeGroupChatScript(
+          script,
+          id,
+          memberProfiles,
+          // 消息回调
+          (messageData) => {
+            const now = Date.now()
+            const newMessage: GroupMessage = {
+              id: now + Math.random() * 1000,
               groupId: id,
-              senderId: speaker.id,
-              senderType: 'character',
-              senderName: speaker.name,
-              senderAvatar: speaker.avatar,
-              content: result.content,
-              time: new Date().toLocaleTimeString('zh-CN', {
+              senderId: messageData.senderId,
+              senderType: messageData.senderType,
+              senderName: messageData.senderName,
+              senderAvatar: messageData.senderAvatar,
+              content: messageData.content,
+              time: new Date(now).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
               }),
-              timestamp: Date.now(),
+              timestamp: now,
               messageType: 'text'
             }
-
-            setMessages(prev => [...prev, aiMessage])
-            updateGroupLastMessage(result.content)
-            console.log(`💬 ${speaker.name}: ${result.content}`)
+            
+            setMessages(prev => [...prev, newMessage])
+            
+            // 💾 同步AI消息到所有AI的记忆
+            syncGroupChatToAIMemory(
+              messageData.senderId,
+              messageData.senderName,
+              messageData.content,
+              'ai'
+            )
+            
+            // 更新群聊最后消息
+            updateGroupLastMessage(`${messageData.senderName}: ${messageData.content}`)
+          },
+          // 退群回调
+          (memberId, memberName) => {
+            if (group) {
+              const updatedMembers = group.members.filter(m => m.id !== memberId)
+              updateGroup(group.id, { members: updatedMembers })
+              
+              const systemMessage: GroupMessage = {
+                id: Date.now(),
+                groupId: id,
+                senderId: 'system',
+                senderType: 'user',
+                senderName: '系统',
+                senderAvatar: '',
+                content: `${memberName} 退出了群聊`,
+                time: new Date().toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                timestamp: Date.now(),
+                messageType: 'system'
+              }
+              setMessages(prev => [...prev, systemMessage])
+            }
+          },
+          // 撤回消息回调
+          (actorId, actorName) => {
+            setMessages(prev => {
+              const lastMessageIndex = [...prev]
+                .reverse()
+                .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system')
+              
+              if (lastMessageIndex !== -1) {
+                const actualIndex = prev.length - 1 - lastMessageIndex
+                const newMessages = [...prev]
+                newMessages.splice(actualIndex, 1)
+                return newMessages
+              }
+              return prev
+            })
           }
-        }
+        )
+
+        console.log('✅ AI自由对话剧本执行完成')
       } catch (error) {
         console.error('❌ AI自由对话失败:', error)
       } finally {
@@ -157,7 +251,7 @@ const GroupChatDetail = () => {
       clearInterval(timer)
       console.log('🤖 AI自由对话定时器已清理')
     }
-  }, [id, group, messages, isAiTyping, getCharacter, updateGroup])
+  }, [id, group, messages, isAiTyping, getCharacter, updateGroup, currentUser])
 
   // 更新群聊最后消息
   const updateGroupLastMessage = (content: string) => {
@@ -170,6 +264,57 @@ const GroupChatDetail = () => {
         })
       })
     }
+  }
+
+  // 💾 同步群聊消息到AI角色的单聊记录（隐藏消息，用于记忆）
+  const syncGroupChatToAIMemory = (
+    senderId: string,
+    senderName: string,
+    content: string,
+    messageType: 'user' | 'ai' | 'other'
+  ) => {
+    if (!group) return
+
+    // 获取所有AI成员
+    const aiMembers = group.members.filter(m => m.type === 'character')
+    
+    aiMembers.forEach(member => {
+      try {
+        const chatKey = `chat_messages_${member.id}`
+        const chatMessages = localStorage.getItem(chatKey)
+        const messages = chatMessages ? JSON.parse(chatMessages) : []
+        
+        // 构建隐藏的系统消息
+        let systemContent = ''
+        if (messageType === 'user') {
+          systemContent = `💬 群聊[${group.name}]: 用户说: ${content}`
+        } else if (messageType === 'ai' && senderId === member.id) {
+          systemContent = `💬 群聊[${group.name}]: 我说: ${content}`
+        } else {
+          systemContent = `💬 群聊[${group.name}]: ${senderName}说: ${content}`
+        }
+        
+        const hiddenMessage = {
+          id: Date.now() + Math.random(),
+          type: 'system',
+          content: systemContent,
+          time: new Date().toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          timestamp: Date.now(),
+          messageType: 'system',
+          isHidden: true  // 标记为隐藏，仅用于AI记忆
+        }
+        
+        messages.push(hiddenMessage)
+        localStorage.setItem(chatKey, JSON.stringify(messages))
+        
+        console.log(`💾 已同步到 ${member.name} 的记忆:`, systemContent.substring(0, 50))
+      } catch (error) {
+        console.error(`同步到 ${member.name} 失败:`, error)
+      }
+    })
   }
 
   // 处理输入变化，检测@
@@ -383,24 +528,15 @@ const GroupChatDetail = () => {
     console.log('💬 用户消息:', userMessage.content)
     setMessages(prev => [...prev, userMessage])
     updateGroupLastMessage(userMessage.content)
+    
+    // 💾 同步用户消息到所有AI的记忆
+    syncGroupChatToAIMemory('user', currentUser?.name || '我', userMessage.content, 'user')
+    
     setInputValue('')
-
-    // 延迟2秒后触发AI回复（让用户看到自己的消息）
-    console.log('⏰ 设置2秒延迟触发AI回复')
-    setTimeout(async () => {
-      console.log('🎯 延迟结束，开始处理AI回复')
-      try {
-        // 先让AI抢红包
-        console.log('🧧 检查红包...')
-        await handleAiGrabRedEnvelopes()
-        console.log('💬 开始AI回复...')
-        // 然后AI回复消息
-        await handleAiReplies(userMessage)
-        console.log('✅ AI回复处理完成')
-      } catch (error) {
-        console.error('❌ AI回复出错:', error)
-      }
-    }, 2000)
+    
+    // ✅ 不再自动触发AI回复！
+    // 用户需要点击纸飞机按钮才能让AI回复
+    console.log('📝 消息已发送，点击纸飞机按钮让AI回复')
   }
 
   // 发送红包
@@ -442,10 +578,13 @@ const GroupChatDetail = () => {
 
   // 点击纸飞机触发AI主动发消息
   const handleAIReply = async () => {
-    if (isAiTyping || !group) return
+    if (isAiTyping || !group || !id) return
     
     // 先让AI抢红包
     await handleAiGrabRedEnvelopes()
+    
+    // 检查是否启用剧本导演模式（默认启用）
+    const useDirector = localStorage.getItem(`group_use_director_${id}`) !== 'false'
     
     // 获取最后一条用户消息
     const lastUserMessage = [...messages].reverse().find(msg => msg.senderType === 'user' && msg.messageType === 'text')
@@ -453,7 +592,11 @@ const GroupChatDetail = () => {
     // 如果有用户消息，就回复用户消息；否则让AI主动聊天
     if (lastUserMessage) {
       // 回复用户的消息
-      await handleAiReplies(lastUserMessage)
+      if (useDirector) {
+        await handleAiRepliesWithDirector(lastUserMessage)
+      } else {
+        await handleAiReplies(lastUserMessage)
+      }
     } else {
       // 空群聊或没有用户消息，让AI们主动聊天
       const promptHint = '(群里比较安静，AI们可以主动打招呼、聊聊天、分享自己的事情)'
@@ -474,7 +617,11 @@ const GroupChatDetail = () => {
         messageType: 'text'
       }
 
-      await handleAiReplies(virtualMessage)
+      if (useDirector) {
+        await handleAiRepliesWithDirector(virtualMessage)
+      } else {
+        await handleAiReplies(virtualMessage)
+      }
     }
   }
 
@@ -560,9 +707,198 @@ const GroupChatDetail = () => {
     }
   }
 
+  // 🎬 AI剧本导演版本 - 创造戏剧性的群聊互动
+  const handleAiRepliesWithDirector = async (userMessage: GroupMessage) => {
+    console.log('🎬 ========== 剧本导演模式开始 ==========')
+    console.trace('📞 handleAiRepliesWithDirector 调用堆栈')
+    if (!group || !id) {
+      console.log('❌ 没有群聊信息')
+      return
+    }
+
+    setIsAiTyping(true)
+    
+    try {
+      // 1. 准备成员信息（包含身份和头衔）
+      const memberProfiles: GroupMemberProfile[] = group.members.map(member => {
+        const character = member.type === 'character' ? getCharacter(member.id) : null
+        return {
+          id: member.id,
+          name: member.name,
+          avatar: member.avatar,
+          type: member.type,
+          description: character?.description || character?.signature || '',
+          role: member.role,
+          title: member.title
+        }
+      })
+
+      // 2. 分析角色关系
+      const scriptMessages: ScriptMessage[] = messages.map(msg => ({
+        id: msg.id,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderType: msg.senderType,
+        content: msg.content,
+        time: msg.time,
+        timestamp: msg.timestamp
+      }))
+
+      const relationships = analyzeCharacterRelationships(
+        memberProfiles,
+        scriptMessages,
+        { id: currentUser?.id || 'user', name: currentUser?.name || '我' }
+      )
+
+      // 3. 生成触发上下文
+      const triggerContext = generateTriggerContext(
+        'user_message',
+        userMessage.content,
+        currentUser?.name || '我'
+      )
+
+      // 4. 生成剧本
+      console.log('🎭 调用AI导演生成剧本...')
+      const script = await generateGroupChatScript(
+        memberProfiles,
+        relationships,
+        scriptMessages,
+        { id: currentUser?.id || 'user', name: currentUser?.name || '我' },
+        triggerContext
+      )
+
+      if (!script) {
+        console.log('❌ 剧本生成失败')
+        setIsAiTyping(false)
+        return
+      }
+
+      // 5. 执行剧本
+      console.log('🎬 开始执行剧本')
+      await executeGroupChatScript(
+        script,
+        id,
+        memberProfiles,
+        // 消息回调
+        (messageData) => {
+          const now = Date.now()
+          const newMessage: GroupMessage = {
+            id: now + Math.random() * 1000,
+            groupId: id,
+            senderId: messageData.senderId,
+            senderType: messageData.senderType,
+            senderName: messageData.senderName,
+            senderAvatar: messageData.senderAvatar,
+            content: messageData.content,
+            time: new Date(now).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: now,
+            messageType: 'text'
+          }
+          
+          setMessages(prev => [...prev, newMessage])
+          
+          // 💾 同步AI消息到所有AI的记忆
+          syncGroupChatToAIMemory(
+            messageData.senderId,
+            messageData.senderName,
+            messageData.content,
+            'ai'
+          )
+          
+          // 更新群聊最后消息
+          updateGroupLastMessage(`${messageData.senderName}: ${messageData.content}`)
+        },
+        // 退群回调
+        (memberId, memberName) => {
+          console.log(`🚪 处理退群: ${memberName} (${memberId})`)
+          
+          // 从群组中移除该成员
+          if (group) {
+            const updatedMembers = group.members.filter(m => m.id !== memberId)
+            updateGroup(group.id, {
+              members: updatedMembers
+            })
+            
+            // 添加系统消息
+            const systemMessage: GroupMessage = {
+              id: Date.now(),
+              groupId: id,
+              senderId: 'system',
+              senderType: 'user',
+              senderName: '系统',
+              senderAvatar: '',
+              content: `${memberName} 退出了群聊`,
+              time: new Date().toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              }),
+              timestamp: Date.now(),
+              messageType: 'system'
+            }
+            setMessages(prev => [...prev, systemMessage])
+            
+            console.log(`✅ ${memberName} 已从群聊中移除`)
+          }
+        },
+        // 撤回消息回调
+        (actorId, actorName) => {
+          console.log(`🔙 处理撤回: ${actorName} (${actorId})`)
+          
+          // 找到该角色的最后一条消息并删除
+          setMessages(prev => {
+            const lastMessageIndex = [...prev]
+              .reverse()
+              .findIndex(msg => msg.senderId === actorId && msg.messageType !== 'system')
+            
+            if (lastMessageIndex !== -1) {
+              const actualIndex = prev.length - 1 - lastMessageIndex
+              const newMessages = [...prev]
+              newMessages.splice(actualIndex, 1)
+              console.log(`✅ 已撤回 ${actorName} 的消息`)
+              return newMessages
+            }
+            
+            console.log(`⚠️ 没有找到 ${actorName} 的消息可撤回`)
+            return prev
+          })
+        }
+      )
+
+      console.log('✅ 剧本执行完成')
+      
+    } catch (error) {
+      console.error('❌ 剧本导演系统失败:', error)
+      
+      // 显示错误提示
+      const errorMessage: GroupMessage = {
+        id: Date.now(),
+        groupId: id,
+        senderId: 'system',
+        senderType: 'user',
+        senderName: '系统',
+        senderAvatar: '⚠️',
+        content: 'AI回复失败，请稍后重试',
+        time: new Date().toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        timestamp: Date.now(),
+        messageType: 'system'
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsAiTyping(false)
+    }
+  }
+
   // AI全员参与对话逻辑 - 一次API调用获取所有回复
   const handleAiReplies = async (userMessage: GroupMessage) => {
-    console.log('🤖 handleAiReplies 被调用，用户消息:', userMessage.content)
+    console.log('🤖 ========== 传统模式开始 ==========')
+    console.trace('📞 handleAiReplies 调用堆栈')
+    console.log('用户消息:', userMessage.content)
     if (!group) {
       console.log('❌ 没有群聊信息')
       return
@@ -1192,10 +1528,24 @@ ${aiMembersInfo[2] ? `[${aiMembersInfo[2].name}] 回复内容 或 SKIP` : ''}
 
                 {/* 消息内容 */}
                 <div className={`flex flex-col max-w-[70%] ${isUser ? 'items-end' : 'items-start'}`}>
-                  {/* 发送者名称 */}
-                  {!isUser && (
-                    <span className="text-xs text-gray-500 mb-1 px-2">{message.senderName}</span>
-                  )}
+                  {/* 发送者名称 + 头衔 */}
+                  {!isUser && (() => {
+                    const sender = group.members.find(m => m.id === message.senderId)
+                    return (
+                      <div className="flex items-center gap-1.5 mb-1 px-2">
+                        <span className="text-xs text-gray-500">{message.senderName}</span>
+                        {sender?.role === 'owner' && (
+                          <span className="text-[10px] px-1 py-0.5 bg-yellow-100 text-yellow-700 rounded">👑</span>
+                        )}
+                        {sender?.role === 'admin' && (
+                          <span className="text-[10px] px-1 py-0.5 bg-purple-100 text-purple-700 rounded">🛡️</span>
+                        )}
+                        {sender?.title && (
+                          <span className="text-[10px] px-1 py-0.5 bg-pink-100 text-pink-700 rounded">✨{sender.title}</span>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* 消息气泡 */}
                   <div

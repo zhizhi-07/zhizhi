@@ -59,13 +59,8 @@ export const MomentsProvider = ({ children }: { children: ReactNode }) => {
     // 压缩数据：移除不必要的字段，减少存储空间
     const compressedMoments = momentsToSave.map(moment => ({
       ...moment,
-      // 压缩图片数据（如果图片是base64，只保留前100个字符作为缩略图）
-      images: moment.images.map(img => ({
-        id: img.id,
-        url: img.url.startsWith('data:') && img.url.length > 1000 
-          ? img.url.substring(0, 100) + '...[compressed]'
-          : img.url
-      })),
+      // 保持图片完整（不截断，避免破坏图片显示）
+      images: moment.images,
       // 限制评论数量，每条朋友圈最多保留最近50条评论
       comments: moment.comments.slice(-50),
       // 限制点赞数量，每条朋友圈最多保留最近100个点赞

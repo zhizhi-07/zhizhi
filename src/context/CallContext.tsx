@@ -21,12 +21,14 @@ interface CallState {
   } | null
   messages: CallMessage[]
   isAITyping: boolean
+  startTime?: number // 通话开始时间戳
+  isAIInitiated?: boolean // 是否由AI主动发起
 }
 
 interface CallContextType {
   callState: CallState
-  startCall: (character: CallState['character'], isVideo: boolean) => void
-  endCall: () => void
+  startCall: (character: CallState['character'], isVideo: boolean, isAIInitiated?: boolean) => void
+  endCall: (onSaveRecord?: (messages: CallMessage[], duration: number, isVideo: boolean, characterId: string) => void) => void
   minimizeCall: () => void
   maximizeCall: () => void
   sendMessage: (message: string) => void
@@ -45,30 +47,44 @@ export const CallProvider = ({ children }: { children: ReactNode }) => {
     isMinimized: false,
     character: null,
     messages: [],
-    isAITyping: false
+    isAITyping: false,
+    startTime: undefined,
+    isAIInitiated: false
   })
 
-  const startCall = (character: CallState['character'], isVideo: boolean) => {
-    console.log('📞 启动通话:', character?.name, isVideo ? '视频' : '语音')
+  const startCall = (character: CallState['character'], isVideo: boolean, isAIInitiated: boolean = false) => {
+    console.log('📞 启动通话:', character?.name, isVideo ? '视频' : '语音', isAIInitiated ? '(AI主动)' : '(用户主动)')
     setCallState({
       isActive: true,
       isVideoCall: isVideo,
       isMinimized: false,
       character,
       messages: [],
-      isAITyping: false
+      isAITyping: false,
+      startTime: Date.now(),
+      isAIInitiated
     })
   }
 
-  const endCall = () => {
+  const endCall = (onSaveRecord?: (messages: CallMessage[], duration: number, isVideo: boolean, characterId: string) => void) => {
     console.log('📞 结束通话')
+    
+    // 保存通话记录
+    if (onSaveRecord && callState.character && callState.messages.length > 0 && callState.startTime) {
+      const duration = Math.floor((Date.now() - callState.startTime) / 1000) // 秒
+      console.log('💾 保存通话记录:', callState.messages.length, '条消息，时长:', duration, '秒')
+      onSaveRecord(callState.messages, duration, callState.isVideoCall, callState.character.id)
+    }
+    
     setCallState({
       isActive: false,
       isVideoCall: false,
       isMinimized: false,
       character: null,
       messages: [],
-      isAITyping: false
+      isAITyping: false,
+      startTime: undefined,
+      isAIInitiated: false
     })
   }
 

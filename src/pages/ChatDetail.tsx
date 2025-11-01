@@ -28,6 +28,7 @@ import IntimatePaySender from '../components/IntimatePaySender'
 import EmojiPanel from '../components/EmojiPanel'
 import FlipPhotoCard from '../components/FlipPhotoCard'
 import { Emoji } from '../utils/emojiStorage'
+import { retrieveMemes, getRandomMemes } from '../utils/memesRetrieval'
 import HtmlRenderer from '../components/offline/HtmlRenderer'
 import { useAiMoments } from '../hooks/useAiMoments'
 import { useMoments } from '../context/MomentsContext'
@@ -264,11 +265,8 @@ const ChatDetail = () => {
     return saved === 'true'
   })
 
-  // 从localStorage读取当前聊天的主动打电话设置
-  const [enableProactiveCalls, setEnableProactiveCalls] = useState(() => {
-    const saved = localStorage.getItem(`proactive_calls_enabled_${id}`)
-    return saved === null ? true : saved === 'true'  // 默认开启
-  })
+  // AI可以直接主动打电话，不需要设置开关
+  const enableProactiveCalls = true  // 始终开启
 
   // 读取气泡自定义设置 - 使用 state 以便响应变化
   const [userBubbleColor, setUserBubbleColor] = useState(() => {
@@ -530,6 +528,11 @@ const ChatDetail = () => {
   
   // 查看撤回消息原内容
   const [viewingRecalledMessage, setViewingRecalledMessage] = useState<Message | null>(null)
+  
+  // 撤回理由弹窗
+  const [showRecallReasonModal, setShowRecallReasonModal] = useState(false)
+  const [recallReason, setRecallReason] = useState('')
+  const [messageToRecall, setMessageToRecall] = useState<Message | null>(null)
   
   // 批量删除模式
   const [isBatchDeleteMode, setIsBatchDeleteMode] = useState(false)
@@ -853,9 +856,7 @@ const ChatDetail = () => {
       storageObserver.observe(`narrator_enabled_${id}`, (value) => {
         setEnableNarration(value === 'true')
       }),
-      storageObserver.observe(`proactive_calls_enabled_${id}`, (value) => {
-        setEnableProactiveCalls(value === null ? true : value === 'true')
-      })
+      // AI主动打电话功能始终开启，不需要监听设置变化
     ]
     
     return () => {
@@ -2206,16 +2207,33 @@ ${willAccept ?
         return
       }
       
-      const isUserMessage = longPressedMessage.type === 'sent'
+      // 打开撤回理由输入弹窗
+      setMessageToRecall(longPressedMessage)
+      setShowRecallReasonModal(true)
+      setShowMessageMenu(false)
+    }
+  }
+  
+  // 确认撤回消息（带理由）
+  const confirmRecallMessage = () => {
+    // 检查是否填写了撤回理由
+    if (!recallReason.trim()) {
+      alert('请填写撤回理由')
+      return
+    }
+    
+    if (messageToRecall) {
+      const isUserMessage = messageToRecall.type === 'sent'
       
       // 保留原始消息内容，但添加撤回标记
       // AI 可以看到原始内容，但用户界面显示撤回提示
       setMessages(prev => prev.map(msg => 
-        msg.id === longPressedMessage.id 
+        msg.id === messageToRecall.id 
           ? { 
               ...msg, 
               isRecalled: true, // 标记为已撤回
               recalledContent: msg.content || msg.emojiDescription || msg.photoDescription || msg.voiceText || '特殊消息', // 保存原始内容供AI查看
+              recallReason: recallReason.trim(), // 保存撤回理由
               originalType: msg.type as 'received' | 'sent', // 保存原始消息类型，用于判断撤回者
               content: isUserMessage ? '你撤回了一条消息' : `${character?.name || '对方'}撤回了一条消息`, // 用户界面显示的内容
               type: 'system' as const, 
@@ -2223,7 +2241,11 @@ ${willAccept ?
             }
           : msg
       ))
-      setShowMessageMenu(false)
+      
+      // 重置状态
+      setShowRecallReasonModal(false)
+      setRecallReason('')
+      setMessageToRecall(null)
       setLongPressedMessage(null)
     }
   }
@@ -2549,10 +2571,10 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
       const lastUserMsg = currentMessages.filter(m => m.type === 'sent').slice(-1)[0]
       const userMessageContent = lastUserMsg?.content || ''
       
-      console.log('🟢 步骤2: 导入梗库工具')
+      console.log('🟢 步骤2: 梗库工具已就绪')
       // 🔥 基于对话上下文匹配可能用到的梗（类似世界书）
-      const { retrieveMemes, getRandomMemes } = await import('../utils/memesRetrieval')
-      console.log('🟢 步骤2完成: 梗库工具导入成功')
+      // retrieveMemes 和 getRandomMemes 已在顶部静态导入
+      console.log('🟢 步骤2完成: 梗库工具就绪')
       
       // 获取最近10条消息的内容作为上下文（包括AI可能想说的话的情绪）
       const recentContext = currentMessages
@@ -4161,52 +4183,9 @@ ${emojiInstructions}
         cleanedResponse = cleanedResponse.replace(/\[引用:\s*\d+\]/g, '').trim()
         console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
         
-        // 检查AI回复是否重复了引用内容（避免不必要的重复）
-        const quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
-        if (quotedMsg) {
-          const quotedContent = quotedMsg.isRecalled && quotedMsg.recalledContent 
-            ? quotedMsg.recalledContent 
-            : (quotedMsg.content || quotedMsg.emojiDescription || quotedMsg.photoDescription || quotedMsg.voiceText || '')
-          
-          const cleanedQuoted = quotedContent.trim()
-          const cleanedReply = cleanedResponse.trim()
-          
-          // 情况1: 完全相同
-          if (cleanedReply === cleanedQuoted) {
-            console.log('⚠️ AI回复与引用内容完全相同，已移除')
-            cleanedResponse = ''
-          }
-          // 情况2: AI回复以引用内容开头（重复了引用内容）
-          else if (cleanedReply.startsWith(cleanedQuoted) && cleanedReply.length > cleanedQuoted.length) {
-            // 检查是否是简单重复延伸（如"呀呀" -> "呀呀呀呀"）
-            const afterQuote = cleanedReply.substring(cleanedQuoted.length).trim()
-            const quotedChar = cleanedQuoted.charAt(cleanedQuoted.length - 1)
-            
-            // 如果后面的内容都是重复的字符或标点，说明是无意义延伸
-            if (afterQuote.split('').every(c => c === quotedChar || c === '.' || c === '。' || c === '!' || c === '！' || c === '?' || c === '？')) {
-              console.log('⚠️ AI回复是引用内容的简单重复延伸，已移除重复部分')
-              cleanedResponse = afterQuote.replace(new RegExp(`^${quotedChar}+`, 'g'), '').trim()
-            }
-            // 如果后面有实质性内容，只移除开头的重复部分
-            else if (afterQuote.length < cleanedQuoted.length * 0.5) {
-              // 后续内容很短，可能是不小心重复了
-              console.log('⚠️ AI回复以引用内容开头，移除重复部分')
-              cleanedResponse = afterQuote
-            }
-          }
-          // 情况3: 引用内容很短（如"呀呀"），AI回复也很短且相似
-          else if (cleanedQuoted.length <= 4 && cleanedReply.length <= 8) {
-            // 检查是否是同一个字符的重复
-            const quotedChars = new Set(cleanedQuoted.split(''))
-            const replyChars = cleanedReply.split('')
-            const isSimilarRepeat = replyChars.filter(c => quotedChars.has(c)).length / replyChars.length > 0.8
-            
-            if (isSimilarRepeat && !cleanedReply.includes('，') && !cleanedReply.includes(',') && !cleanedReply.includes('。')) {
-              console.log('⚠️ AI回复是引用内容的相似重复，已移除')
-              cleanedResponse = ''
-            }
-          }
-        }
+        // 不再自动移除与引用相同的内容
+        // AI可能就是想重复强调，或者多次引用
+        console.log('💬 AI使用了引用功能，保留原始回复内容')
       }
       
       // 检查AI是否要撤回消息
@@ -4498,20 +4477,25 @@ ${emojiInstructions}
           
           const now = Date.now()
           
-          // 如果处理后文字内容为空，跳过这条消息
-          if (!textContent || !textContent.trim()) {
-            console.log('⚠️ 文字内容为空，跳过消息')
+          // 查找引用的消息
+          let quotedMsg = null
+          if (aiQuotedMessageId) {
+            quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
+          }
+          
+          // 如果处理后文字内容为空但有引用，使用引用内容作为提示
+          if ((!textContent || !textContent.trim()) && !quotedMsg) {
+            console.log('⚠️ 文字内容为空且无引用，跳过消息')
           } else {
-            // 查找引用的消息
-            let quotedMsg = null
-            if (aiQuotedMessageId) {
-              quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
-            }
+            // 如果只有引用没有文字，使用一个占位内容
+            const finalContent = (textContent && textContent.trim()) 
+              ? textContent 
+              : (quotedMsg ? '...' : '')
             
             const aiMessage: Message = {
               id: newMessages.length + 1,
               type: 'received',
-              content: textContent,
+              content: finalContent,
             time: new Date().toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit',
@@ -4599,22 +4583,27 @@ ${emojiInstructions}
               }
             }
             
-            // 如果处理后文字内容为空，跳过这条消息
-            if (!textContent || !textContent.trim()) {
-              console.log(`⚠️ 多行消息第${i+1}条内容为空，跳过`)
-              continue
-            }
-            
             // 查找引用的消息（只在第一条消息添加引用）
             let quotedMsg = null
             if (i === 0 && aiQuotedMessageId) {
               quotedMsg = currentMessages.find(m => m.id === aiQuotedMessageId)
             }
             
+            // 如果处理后文字内容为空，检查是否有引用
+            if ((!textContent || !textContent.trim()) && !quotedMsg) {
+              console.log(`⚠️ 多行消息第${i+1}条内容为空且无引用，跳过`)
+              continue
+            }
+            
+            // 如果只有引用没有文字，使用占位内容
+            const finalContent = (textContent && textContent.trim()) 
+              ? textContent 
+              : (quotedMsg ? '...' : '')
+            
             const aiMessage: Message = {
               id: newMessages.length + 1,
               type: 'received',
-              content: textContent,
+              content: finalContent,
               time: new Date().toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -7373,44 +7362,113 @@ ${emojiInstructions}
         </>
       )}
 
-      {/* 查看撤回消息弹窗 */}
-      {viewingRecalledMessage && (
-        <>
-          {/* 遮罩层 */}
+      {/* 撤回理由输入弹窗 */}
+      {showRecallReasonModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+        >
           <div 
-            className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
-            style={{
-              backdropFilter: 'blur(5px)',
-              WebkitBackdropFilter: 'blur(5px)',
+            className="absolute inset-0 bg-black/30"
+            onClick={() => {
+              setShowRecallReasonModal(false)
+              setRecallReason('')
+              setMessageToRecall(null)
             }}
-            onClick={() => setViewingRecalledMessage(null)}
+          />
+          <div 
+            className="relative glass-card rounded-3xl p-6 mx-4 max-w-sm w-full shadow-2xl border border-white/20"
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* 弹窗内容 */}
-            <div 
-              className="bg-white rounded-2xl p-6 mx-4 max-w-sm w-full shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="text-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {viewingRecalledMessage.content?.includes('你撤回了') ? '你' : (character?.name || 'AI')}撤回的消息
-                </h3>
-              </div>
-              
-              <div className="bg-gray-50 rounded-xl p-4 mb-4 max-h-60 overflow-y-auto">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-                  {viewingRecalledMessage.recalledContent || '无内容'}
-                </p>
-              </div>
-              
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                撤回消息
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">请输入撤回理由（必填）</p>
+            </div>
+            
+            <textarea
+              value={recallReason}
+              onChange={(e) => setRecallReason(e.target.value)}
+              placeholder="例如：发错了、说错话了..."
+              className="w-full bg-white/50 rounded-2xl px-4 py-3 text-sm text-gray-900 border border-white/30 outline-none focus:border-primary resize-none mb-4"
+              rows={3}
+              maxLength={100}
+              required
+            />
+            
+            <div className="flex gap-3">
               <button
-                onClick={() => setViewingRecalledMessage(null)}
-                className="w-full py-3 bg-wechat-green text-white rounded-xl font-medium hover:bg-green-600 transition-colors"
+                onClick={() => {
+                  setShowRecallReasonModal(false)
+                  setRecallReason('')
+                  setMessageToRecall(null)
+                }}
+                className="flex-1 glass-card rounded-xl py-3 text-sm font-medium text-gray-700 border border-white/30"
               >
-                关闭
+                取消
+              </button>
+              <button
+                onClick={confirmRecallMessage}
+                disabled={!recallReason.trim()}
+                className={`flex-1 rounded-xl py-3 text-sm font-medium text-white shadow-lg transition-all ${
+                  recallReason.trim() 
+                    ? 'bg-gradient-to-r from-red-400 to-pink-400 hover:from-red-500 hover:to-pink-500' 
+                    : 'bg-gray-300 cursor-not-allowed'
+                }`}
+              >
+                确认撤回
               </button>
             </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* 查看撤回消息弹窗 */}
+      {viewingRecalledMessage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+          }}
+        >
+          <div 
+            className="absolute inset-0 bg-black/20"
+            onClick={() => setViewingRecalledMessage(null)}
+          />
+          <div 
+            className="relative glass-card rounded-3xl p-6 mx-4 max-w-md w-full shadow-2xl border border-white/30"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {viewingRecalledMessage.originalType === 'sent' ? '你' : (character?.name || 'AI')}撤回的消息
+              </h3>
+              {viewingRecalledMessage.recallReason && (
+                <p className="text-xs text-gray-500 mt-1">
+                  理由：{viewingRecalledMessage.recallReason}
+                </p>
+              )}
+            </div>
+            
+            <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 mb-4 max-h-80 overflow-y-auto border border-white/20">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+                {viewingRecalledMessage.recalledContent || '无内容'}
+              </p>
+            </div>
+            
+            <button
+              onClick={() => setViewingRecalledMessage(null)}
+              className="w-full glass-card border border-white/30 rounded-2xl py-3 text-sm font-medium text-gray-700 hover:bg-white/50 transition-all"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
       )}
 
       {/* 情侣空间内容创建弹窗 */}

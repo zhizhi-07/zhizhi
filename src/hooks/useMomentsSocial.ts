@@ -1,16 +1,19 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useMoments } from '../context/MomentsContext'
 import { useCharacter } from '../context/CharacterContext'
-import { triggerAIReactToComment, aiInteractWithMomentSocial } from '../utils/aiMomentsSocial'
+import { generateMovieScript, executeMovieScript } from '../utils/aiSocialDirector'
+import { useUser } from '../context/UserContext'
 
 // 监听朋友圈评论变化和新朋友圈，触发AI互动
 export const useMomentsSocial = () => {
-  const { moments, likeMoment, addComment } = useMoments()
-  const { characters } = useCharacter()
+  const momentsAPI = useMoments()
+  const { moments, likeMoment, addComment } = momentsAPI
+  const charactersAPI = useCharacter()
+  const { characters, getCharacter } = charactersAPI
+  const { currentUser } = useUser()
   const prevMomentsRef = useRef(moments)
   const processedMomentsRef = useRef(new Set<string>())
-  const processedCommentsRef = useRef(new Set<string>()) // 记录已处理的评论
-  const momentInteractionCountRef = useRef<{ [key: string]: number }>({}) // 记录每条朋友圈的互动轮数
+  const lastScriptTimeRef = useRef<{ [key: string]: number }>({}) // 记录每条朋友圈最后生成剧本的时间
   
   // 🚨 紧急停止开关：如果设置为true，完全停止AI互动
   const emergencyStop = localStorage.getItem('emergency_stop_ai_moments') === 'true'
@@ -20,103 +23,115 @@ export const useMomentsSocial = () => {
     return
   }
 
-  // 获取聊天记录的辅助函数
-  const getChatMessages = (characterId: string) => {
-    const chatMessages = localStorage.getItem(`chat_messages_${characterId}`)
-    return chatMessages 
-      ? JSON.parse(chatMessages).slice(-10).map((msg: any) => ({
-          role: msg.type === 'sent' ? 'user' as const : 'assistant' as const,
-          content: msg.content
-        }))
-      : []
-  }
+  //获取聊天历史（分析角色关系）
+  const getChatHistory = useCallback((characterId: string, authorName: string): string => {
+    const saved = localStorage.getItem(`chat_messages_${characterId}`)
+    if (!saved) return `与 ${authorName} 之间没有聊天记录。`
+    
+    try {
+      const messages = JSON.parse(saved)
+      // 简化：直接返回最近20条消息的内容摘要
+      return '关系摘要：' + messages.slice(-20).map((m: any) => m.content).join('; ')
+    } catch (e) {
+      return '聊天记录解析失败。'
+    }
+  }, [])
 
   useEffect(() => {
     const prevMoments = prevMomentsRef.current
     
+    // 检测新发布的朋友圈和评论变化
     moments.forEach((currentMoment) => {
       const prevMoment = prevMoments.find(m => m.id === currentMoment.id)
+      const isNewMoment = !prevMoment
+      const hasNewComments = prevMoment && currentMoment.comments.length > prevMoment.comments.length
       
-      // 检测新朋友圈（AI发布的）
-      if (!prevMoment && !processedMomentsRef.current.has(currentMoment.id)) {
-        // 这是一条新朋友圈
+      // 处理新朋友圈
+      if (isNewMoment && !processedMomentsRef.current.has(currentMoment.id)) {
         processedMomentsRef.current.add(currentMoment.id)
         
-        // 如果是AI发布的，暂时不触发其他AI（避免复杂性）
-        const isAIMoment = characters.some(c => c.id === currentMoment.userId)
-        if (isAIMoment) {
-          console.log(`📭 ${currentMoment.userName} 发布了新朋友圈（AI发布的朋友圈暂不触发其他AI）`)
+        console.log(`🎬 检测到新朋友圈: "${currentMoment.content.substring(0, 20)}..."，移交AI社交总监处理。`)
+
+        // 获取发布者信息
+        const authorIsAI = characters.some(c => c.id === currentMoment.userId)
+        const momentAuthor = authorIsAI 
+          ? getCharacter(currentMoment.userId)
+          : (currentUser ? { id: currentUser.id, name: currentUser.name } : null)
+
+        if (!momentAuthor) {
+          console.error('❌ 找不到朋友圈发布者信息')
+          return
         }
+
+        // 延迟执行，给系统一点反应时间
+        setTimeout(async () => {
+          // 1. 调用AI电影编剧生成完整剧本
+          const script = await generateMovieScript(
+            currentMoment,
+            characters,
+            momentAuthor,
+            (charId) => getChatHistory(charId, momentAuthor.name)
+          )
+
+          if (script) {
+            // 2. 执行电影剧本
+            executeMovieScript(
+              script,
+              currentMoment,
+              momentsAPI,
+              charactersAPI
+            )
+          }
+        }, 2000 + Math.random() * 3000) // 2-5秒后AI开始有反应
       }
       
-      // 检测朋友圈评论的变化
-      if (prevMoment && currentMoment.comments.length > prevMoment.comments.length) {
-        // 有新评论
-        const newComments = currentMoment.comments.slice(prevMoment.comments.length)
+      // 处理新评论（评论区有新互动时，重新编排剧本）
+      if (hasNewComments) {
+        // 防抖：避免短时间内重复生成剧本
+        const lastScriptTime = lastScriptTimeRef.current[currentMoment.id] || 0
+        const timeSinceLastScript = Date.now() - lastScriptTime
+        const MIN_INTERVAL = 10000 // 最少间隔10秒
         
-        newComments.forEach((newComment) => {
-          // 生成评论的唯一ID，防止重复处理
-          const commentKey = `${currentMoment.id}-${newComment.id}`
-          if (processedCommentsRef.current.has(commentKey)) {
-            console.log(`⏭️ 评论已处理过，跳过: ${commentKey}`)
-            return
+        if (timeSinceLastScript < MIN_INTERVAL) {
+          console.log(`⏸️ 朋友圈 ${currentMoment.id} 在 ${Math.floor(timeSinceLastScript/1000)}秒前刚生成过剧本，跳过`)
+          return
+        }
+        
+        console.log(`💬 检测到朋友圈有新评论，AI电影编剧重新编排剧本...`)
+        lastScriptTimeRef.current[currentMoment.id] = Date.now()
+        
+        const authorIsAI = characters.some(c => c.id === currentMoment.userId)
+        const momentAuthor = authorIsAI 
+          ? getCharacter(currentMoment.userId)
+          : (currentUser ? { id: currentUser.id, name: currentUser.name } : null)
+        
+        if (!momentAuthor) {
+          console.error('❌ 找不到朋友圈发布者信息')
+          return
+        }
+        
+        // 延迟执行，让评论先显示出来
+        setTimeout(async () => {
+          const script = await generateMovieScript(
+            currentMoment,
+            characters,
+            momentAuthor,
+            (charId) => getChatHistory(charId, momentAuthor.name)
+          )
+          
+          if (script) {
+            executeMovieScript(
+              script,
+              currentMoment,
+              momentsAPI,
+              charactersAPI
+            )
           }
-          
-          processedCommentsRef.current.add(commentKey)
-          console.log(`🔔 检测到新评论: ${newComment.userName} 在 ${currentMoment.userName} 的朋友圈评论了`)
-          
-          // 检查评论中是否@了某个AI
-          const mentionMatch = newComment.content.match(/@(\S+)/)
-          let mentionedAIName: string | null = null
-          
-          if (mentionMatch) {
-            const mentionedName = mentionMatch[1]
-            const mentionedAI = characters.find(c => c.name === mentionedName)
-            if (mentionedAI) {
-              mentionedAIName = mentionedName
-              console.log(`👤 评论中@了 ${mentionedName}`)
-            }
-          }
-          
-          // 等待一下，确保状态已更新，并且localStorage中的聊天记录也已更新
-          setTimeout(() => {
-            // 从最新的moments中获取这条朋友圈，确保包含所有最新评论
-            const latestMoment = moments.find(m => m.id === currentMoment.id)
-            if (latestMoment) {
-              console.log(`📝 传递给AI的朋友圈包含 ${latestMoment.comments.length} 条评论`)
-              
-              // 检查这条朋友圈的互动轮数，防止无限循环（限制改为20轮）
-              const interactionCount = momentInteractionCountRef.current[currentMoment.id] || 0
-              if (interactionCount >= 20) {
-                console.log(`🛑 朋友圈 ${currentMoment.id} 已经互动了${interactionCount}轮，停止触发`)
-                return
-              }
-              
-              // 记录互动轮数
-              momentInteractionCountRef.current[currentMoment.id] = interactionCount + 1
-              console.log(`🔄 第 ${interactionCount + 1} 轮互动`)
-              
-              // 如果评论中@了某个AI，优先触发那个AI（但不排除其他AI）
-              if (mentionedAIName) {
-                console.log(`🎯 评论中@了 ${mentionedAIName}，该AI会优先看到`)
-              }
-              
-              triggerAIReactToComment(
-                latestMoment.id,
-                latestMoment,
-                newComment.userName,
-                characters,
-                getChatMessages,
-                likeMoment,
-                addComment
-              )
-            }
-          }, 500)
-        })
+        }, 1500 + Math.random() * 2000) // 1.5-3.5秒后AI开始反应
       }
     })
     
     // 更新引用
     prevMomentsRef.current = moments
-  }, [moments, characters, likeMoment, addComment, getChatMessages])
+  }, [moments, characters, currentUser, likeMoment, addComment, getCharacter, momentsAPI, charactersAPI, getChatHistory])
 }
