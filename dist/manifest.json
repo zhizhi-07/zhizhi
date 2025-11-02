@@ -1,0 +1,59 @@
+{
+  "name": "汁汁 - AI智能聊天应用",
+  "short_name": "汁汁",
+  "description": "汁汁 - 功能完整的AI聊天应用，支持智能对话、朋友圈、红包转账等功能",
+  "start_url": "/zhizhi/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#07C160",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/zhizhi/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/zhizhi/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "productivity"],
+  "screenshots": [
+    {
+      "src": "/zhizhi/screenshot-1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "label": "聊天界面"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "聊天",
+      "short_name": "聊天",
+      "description": "打开聊天列表",
+      "url": "/zhizhi/",
+      "icons": [
+        {
+          "src": "/zhizhi/icon-chat.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "朋友圈",
+      "short_name": "朋友圈",
+      "description": "查看朋友圈",
+      "url": "/zhizhi/moments",
+      "icons": [
+        {
+          "src": "/zhizhi/icon-moments.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ]
+}
