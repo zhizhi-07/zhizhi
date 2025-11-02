@@ -113,6 +113,11 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
       ...groupData,
       id: `group_${Date.now()}`,
       createdAt: new Date().toISOString(),
+      lastMessage: '开始群聊吧',  // 添加默认最后消息
+      lastMessageTime: new Date().toLocaleTimeString('zh-CN', {  // 添加默认时间
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
       settings: {
         ...groupData.settings,
         allowMemberInvite: groupData.settings?.allowMemberInvite ?? true,
@@ -124,6 +129,7 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     setGroups(prev => [newGroup, ...prev])
+    console.log('✅ 群聊已创建并添加到列表:', newGroup.name, newGroup.id)
     return newGroup.id
   }
 
@@ -132,10 +138,36 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const deleteGroup = (id: string) => {
-    // 不删除群聊，只标记为已解散
-    setGroups(prev => prev.map(g => 
+    const group = groups.find(g => g.id === id)
+    if (!group) return
+
+    // 询问用户是否同时删除数据
+    const shouldDeleteData = confirm(
+      `确定要解散群聊"${group.name}"吗？\n\n是否同时删除群聊记录和红包数据？\n\n• 点击"确定"：解散群聊并删除所有数据\n• 点击"取消"：仅解散群聊，保留数据`
+    )
+
+    if (shouldDeleteData) {
+      // 删除群消息
+      localStorage.removeItem(`group_messages_${id}`)
+      console.log(`✅ 已删除群 ${id} 的消息记录`)
+
+      // 清理群红包
+      try {
+        const allRedEnvelopes = JSON.parse(localStorage.getItem('group_red_envelopes') || '[]')
+        const filtered = allRedEnvelopes.filter((e: any) => e.groupId !== id)
+        localStorage.setItem('group_red_envelopes', JSON.stringify(filtered))
+        console.log(`✅ 已删除群 ${id} 的红包记录`)
+      } catch (e) {
+        console.error('清理群红包失败:', e)
+      }
+    }
+
+    // 标记为已解散
+    setGroups(prev => prev.map(g =>
       g.id === id ? { ...g, disbanded: true } : g
     ))
+
+    console.log(`✅ 群聊"${group.name}"已解散${shouldDeleteData ? '，数据已清理' : ''}`)
   }
 
   const getGroup = (id: string) => {
@@ -162,6 +194,22 @@ export const GroupProvider = ({ children }: { children: ReactNode }) => {
   const removeMember = (groupId: string, memberId: string) => {
     setGroups(prev => prev.map(g => {
       if (g.id === groupId) {
+        // 清理该成员的红包领取记录
+        try {
+          const redEnvelopes = JSON.parse(localStorage.getItem('group_red_envelopes') || '[]')
+          const updatedEnvelopes = redEnvelopes.map((envelope: any) => {
+            if (envelope.groupId === groupId && envelope.received[memberId]) {
+              const { [memberId]: removed, ...remainingReceived } = envelope.received
+              return { ...envelope, received: remainingReceived }
+            }
+            return envelope
+          })
+          localStorage.setItem('group_red_envelopes', JSON.stringify(updatedEnvelopes))
+          console.log(`✅ 已清理成员 ${memberId} 在群 ${groupId} 的红包记录`)
+        } catch (e) {
+          console.error('清理群成员红包记录失败:', e)
+        }
+
         return {
           ...g,
           members: g.members.filter(m => m.id !== memberId)

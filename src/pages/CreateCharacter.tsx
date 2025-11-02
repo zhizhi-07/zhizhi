@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
 import { ImageIcon } from '../components/Icons'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { toPinyin } from '../utils/pinyin'

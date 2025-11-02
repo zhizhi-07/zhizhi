@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import AIPhoneModal from '../components/AIPhoneModal'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { getPhoneHistory, PhoneHistory } from '../utils/aiPhoneGenerator'
 import { backgroundGenerator, BackgroundTask } from '../utils/backgroundPhoneGenerator'
 

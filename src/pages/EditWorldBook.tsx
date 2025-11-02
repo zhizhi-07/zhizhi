@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { lorebookManager, Lorebook, LorebookEntry } from '../utils/lorebookSystem'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 
 const EditWorldBook = () => {
   const navigate = useNavigate()

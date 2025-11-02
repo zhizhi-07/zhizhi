@@ -15,26 +15,53 @@ export const getItem = <T>(key: string, defaultValue: T): T => {
   }
 }
 
-export const setItem = (key: string, value: any): boolean => {
+export const setItem = async (key: string, value: any): Promise<boolean> => {
   const jsonString = JSON.stringify(value)
   try {
     localStorage.setItem(key, jsonString)
     return true
   } catch (error) {
     if (error instanceof Error && error.name === 'QuotaExceededError') {
-      // 静默尝试自动清理，不输出错误日志（避免频繁打扰）
+      console.warn('⚠️ localStorage 超限，尝试自动清理...')
       autoCleanIfNeeded()
-      
+
       // 再次尝试保存
       try {
         localStorage.setItem(key, jsonString)
+        console.log('✅ 清理后保存成功')
         return true
       } catch (retryError) {
-        // 只在真正失败时才提示用户
-        console.error('❌ 存储空间不足，保存失败')
-        console.warn('⚠️ localStorage 存储失败（这是正常的，数据已自动保存到 IndexedDB）')
-        console.log('💡 提示：大部分数据已迁移到 IndexedDB，不影响使用')
-        return false
+        // 降级到 IndexedDB
+        console.warn('⚠️ localStorage 仍然超限，降级到 IndexedDB')
+        try {
+          // 动态导入 IndexedDB 模块
+          const { setIndexedDBItem } = await import('./indexedDBStorage')
+
+          // 根据 key 判断存储到哪个 store
+          let storeName = 'settings'
+          if (key.startsWith('chat_messages_')) {
+            storeName = 'chat_messages'
+          } else if (key.startsWith('group_messages_')) {
+            storeName = 'group_messages'
+          } else if (key === 'moments') {
+            storeName = 'moments'
+          }
+
+          await setIndexedDBItem(storeName, { key, value })
+          console.log(`✅ 数据已保存到 IndexedDB (${storeName})`)
+
+          // 提示用户
+          if (!sessionStorage.getItem('indexeddb_fallback_notified')) {
+            console.log('💡 提示：由于存储空间不足，部分数据已自动保存到 IndexedDB')
+            sessionStorage.setItem('indexeddb_fallback_notified', 'true')
+          }
+
+          return true
+        } catch (idbError) {
+          console.error('❌ IndexedDB 也失败了:', idbError)
+          alert('存储空间严重不足！\n\n请清理浏览器数据或删除一些聊天记录。')
+          return false
+        }
       }
     }
     console.error('Storage error:', error)
@@ -48,28 +75,50 @@ const cleanUnimportantData = (): void => {
     console.log('🧹 开始清理缓存数据')
     console.log('💬 聊天记录不会被清理')
     console.log('📱 朋友圈不会被清理')
-    console.log('🗑️ 只清理临时缓存')
-    
+    console.log('🗑️ 只清理超过1小时的临时缓存')
+
     let cleanedCount = 0
-    
-    // 只清理缓存数据（temp_、cache_、preview_ 开头的）
+    const now = Date.now()
+    const ONE_HOUR = 60 * 60 * 1000
+
+    // 只清理超过1小时的缓存数据（temp_、cache_、preview_ 开头的）
     const cacheKeys = ['temp_', 'cache_', 'preview_']
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const key = localStorage.key(i)
       if (key && cacheKeys.some(prefix => key.startsWith(prefix))) {
-        localStorage.removeItem(key)
-        cleanedCount++
-        console.log(`🗑️ 清理缓存: ${key}`)
+        try {
+          const data = localStorage.getItem(key)
+          if (data) {
+            // 尝试解析数据，检查时间戳
+            const parsed = JSON.parse(data)
+            if (parsed.timestamp && now - parsed.timestamp > ONE_HOUR) {
+              // 只删除超过1小时的数据
+              localStorage.removeItem(key)
+              cleanedCount++
+              console.log(`🗑️ 清理过期缓存: ${key}`)
+            } else if (!parsed.timestamp) {
+              // 没有时间戳的旧数据也删除
+              localStorage.removeItem(key)
+              cleanedCount++
+              console.log(`🗑️ 清理无时间戳缓存: ${key}`)
+            }
+          }
+        } catch (e) {
+          // 无法解析的数据直接删除
+          localStorage.removeItem(key)
+          cleanedCount++
+          console.log(`🗑️ 清理无效缓存: ${key}`)
+        }
       }
     }
-    
+
     if (cleanedCount === 0) {
-      console.log('ℹ️ 没有找到可清理的缓存数据')
+      console.log('ℹ️ 没有找到可清理的过期缓存数据')
       console.log('💡 建议：手动清理浏览器缓存或删除不需要的数据')
     } else {
-      console.log(`✅ 清理完成，共清理 ${cleanedCount} 个缓存项`)
+      console.log(`✅ 清理完成，共清理 ${cleanedCount} 个过期缓存项`)
     }
-    
+
     console.log('✅ 聊天记录和朋友圈已完整保留')
   } catch (error) {
     console.error('清理存储空间失败:', error)

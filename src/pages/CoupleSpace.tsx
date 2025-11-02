@@ -3,15 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
-import { useUser } from '../context/UserContext'
-import { 
-  getCoupleSpaceRelation, 
-  createCoupleSpaceInvite, 
+import { useCharacter, useUser } from '../context/ContactsContext'
+import {
+  getCoupleSpaceRelation,
+  createCoupleSpaceInvite,
   endCoupleSpaceRelation,
   getCoupleSpacePrivacy,
   setCoupleSpacePrivacy,
-  type CoupleSpaceRelation 
+  type CoupleSpaceRelation
 } from '../utils/coupleSpaceUtils'
 
 const CoupleSpace = () => {

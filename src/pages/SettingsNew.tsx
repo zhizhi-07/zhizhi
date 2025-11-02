@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useRef } from 'react'
 import StatusBar from '../components/StatusBar'
-import { useUser } from '../context/UserContext'
-import { 
+import { useUser } from '../context/ContactsContext'
+import {
   BackIcon, SearchIcon,
   SignalIcon, BellIcon, VolumeIcon, MoonIcon, SettingsIcon,
   SunIcon, LockIcon, ShieldIcon, ImageIcon, KeyIcon

@@ -1,7 +1,7 @@
 import { useCall } from '../context/CallContext'
 import CallScreen from './CallScreen'
 import { callAI } from '../utils/api'
-import { useUser } from '../context/UserContext'
+import { useUser } from '../context/ContactsContext'
 import { useEffect, useRef } from 'react'
 
 /**

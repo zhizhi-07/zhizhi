@@ -12,28 +12,14 @@
  * - LCP (Largest Contentful Paint) 改善明显
  */
 
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { useEffect, lazy, Suspense } from 'react'
-import { SettingsProvider } from './context/SettingsContext'
-import { UserProvider } from './context/UserContext'
-import { CharacterProvider } from './context/CharacterContext'
-import { MomentsProvider } from './context/MomentsContext'
 import './utils/clearAvatarCache' // 导入清理工具，使其在控制台可用
 import './utils/emergencyCleanup' // 导入紧急清理工具
-import { ApiProvider } from './context/ApiContext'
-import { RedEnvelopeProvider } from './context/RedEnvelopeContext'
-import { ThemeProvider } from './context/ThemeContext'
-import { BackgroundProvider } from './context/BackgroundContext'
-import { AccountingProvider } from './context/AccountingContext'
-import { GroupProvider } from './context/GroupContext'
-import { GroupRedEnvelopeProvider } from './context/GroupRedEnvelopeContext'
-import { MusicPlayerProvider, useMusicPlayer } from './context/MusicPlayerContext'
-import { AILifeProvider } from './context/AILifeContext'
-import { CallProvider } from './context/CallContext'
+import { useMusicPlayer } from './context/MusicPlayerContext'
 import NotificationContainer from './components/NotificationContainer'
 import ForumNotificationManager from './components/ForumNotificationManager'
 import BackgroundChatNotificationManager from './components/BackgroundChatNotificationManager'
-import { ForumProvider } from './context/ForumContext'
 import DynamicIsland from './components/DynamicIsland'
 import './styles/redenvelope.css'
 import Layout from './components/Layout'
@@ -42,6 +28,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import OfflineIndicator from './components/OfflineIndicator'
 import GlobalCallScreen from './components/GlobalCallScreen'
 import { initPerformanceMonitor } from './utils/performance'
+import { AppProviders } from './context/AppProviders'
 
 // 通用加载组件
 const LoadingFallback = () => (
@@ -236,6 +223,19 @@ function App() {
     }
   }, [])
 
+  // 初始化 IndexedDB 定期清理
+  useEffect(() => {
+    const initCleanup = async () => {
+      try {
+        const { initPeriodicCleanup } = await import('./utils/indexedDBStorage')
+        initPeriodicCleanup()
+      } catch (error) {
+        console.error('初始化 IndexedDB 清理失败:', error)
+      }
+    }
+    initCleanup()
+  }, [])
+
   // 加载自定义字体 - 优化版
   useEffect(() => {
     const loadCustomFonts = async () => {
@@ -295,30 +295,15 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <BackgroundProvider>
-          <SettingsProvider>
-            <ApiProvider>
-              <UserProvider>
-                <CharacterProvider>
-                  <AILifeProvider>
-                    <MomentsProvider>
-                      <RedEnvelopeProvider>
-                      <AccountingProvider>
-                        <GroupProvider>
-                          <GroupRedEnvelopeProvider>
-                            <ForumProvider>
-                            <MusicPlayerProvider>
-                              <CallProvider>
-                                <Router basename={import.meta.env.BASE_URL || "/"}>
-                                  <OfflineIndicator />
-                                  <DynamicIslandWrapper />
-                                  <NotificationContainer />
-                                  <ForumNotificationManager />
-                                  <BackgroundChatNotificationManager />
-                                  <GlobalCallScreen />
-                                  <MomentsSocialManager>
-                                  <Routes>
+      <AppProviders>
+        <OfflineIndicator />
+        <DynamicIslandWrapper />
+        <NotificationContainer />
+        <ForumNotificationManager />
+        <BackgroundChatNotificationManager />
+        <GlobalCallScreen />
+        <MomentsSocialManager>
+          <Routes>
                                     <Route path="/wechat" element={<Layout />}>
                                       <Route index element={<ChatList />} />
                                       <Route path="contacts" element={<Contacts />} />
@@ -431,26 +416,11 @@ function App() {
                                     <Route path="/forum/profile" element={<PageWrapper><ForumProfile /></PageWrapper>} />
                                     <Route path="/forum/user/:userId" element={<PageWrapper><ForumUserProfile /></PageWrapper>} />
                                     <Route path="/forum/memes" element={<PageWrapper><ForumMemeManager /></PageWrapper>} />
-                                    
-                                    <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
-                                  </Routes>
-                                  </MomentsSocialManager>
-                                </Router>
-                              </CallProvider>
-                              </MusicPlayerProvider>
-                              </ForumProvider>
-                            </GroupRedEnvelopeProvider>
-                          </GroupProvider>
-                        </AccountingProvider>
-                      </RedEnvelopeProvider>
-                    </MomentsProvider>
-                  </AILifeProvider>
-                </CharacterProvider>
-              </UserProvider>
-            </ApiProvider>
-          </SettingsProvider>
-        </BackgroundProvider>
-      </ThemeProvider>
+
+            <Route path="/" element={<PageWrapper><Desktop /></PageWrapper>} />
+          </Routes>
+        </MomentsSocialManager>
+      </AppProviders>
     </ErrorBoundary>
   )
 }

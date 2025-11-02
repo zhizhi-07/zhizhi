@@ -103,6 +103,16 @@ export const MomentsProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteMoment = (id: string) => {
     setMoments(prev => prev.filter(m => m.id !== id))
+
+    // 清理相关通知
+    try {
+      const notifications = JSON.parse(localStorage.getItem('moment_notifications') || '[]')
+      const filtered = notifications.filter((n: any) => n.momentId !== id)
+      localStorage.setItem('moment_notifications', JSON.stringify(filtered))
+      console.log(`✅ 已删除朋友圈 ${id} 及其相关通知`)
+    } catch (e) {
+      console.error('清理朋友圈通知失败:', e)
+    }
   }
 
   const likeMoment = (momentId: string, userId: string, userName: string, userAvatar: string) => {

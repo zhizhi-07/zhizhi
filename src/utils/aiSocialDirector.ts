@@ -1,5 +1,5 @@
 import { Moment } from '../context/MomentsContext'
-import { Character } from '../context/CharacterContext'
+import { Character } from '../context/ContactsContext'
 import { callAI } from './api'
 
 // --- 数据结构定义 (简化版) ---

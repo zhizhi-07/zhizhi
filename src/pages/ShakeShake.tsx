@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'

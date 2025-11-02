@@ -3,8 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { BackIcon, MoreIcon, SendIcon, AddCircleIcon, EmojiIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
-import { useUser } from '../context/UserContext'
+import { useCharacter, useUser } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
 import MusicInviteCard from '../components/MusicInviteCard'
@@ -616,13 +615,14 @@ const ChatDetail = () => {
     setDisplayCount(30)
     isFirstLoadRef.current = true
     prevMessageCountRef.current = 0 // 重置消息数量记录
-    
+    processedMessageIdsRef.current.clear() // 清除已处理的消息ID
+
     // 清除未读消息
     if (id) {
       clearUnread(id)
       console.log('✅ 已清除未读消息:', id)
     }
-    
+
     // 立即尝试滚动一次
     setTimeout(() => {
       const container = messagesContainerRef.current
@@ -630,6 +630,33 @@ const ChatDetail = () => {
         container.scrollTop = container.scrollHeight
       }
     }, 200)
+
+    // 监听强制重新加载消息的事件（从通知跳转时触发）
+    const handleReloadMessages = () => {
+      if (!id) return
+      console.log('🔄 收到重新加载消息的请求')
+
+      const savedMessages = localStorage.getItem(`chat_messages_${id}`)
+      if (savedMessages) {
+        const loadedMessages = JSON.parse(savedMessages)
+        setMessages(loadedMessages)
+        console.log(`✅ 重新加载了 ${loadedMessages.length} 条消息`)
+
+        // 滚动到底部
+        setTimeout(() => {
+          const container = messagesContainerRef.current
+          if (container) {
+            container.scrollTop = container.scrollHeight
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('reload-chat-messages', handleReloadMessages)
+
+    return () => {
+      window.removeEventListener('reload-chat-messages', handleReloadMessages)
+    }
   }, [id])
   
   // 监听页面可见性（用户是否在当前聊天页面）
@@ -656,21 +683,38 @@ const ChatDetail = () => {
     }
   }, [id])
 
+  // 记录已处理的消息ID，防止重复触发通知
+  const processedMessageIdsRef = useRef<Set<number>>(new Set())
+
   // 实时监听AI消息，立即触发通知和未读消息（和群聊逻辑一致）
   useEffect(() => {
     if (!id || !character || messages.length === 0) return
-    
+
     const lastMessage = messages[messages.length - 1]
-    
-    // 只处理AI发送的消息
-    if (lastMessage && lastMessage.type === 'received') {
+
+    // 只处理AI发送的消息，且未处理过
+    if (lastMessage && lastMessage.type === 'received' && !processedMessageIdsRef.current.has(lastMessage.id)) {
+      // 标记为已处理
+      processedMessageIdsRef.current.add(lastMessage.id)
+
       // 判断用户是否在当前聊天页面
       const isInCurrentChat = !document.hidden && window.location.pathname === `/chat/${id}`
-      
+
+      console.log('🔔 [通知检查]', {
+        characterName: character.name,
+        messageContent: lastMessage.content?.substring(0, 20),
+        isInCurrentChat,
+        documentHidden: document.hidden,
+        currentPath: window.location.pathname,
+        expectedPath: `/chat/${id}`,
+        messageId: lastMessage.id
+      })
+
       // 如果不在当前页面，立即增加未读并发送通知
       if (!isInCurrentChat) {
+        console.log('📬 [触发通知] 发送通知给:', character.name)
         incrementUnread(id, 1, 'single')
-        
+
         // 发送通知事件
         window.dispatchEvent(new CustomEvent('background-chat-message', {
           detail: {
@@ -681,12 +725,14 @@ const ChatDetail = () => {
             avatar: character.avatar
           }
         }))
-        
+
         // 更新聊天列表
         updateChatListLastMessage(id, lastMessage.content, lastMessage.timestamp)
+      } else {
+        console.log('⏸️ [跳过通知] 用户正在当前聊天窗口')
       }
     }
-  }, [messages, id, character])
+  }, [messages, id, character?.id])
 
   // 🔍 首次进入聊天时自动识别AI头像（只识别一次，除非头像变了）
   useEffect(() => {
@@ -2268,19 +2314,37 @@ ${willAccept ?
         setLongPressedMessage(null)
         return
       }
-      
+
+      // 清理关联数据
+      if (longPressedMessage.redEnvelopeId) {
+        // 清理红包记录
+        try {
+          const redEnvelopes = JSON.parse(localStorage.getItem('red_envelopes') || '[]')
+          const filtered = redEnvelopes.filter((e: any) => e.id !== longPressedMessage.redEnvelopeId)
+          localStorage.setItem('red_envelopes', JSON.stringify(filtered))
+          console.log(`🗑️ 已清理红包记录: ${longPressedMessage.redEnvelopeId}`)
+        } catch (e) {
+          console.error('清理红包记录失败:', e)
+        }
+      }
+
+      if (longPressedMessage.transfer) {
+        // 清理转账记录（如果有独立存储）
+        console.log('🗑️ 已清理转账记录')
+      }
+
       // 从消息列表中永久移除
       const newMessages = messages.filter(msg => msg.id !== longPressedMessage.id)
-      
+
       // 立即保存到state和localStorage
       safeSetMessages(newMessages)
-      
+
       // 确保localStorage中的数据已更新
       if (id) {
         localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
       }
-      
-      console.log('🗑️ 消息已永久删除（ID:', longPressedMessage.id, '）')
+
+      console.log('🗑️ 消息及关联数据已永久删除（ID:', longPressedMessage.id, '）')
       setShowMessageMenu(false)
       setLongPressedMessage(null)
     }
@@ -2344,27 +2408,53 @@ ${willAccept ?
     }
   }
   
-  // 批量删除消息（永久删除）
-  const handleBatchDelete = () => {
+  // 批量删除消息（永久删除，优化性能）
+  const handleBatchDelete = async () => {
     if (selectedMessageIds.size === 0) {
       alert('请先选择要删除的消息')
       return
     }
-    
-    if (confirm(`确定要永久删除选中的 ${selectedMessageIds.size} 条消息吗？\n\n⚠️ 此操作无法撤销！`)) {
-      // 从消息列表中永久移除所有选中的消息
-      const newMessages = messages.filter(msg => !selectedMessageIds.has(msg.id))
-      
+
+    if (!confirm(`确定要永久删除选中的 ${selectedMessageIds.size} 条消息吗？\n\n⚠️ 此操作无法撤销！`)) {
+      return
+    }
+
+    // 显示进度提示（如果删除数量较多）
+    if (selectedMessageIds.size > 100) {
+      console.log(`🗑️ 正在删除 ${selectedMessageIds.size} 条消息，请稍候...`)
+    }
+
+    try {
+      // 使用 Set 提高查找性能
+      const idsToDelete = new Set(selectedMessageIds)
+
+      // 分批处理，避免阻塞主线程
+      const batchSize = 100
+      let newMessages = [...messages]
+
+      for (let i = 0; i < Math.ceil(newMessages.length / batchSize); i++) {
+        // 过滤当前批次
+        newMessages = newMessages.filter(msg => !idsToDelete.has(msg.id))
+
+        // 让出主线程，避免卡顿
+        if (i % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0))
+        }
+      }
+
       // 立即保存
       safeSetMessages(newMessages)
-      
+
       // 确保localStorage中的数据已更新
       if (id) {
         localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
       }
-      
+
       console.log(`🗑️ 批量删除了 ${selectedMessageIds.size} 条消息`)
-      
+    } catch (error) {
+      console.error('批量删除失败:', error)
+      alert('删除失败，请重试')
+    } finally {
       // 重置批量删除模式
       setIsBatchDeleteMode(false)
       setSelectedMessageIds(new Set())
@@ -2611,12 +2701,15 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
 
   // 安全的setMessages：组件卸载后也能保存消息
   const safeSetMessages = useCallback((newMessages: Message[]) => {
-    console.log('🔍 safeSetMessages 调用，isMounted:', isMountedRef.current, '消息数:', newMessages.length)
-    
-    // 先直接设置消息到state（确保渲染）
+    console.log('🔍 safeSetMessages 调用，消息数:', newMessages.length)
+
+    // 🔧 修复：不再检查 isMountedRef，直接设置消息到state
+    // 原因：当用户快速切换聊天时，旧聊天的AI回复仍在进行中
+    // 如果检查 isMountedRef，会导致消息丢失
+    // React会自动处理卸载后的state更新警告
     setMessages(newMessages)
     console.log('✅ 消息已设置到state')
-    
+
     // 🔧 始终立即保存到 localStorage（防止用户快速退出聊天窗口时消息丢失）
     if (id) {
       safeSetItem(`chat_messages_${id}`, newMessages)
@@ -3868,16 +3961,43 @@ ${emojiInstructions}
       // 检查AI是否要打电话
       const voiceCallMatch = aiResponse.match(/\[语音通话\]/)
       const videoCallMatch = aiResponse.match(/\[视频通话\]/)
-      
+
       if (voiceCallMatch || videoCallMatch) {
         const isVideo = !!videoCallMatch
         console.log(`📞 AI发起${isVideo ? '视频' : '语音'}通话请求`)
-        
-        // 显示来电界面
-        setIncomingCallIsVideo(isVideo)
-        setShowIncomingCall(true)
-        
-        // 直接返回，不添加文字消息
+
+        // 移除电话标记，保留其他文字内容
+        let textBeforeCall = aiResponse
+          .replace(/\[语音通话\]/g, '')
+          .replace(/\[视频通话\]/g, '')
+          .trim()
+
+        // 如果有文字内容，先添加文字消息
+        if (textBeforeCall) {
+          const now = Date.now()
+          const textMessage: Message = {
+            id: now,
+            type: 'received',
+            content: textBeforeCall,
+            time: new Date().toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            timestamp: now
+          }
+          setMessages(prev => [...prev, textMessage])
+
+          // 等待一下再显示来电
+          setTimeout(() => {
+            setIncomingCallIsVideo(isVideo)
+            setShowIncomingCall(true)
+          }, 500)
+        } else {
+          // 没有文字内容，直接显示来电
+          setIncomingCallIsVideo(isVideo)
+          setShowIncomingCall(true)
+        }
+
         setIsAiTyping(false)
         return
       }
@@ -4291,15 +4411,24 @@ ${emojiInstructions}
         }
       }
       
-      // 检查AI是否要引用消息（支持冒号后有空格）
-      const quoteMatch = aiResponse.match(/\[引用:\s*(\d+)\]/)
+      // 检查AI是否要引用消息（支持多个引用）
+      const quoteMatches = Array.from(aiResponse.matchAll(/\[引用:\s*(\d+)\]/g))
       let aiQuotedMessageId: number | null = null
-      
-      if (quoteMatch) {
-        aiQuotedMessageId = parseInt(quoteMatch[1])
+
+      if (quoteMatches.length > 0) {
+        // 只使用第一个引用ID（保持向后兼容）
+        aiQuotedMessageId = parseInt(quoteMatches[0][1])
+
+        // 清除所有引用标记
         cleanedResponse = cleanedResponse.replace(/\[引用:\s*\d+\]/g, '').trim()
-        console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
-        
+
+        if (quoteMatches.length > 1) {
+          console.log(`💬 AI引用了 ${quoteMatches.length} 条消息:`, quoteMatches.map(m => m[1]).join(', '))
+          console.log('⚠️ 注意：当前只支持单条引用，已使用第一条引用ID:', aiQuotedMessageId)
+        } else {
+          console.log('💬 AI引用了消息ID:', aiQuotedMessageId)
+        }
+
         // 不再自动移除与引用相同的内容
         // AI可能就是想重复强调，或者多次引用
         console.log('💬 AI使用了引用功能，保留原始回复内容')
@@ -5246,68 +5375,83 @@ ${emojiInstructions}
             try {
               addCouplePhoto(character.id, character.name, albumDescription)
               console.log('📸 相册照片已保存')
-              
+
               // 添加系统消息
               const systemMsg: Message = {
                 id: Date.now() + Math.random(),
                 type: 'system',
-                content: `在情侣空间相册中添加了照片：${albumDescription}`,
+                content: `📸 ${character.name}在情侣空间上传了照片：${albumDescription}`,
                 time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now(),
                 messageType: 'system',
                 isHidden: false
               }
-              setMessages(prev => [...prev, systemMsg])
+              console.log('📝 [情侣空间] 添加相册系统消息:', systemMsg)
+              setMessages(prev => {
+                const updated = [...prev, systemMsg]
+                console.log('📝 [情侣空间] 消息列表已更新，总数:', updated.length)
+                return updated
+              })
             } catch (error) {
               console.error('保存相册照片失败:', error)
             }
           }
-          
+
           // 保存留言
           if (coupleMessage) {
             try {
               addCoupleMessage(character.id, character.name, coupleMessage)
               console.log('💌 留言已保存')
-              
+
               // 添加系统消息
               const systemMsg: Message = {
                 id: Date.now() + Math.random(),
                 type: 'system',
-                content: `在情侣空间留言：${coupleMessage}`,
+                content: `💌 ${character.name}在情侣空间留言：${coupleMessage}`,
                 time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now(),
                 messageType: 'system',
                 isHidden: false
               }
-              setMessages(prev => [...prev, systemMsg])
+              console.log('📝 [情侣空间] 添加留言系统消息:', systemMsg)
+              setMessages(prev => {
+                const updated = [...prev, systemMsg]
+                console.log('📝 [情侣空间] 消息列表已更新，总数:', updated.length)
+                return updated
+              })
             } catch (error) {
               console.error('保存留言失败:', error)
             }
           }
-          
+
           // 保存纪念日
           if (anniversaryData) {
             try {
               addCoupleAnniversary(
-                character.id, 
-                character.name, 
-                anniversaryData.date, 
-                anniversaryData.title, 
+                character.id,
+                character.name,
+                anniversaryData.date,
+                anniversaryData.title,
                 anniversaryData.description
               )
               console.log('🎂 纪念日已保存')
-              
+
               // 添加系统消息
               const systemMsg: Message = {
                 id: Date.now() + Math.random(),
                 type: 'system',
-                content: `在情侣空间添加了纪念日：${anniversaryData.title}（${anniversaryData.date}）`,
+                content: `🎂 ${character.name}在情侣空间添加了纪念日：${anniversaryData.title}（${anniversaryData.date}）`,
                 time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now(),
                 messageType: 'system',
                 isHidden: false
               }
-              setMessages(prev => [...prev, systemMsg])
+              console.log('📝 [情侣空间] 添加纪念日系统消息:', systemMsg)
+              setMessages(prev => {
+                const updated = [...prev, systemMsg]
+                console.log('📝 [情侣空间] 消息列表已更新，总数:', updated.length)
+                return updated
+              })
             } catch (error) {
               console.error('保存纪念日失败:', error)
             }
@@ -6504,28 +6648,52 @@ ${emojiInstructions}
                               开启专属情侣空间，分享你们的美好时光
                             </div>
                             {message.type === 'received' ? (
-                              <button 
-                                onClick={async () => {
-                                  // 更新消息状态为已接受
-                                  setMessages(prev => prev.map(msg => 
-                                    msg.id === message.id && msg.coupleSpaceInvite
-                                      ? { ...msg, coupleSpaceInvite: { ...msg.coupleSpaceInvite, status: 'accepted' } }
-                                      : msg
-                                  ))
-                                  
-                                  // 接受情侣空间邀请，保存到localStorage
-                                  if (id) {
-                                    const { acceptCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
-                                    const success = acceptCoupleSpaceInvite(id)
-                                    if (success) {
-                                      alert('已接受情侣空间邀请！现在可以去情侣空间查看了')
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={async () => {
+                                    // 更新消息状态为已拒绝
+                                    setMessages(prev => prev.map(msg =>
+                                      msg.id === message.id && msg.coupleSpaceInvite
+                                        ? { ...msg, coupleSpaceInvite: { ...msg.coupleSpaceInvite, status: 'rejected' } }
+                                        : msg
+                                    ))
+
+                                    // 拒绝情侣空间邀请，保存到localStorage
+                                    if (id) {
+                                      const { rejectCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
+                                      const success = rejectCoupleSpaceInvite(id)
+                                      if (success) {
+                                        console.log('已拒绝情侣空间邀请')
+                                      }
                                     }
-                                  }
-                                }}
-                                className="w-full px-4 py-2 bg-gradient-to-r from-pink-400 to-rose-400 text-white text-sm rounded-full ios-button"
-                              >
-                                接受邀请
-                              </button>
+                                  }}
+                                  className="px-4 py-2 glass-card border border-white/20 text-gray-700 text-sm rounded-full ios-button"
+                                >
+                                  拒绝
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    // 更新消息状态为已接受
+                                    setMessages(prev => prev.map(msg =>
+                                      msg.id === message.id && msg.coupleSpaceInvite
+                                        ? { ...msg, coupleSpaceInvite: { ...msg.coupleSpaceInvite, status: 'accepted' } }
+                                        : msg
+                                    ))
+
+                                    // 接受情侣空间邀请，保存到localStorage
+                                    if (id) {
+                                      const { acceptCoupleSpaceInvite } = await import('../utils/coupleSpaceUtils')
+                                      const success = acceptCoupleSpaceInvite(id)
+                                      if (success) {
+                                        alert('已接受情侣空间邀请！现在可以去情侣空间查看了')
+                                      }
+                                    }
+                                  }}
+                                  className="px-4 py-2 bg-gradient-to-r from-pink-400 to-rose-400 text-white text-sm rounded-full ios-button"
+                                >
+                                  接受邀请
+                                </button>
+                              </div>
                             ) : message.type === 'sent' ? (
                               <div className="text-center">
                                 <span className="text-xs text-gray-400">
@@ -6541,7 +6709,7 @@ ${emojiInstructions}
                         ) : (
                           <div className="text-center">
                             <span className="text-xs text-gray-400">
-                              {message.coupleSpaceInvite.status === 'accepted' 
+                              {message.coupleSpaceInvite.status === 'accepted'
                                 ? (message.type === 'sent' ? '对方已接受' : '你已接受')
                                 : (message.type === 'sent' ? '对方已拒绝' : '你已拒绝')}
                             </span>

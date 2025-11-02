@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { BackIcon, SendIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useUser, useCharacter } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 
 interface Message {

@@ -6,7 +6,7 @@
  * @module utils/forumAI
  */
 
-import type { Character } from '../context/CharacterContext'
+import type { Character } from '../context/ContactsContext'
 import { getAllMemes } from './memeManager'
 
 // ==================== 类型定义 ====================

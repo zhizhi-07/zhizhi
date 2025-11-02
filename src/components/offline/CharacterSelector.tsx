@@ -3,7 +3,7 @@
  * 用于线下聊天选择角色
  */
 
-import { Character } from '../../context/CharacterContext'
+import { Character } from '../../context/ContactsContext'
 
 interface CharacterSelectorProps {
   characters: Character[]

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ServiceIcon, FavoriteIcon, MomentsIcon, WalletIcon, SettingsIcon, ImageIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
+import { useUser } from '../context/ContactsContext'
 import { useBackground } from '../context/BackgroundContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'

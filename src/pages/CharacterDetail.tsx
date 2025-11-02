@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon, MoreIcon } from '../components/Icons'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { useState } from 'react'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'

@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { ImageIcon } from '../components/Icons'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { toPinyin } from '../utils/pinyin'
 
 const EditCharacter = () => {

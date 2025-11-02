@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 
 interface Player {

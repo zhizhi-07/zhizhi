@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { BackIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { useMemory } from '../hooks/useMemory'
 import memorySummaryIcon from '../assets/memory-summary-icon.webp'
 

@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { BackIcon } from '../components/Icons'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { getIntimatePayRelations } from '../utils/walletUtils'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'

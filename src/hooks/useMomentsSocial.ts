@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useMoments } from '../context/MomentsContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter, useUser } from '../context/ContactsContext'
 import { generateMovieScript, executeMovieScript } from '../utils/aiSocialDirector'
-import { useUser } from '../context/UserContext'
 
 // 监听朋友圈评论变化和新朋友圈，触发AI互动
 export const useMomentsSocial = () => {

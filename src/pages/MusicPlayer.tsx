@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useUser } from '../context/UserContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useUser, useCharacter } from '../context/ContactsContext'
 import { useMusicPlayer } from '../context/MusicPlayerContext'
 
 interface Song {

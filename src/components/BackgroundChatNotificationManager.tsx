@@ -24,15 +24,18 @@ const BackgroundChatNotificationManager = () => {
   useEffect(() => {
     // 监听后台聊天消息事件
     const handleBackgroundChat = (event: CustomEvent) => {
+      console.log('🔔 [BackgroundChatNotificationManager] 收到通知事件:', event.detail)
       const { title, message, chatId, characterId, type = 'single', avatar } = event.detail
       // 兼容旧版本，如果没有chatId但有characterId，则使用characterId
       const finalChatId = chatId || characterId
       const finalType = type || 'single'
+      console.log('🔔 [BackgroundChatNotificationManager] 设置通知:', { title, message, finalChatId, finalType })
       setNotification({ title, message, chatId: finalChatId, type: finalType, avatar })
       setShowNotification(true)
     }
 
     window.addEventListener('background-chat-message', handleBackgroundChat as EventListener)
+    console.log('🔔 [BackgroundChatNotificationManager] 已监听 background-chat-message 事件')
 
     return () => {
       window.removeEventListener('background-chat-message', handleBackgroundChat as EventListener)
@@ -48,12 +51,20 @@ const BackgroundChatNotificationManager = () => {
 
   const handleClick = () => {
     if (!notification) return
-    
+
     // 根据类型跳转到对应的聊天页面
     if (notification.type === 'group') {
       navigate(`/group/${notification.chatId}`)
+      // 触发重新加载消息事件（解决从通知跳转后消息不显示的问题）
+      setTimeout(() => {
+        window.dispatchEvent(new Event('reload-group-messages'))
+      }, 100)
     } else {
       navigate(`/chat/${notification.chatId}`)
+      // 触发重新加载消息事件
+      setTimeout(() => {
+        window.dispatchEvent(new Event('reload-chat-messages'))
+      }, 100)
     }
   }
 

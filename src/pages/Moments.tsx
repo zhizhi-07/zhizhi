@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackIcon, CameraIcon, LikeIcon, CommentIcon, MoreVerticalIcon, HeartFilledIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
+import { useUser, useCharacter } from '../context/ContactsContext'
 import { useMoments } from '../context/MomentsContext'
 import { ImageViewer } from '../components/ImageViewer'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
 import { getUnreadNotificationCount } from '../utils/momentsNotification'
 
 const Moments = () => {

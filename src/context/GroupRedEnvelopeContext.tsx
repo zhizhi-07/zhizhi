@@ -30,6 +30,7 @@ interface GroupRedEnvelopeContextType {
   getRedEnvelope: (redEnvelopeId: string) => GroupRedEnvelope | undefined
   getGroupRedEnvelopes: (groupId: string) => GroupRedEnvelope[]
   hasReceived: (redEnvelopeId: string, userId: string) => boolean
+  checkExpiredRedEnvelopes: () => void
 }
 
 const GroupRedEnvelopeContext = createContext<GroupRedEnvelopeContextType | undefined>(undefined)
@@ -44,6 +45,18 @@ export const GroupRedEnvelopeProvider = ({ children }: { children: ReactNode }) 
   useEffect(() => {
     localStorage.setItem('group_red_envelopes', JSON.stringify(redEnvelopes))
   }, [redEnvelopes])
+
+  // 定期检查过期红包（每分钟检查一次）
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      checkExpiredRedEnvelopes()
+    }, 60000) // 每分钟检查一次
+
+    // 组件挂载时立即检查一次
+    checkExpiredRedEnvelopes()
+
+    return () => clearInterval(checkInterval)
+  }, []) // 移除 redEnvelopes 依赖，避免无限循环
 
   // 创建红包
   const createRedEnvelope = (
@@ -146,6 +159,51 @@ export const GroupRedEnvelopeProvider = ({ children }: { children: ReactNode }) 
     return envelope ? !!envelope.received[userId] : false
   }
 
+  // 检查并处理过期红包
+  const checkExpiredRedEnvelopes = () => {
+    const now = Date.now()
+    const ONE_DAY = 24 * 60 * 60 * 1000
+    let hasExpired = false
+
+    setRedEnvelopes(prev => prev.map(envelope => {
+      // 只处理活跃状态的红包
+      if (envelope.status !== 'active') {
+        return envelope
+      }
+
+      // 检查是否过期（24小时）
+      if (now - envelope.timestamp > ONE_DAY) {
+        // 计算未领取的金额
+        const receivedCount = Object.keys(envelope.received).length
+        const remainingPackets = envelope.packets.slice(receivedCount)
+        const refundAmount = remainingPackets.reduce((sum, amount) => sum + amount, 0)
+
+        // 返还给发送者
+        if (refundAmount > 0) {
+          // 获取当前余额
+          const currentBalance = parseFloat(localStorage.getItem('balance') || '0')
+          const newBalance = currentBalance + refundAmount
+          localStorage.setItem('balance', newBalance.toString())
+
+          console.log(`💰 群红包 ${envelope.id} 已过期，退还 ¥${refundAmount.toFixed(2)} 给发送者`)
+          hasExpired = true
+        }
+
+        // 标记为已过期
+        return {
+          ...envelope,
+          status: 'expired' as const
+        }
+      }
+
+      return envelope
+    }))
+
+    if (hasExpired) {
+      console.log('✅ 过期红包检查完成，已退还未领取金额')
+    }
+  }
+
   return (
     <GroupRedEnvelopeContext.Provider
       value={{
@@ -154,7 +212,8 @@ export const GroupRedEnvelopeProvider = ({ children }: { children: ReactNode }) 
         receiveRedEnvelope,
         getRedEnvelope,
         getGroupRedEnvelopes,
-        hasReceived
+        hasReceived,
+        checkExpiredRedEnvelopes
       }}
     >
       {children}

@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { BackIcon } from '../components/Icons'
 import { useSettings } from '../context/SettingsContext'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 
 interface Schedule {
   time: string

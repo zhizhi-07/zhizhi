@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { BackIcon, ImageIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
+import { useUser, useCharacter } from '../context/ContactsContext'
 import { useMoments } from '../context/MomentsContext'
-import { useCharacter } from '../context/CharacterContext'
 
 const PublishMoment = () => {
   const navigate = useNavigate()
@@ -124,9 +123,19 @@ const PublishMoment = () => {
     characters.forEach(character => {
       const enabled = localStorage.getItem(`ai_moments_enabled_${character.id}`)
       if (enabled === 'true') {
+        // ✅ 检查可见性设置
+        if (visibility === 'private') {
+          console.log(`🔒 私密朋友圈，不通知 ${character.name}`)
+          return // 私密朋友圈，不通知任何人
+        }
+        if (visibility === 'partial' && !visibleTo.includes(character.id)) {
+          console.log(`🔒 ${character.name} 不在可见列表中，不通知`)
+          return // 不在可见列表中，不通知
+        }
+
         const chatMessages = localStorage.getItem(`chat_messages_${character.id}`)
         const messages = chatMessages ? JSON.parse(chatMessages) : []
-        
+
         // 构建朋友圈消息内容
         let momentContent = `📸 你发布了朋友圈：${content.trim()}`
         if (images.length > 0) {
@@ -135,7 +144,7 @@ const PublishMoment = () => {
         if (location.trim()) {
           momentContent += ` 📍${location.trim()}`
         }
-        
+
         // 添加系统消息到聊天记录
         const systemMessage = {
           id: Date.now() + Math.random(),
@@ -149,7 +158,7 @@ const PublishMoment = () => {
           messageType: 'system',
           isHidden: false
         }
-        
+
         messages.push(systemMessage)
         localStorage.setItem(`chat_messages_${character.id}`, JSON.stringify(messages))
         console.log(`💾 朋友圈已同步到与 ${character.name} 的聊天记录`)

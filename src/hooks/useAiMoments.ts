@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { useMoments } from '../context/MomentsContext'
 import { aiPostMoment, aiInteractWithSingleMoment } from '../utils/aiMomentsService'
 

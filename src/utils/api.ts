@@ -9,6 +9,9 @@ export interface ApiSettings {
   maxTokens?: number
 }
 
+// 请求去重缓存（防止重复扣费）
+const requestCache = new Map<string, Promise<string>>()
+
 interface Message {
   role: 'system' | 'user' | 'assistant'
   content: string | MessageContent[]
@@ -24,12 +27,36 @@ interface MessageContent {
 }
 
 /**
- * 带超时的fetch请求
+ * 带超时的fetch请求（根据请求类型动态调整超时时间）
  */
-async function fetchWithTimeout(url: string, options: RequestInit, timeout = 15000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 30000): Promise<Response> {
+  // 根据请求体判断是否需要更长的超时时间
+  try {
+    const body = options.body ? JSON.parse(options.body as string) : {}
+
+    // 如果是生成长文本（max_tokens > 2000），增加超时时间
+    if (body.max_tokens && body.max_tokens > 2000) {
+      timeout = 60000 // 60 秒
+      console.log(`⏱️ 检测到长文本生成请求，超时时间延长至 ${timeout}ms`)
+    }
+
+    // 如果包含图片，也增加超时时间
+    if (body.messages && Array.isArray(body.messages)) {
+      const hasImage = body.messages.some((msg: any) =>
+        Array.isArray(msg.content) && msg.content.some((c: any) => c.type === 'image_url')
+      )
+      if (hasImage) {
+        timeout = 60000 // 60 秒
+        console.log(`⏱️ 检测到图片请求，超时时间延长至 ${timeout}ms`)
+      }
+    }
+  } catch (e) {
+    // 解析失败，使用默认超时时间
+  }
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -237,16 +264,29 @@ async function callGoogleAPI(messages: Message[], settings: ApiSettings): Promis
  */
 export async function callAI(messages: Message[] | string, retries = 1, customMaxTokens?: number): Promise<string> {
   const settings = getItem<ApiSettings>(STORAGE_KEYS.API_SETTINGS, {} as ApiSettings)
-  
+
   // 如果提供了自定义maxTokens，使用它
   if (customMaxTokens) {
     settings.maxTokens = customMaxTokens
   }
-  
+
+  // 生成请求指纹（用于去重）
+  const fingerprint = JSON.stringify({
+    messages: Array.isArray(messages) ? messages : [{ role: 'user', content: messages }],
+    maxTokens: customMaxTokens || settings.maxTokens,
+    model: settings.model
+  })
+
+  // 检查是否有正在进行的相同请求
+  if (requestCache.has(fingerprint)) {
+    console.log('🔄 检测到重复请求，使用缓存结果（防止重复扣费）')
+    return requestCache.get(fingerprint)!
+  }
+
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('🚀 开始调用AI API')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-  
+
   if (!settings.baseUrl || !settings.apiKey) {
     console.error('❌ API配置未完成')
     throw new Error('请先配置API')
@@ -255,8 +295,8 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
   // 根据baseUrl自动检测provider
   const baseUrl = settings.baseUrl || ''
   let actualProvider = settings.provider || 'custom'
-  
-  if (baseUrl.includes('generativelanguage.googleapis.com') || 
+
+  if (baseUrl.includes('generativelanguage.googleapis.com') ||
       baseUrl.includes('zhizhi.2373922440jhj.workers.dev') ||
       baseUrl.includes('netlify/functions/gemini-proxy')) {
     // Google Gemini 官方 API 或反代
@@ -271,29 +311,33 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
     // OpenAI格式的Gemini代理（HiAPI、九班AI等）
     actualProvider = 'openai'
   }
-  
+
   settings.provider = actualProvider
-  
+
   console.log('📋 API配置信息：')
   console.log('  提供商:', actualProvider)
   console.log('  地址:', settings.baseUrl)
   console.log('  模型:', settings.model)
   console.log('  温度:', settings.temperature)
   console.log('  最大Token:', settings.maxTokens)
-  
+
   // 转换消息格式
-  const apiMessages: Message[] = Array.isArray(messages) 
-    ? messages 
+  const apiMessages: Message[] = Array.isArray(messages)
+    ? messages
     : [{ role: 'user', content: messages }]
-  
+
   console.log('💬 发送消息数量:', apiMessages.length)
   const lastContent = apiMessages[apiMessages.length - 1]?.content
-  const contentPreview = typeof lastContent === 'string' 
-    ? lastContent.substring(0, 100) 
+  const contentPreview = typeof lastContent === 'string'
+    ? lastContent.substring(0, 100)
     : '[包含图片]'
   console.log('📝 最后一条消息:', contentPreview + '...')
-  
+
   let lastError: Error | null = null
+
+  // 创建请求 Promise 并缓存
+  const requestPromise = (async () => {
+    try {
   
   // 重试机制
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -345,10 +389,20 @@ export async function callAI(messages: Message[] | string, retries = 1, customMa
       }
     }
   }
-  
+
   console.error('❌ 所有重试都失败了')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
   throw lastError || new Error('API调用失败')
+    } finally {
+      // 请求完成后清理缓存（无论成功还是失败）
+      requestCache.delete(fingerprint)
+    }
+  })()
+
+  // 缓存请求
+  requestCache.set(fingerprint, requestPromise)
+
+  return requestPromise
 }
 
 /**

@@ -352,4 +352,69 @@ export async function getIndexedDBUsage(): Promise<{ used: number; quota: number
   return { used: 0, quota: 0, percentage: 0 }
 }
 
+/**
+ * 清理 IndexedDB 旧数据（定期清理）
+ */
+export async function cleanupOldIndexedDBData(): Promise<void> {
+  console.log('🧹 开始清理 IndexedDB 旧数据...')
+
+  try {
+    const db = await initDB()
+
+    // 清理聊天消息（只保留最近 2000 条）
+    const chatTx = db.transaction([STORES.CHAT_MESSAGES], 'readwrite')
+    const chatStore = chatTx.objectStore(STORES.CHAT_MESSAGES)
+    const allChats = await chatStore.getAll()
+
+    for (const chat of allChats) {
+      if (chat.messages && chat.messages.length > 2000) {
+        // 只保留最近 2000 条消息
+        chat.messages = chat.messages.slice(-2000)
+        await chatStore.put(chat)
+        console.log(`✂️ ${chat.key}: 裁剪到 2000 条消息`)
+      }
+    }
+
+    // 清理群聊消息（只保留最近 1000 条）
+    const groupTx = db.transaction([STORES.GROUP_MESSAGES], 'readwrite')
+    const groupStore = groupTx.objectStore(STORES.GROUP_MESSAGES)
+    const allGroups = await groupStore.getAll()
+
+    for (const group of allGroups) {
+      if (group.messages && group.messages.length > 1000) {
+        // 只保留最近 1000 条消息
+        group.messages = group.messages.slice(-1000)
+        await groupStore.put(group)
+        console.log(`✂️ 群 ${group.key}: 裁剪到 1000 条消息`)
+      }
+    }
+
+    console.log('✅ IndexedDB 清理完成')
+  } catch (error) {
+    console.error('❌ IndexedDB 清理失败:', error)
+  }
+}
+
+/**
+ * 初始化定期清理任务（每周一次）
+ */
+export function initPeriodicCleanup(): void {
+  const CLEANUP_INTERVAL = 7 * 24 * 60 * 60 * 1000 // 7 天
+  const lastCleanup = localStorage.getItem('last_indexeddb_cleanup')
+  const now = Date.now()
+
+  if (!lastCleanup || now - parseInt(lastCleanup) > CLEANUP_INTERVAL) {
+    console.log('🕐 执行定期 IndexedDB 清理...')
+    cleanupOldIndexedDBData().then(() => {
+      localStorage.setItem('last_indexeddb_cleanup', now.toString())
+      console.log('✅ 定期清理完成，下次清理时间：', new Date(now + CLEANUP_INTERVAL).toLocaleString())
+    }).catch(error => {
+      console.error('定期清理失败:', error)
+    })
+  } else {
+    const nextCleanup = parseInt(lastCleanup) + CLEANUP_INTERVAL
+    console.log('ℹ️ 下次 IndexedDB 清理时间：', new Date(nextCleanup).toLocaleString())
+  }
+}
+
 export { STORES }

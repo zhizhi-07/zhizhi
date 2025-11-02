@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { BackIcon } from '../components/Icons'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { getStreakData, getCurrentLevel, getNextMilestone, getChatRate, MILESTONES } from '../utils/streakSystem'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'

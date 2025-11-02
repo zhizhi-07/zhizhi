@@ -4,8 +4,7 @@ import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 import { BackIcon, MoreIcon, SendIcon, AddCircleIcon, EmojiIcon } from '../components/Icons'
 import { useGroup } from '../context/GroupContext'
-import { useCharacter } from '../context/CharacterContext'
-import { useUser } from '../context/UserContext'
+import { useCharacter, useUser } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 import { useBackground } from '../context/BackgroundContext'
 import GroupChatMenu from '../components/GroupChatMenu'
@@ -119,29 +118,29 @@ const GroupChatDetail = () => {
   // 初始化：从 IndexedDB 或 localStorage 加载消息
   useEffect(() => {
     if (!id) return
-    
+
     // 重置加载状态
     setMessagesLoaded(false)
-    
+
     const loadMessages = async () => {
       try {
         // 先尝试从 IndexedDB 读取
         const data = await getIndexedDBItem<any>(STORES.GROUP_MESSAGES, `group_messages_${id}`)
-        
+
         if (data && data.messages) {
           console.log(`💾 [IndexedDB] 加载了 ${data.messages.length} 条群聊消息`)
           setMessages(data.messages)
           setMessagesLoaded(true)
           return
         }
-        
+
         // 如果 IndexedDB 没有，尝试从 localStorage 读取
         const localData = localStorage.getItem(`group_messages_${id}`)
         if (localData) {
           const localMessages = JSON.parse(localData)
           console.log(`💾 [localStorage] 加载了 ${localMessages.length} 条消息，将迁移到 IndexedDB`)
           setMessages(localMessages)
-          
+
           // 迁移到 IndexedDB
           await setIndexedDBItem(STORES.GROUP_MESSAGES, {
             key: `group_messages_${id}`,
@@ -149,20 +148,32 @@ const GroupChatDetail = () => {
             messages: localMessages,
             lastUpdated: Date.now()
           })
-          
+
           // 迁移后清理 localStorage
           localStorage.removeItem(`group_messages_${id}`)
           console.log('✅ 已迁移到 IndexedDB 并清理 localStorage')
         }
-        
+
         setMessagesLoaded(true)
       } catch (error) {
         console.error('💥 加载消息失败:', error)
         setMessagesLoaded(true)
       }
     }
-    
+
     loadMessages()
+
+    // 监听强制重新加载消息的事件（从通知跳转时触发）
+    const handleReloadMessages = () => {
+      console.log('🔄 收到重新加载消息的请求')
+      loadMessages()
+    }
+
+    window.addEventListener('reload-group-messages', handleReloadMessages)
+
+    return () => {
+      window.removeEventListener('reload-group-messages', handleReloadMessages)
+    }
   }, [id])
 
   // 消息存储限制配置

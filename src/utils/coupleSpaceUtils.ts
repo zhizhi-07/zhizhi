@@ -117,20 +117,22 @@ export const rejectCoupleSpaceInvite = (characterId: string): boolean => {
   return true
 }
 
-// 结束情侣空间关系
+// 结束情侣空间关系（清理所有数据）
 export const endCoupleSpaceRelation = (): boolean => {
   const relation = getCoupleSpaceRelation()
-  
+
   if (!relation || relation.status !== 'active') {
     console.log('没有活跃的情侣空间')
     return false
   }
 
-  relation.status = 'ended'
-  relation.endedAt = Date.now()
-  saveCoupleSpaceRelation(relation)
-  
-  console.log('情侣空间已结束')
+  // 清理所有情侣空间相关数据
+  localStorage.removeItem('couple_space_relation')
+  localStorage.removeItem('couple_photos')
+  localStorage.removeItem('couple_messages')
+  localStorage.removeItem('couple_anniversaries')
+
+  console.log('✅ 情侣空间已结束，所有数据已清理')
   return true
 }
 

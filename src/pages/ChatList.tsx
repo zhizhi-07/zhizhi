@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { SearchIcon, AddIcon, EmptyIcon } from '../components/Icons'
 import { useState, useEffect } from 'react'
-import { useCharacter } from '../context/CharacterContext'
+import { useCharacter } from '../context/ContactsContext'
 import { useGroup } from '../context/GroupContext'
 import { useBackground } from '../context/BackgroundContext'
 import { getStreakData } from '../utils/streakSystem'
@@ -163,15 +163,16 @@ const ChatList = () => {
 
   // 同步群聊到聊天列表（新增和更新）
   useEffect(() => {
-    if (groups.length === 0) return
+    console.log('🔄 [群聊同步] 开始同步，当前群聊数:', groups.length)
 
+    // 即使 groups.length === 0 也要继续，因为可能需要清理已解散的群聊
     setChats(prev => {
       let updated = [...prev]
       let hasChanges = false
 
       groups.forEach(group => {
         const existingIndex = updated.findIndex(c => c.type === 'group' && c.groupId === group.id)
-        
+
         const groupChat: Chat = {
           id: group.id,
           groupId: group.id,
@@ -190,7 +191,7 @@ const ChatList = () => {
         if (existingIndex >= 0) {
           // 更新现有群聊
           const existing = updated[existingIndex]
-          if (existing.lastMessage !== groupChat.lastMessage || 
+          if (existing.lastMessage !== groupChat.lastMessage ||
               existing.time !== groupChat.time ||
               existing.memberCount !== groupChat.memberCount) {
             updated[existingIndex] = groupChat
@@ -200,11 +201,13 @@ const ChatList = () => {
               updated = [groupChat, ...updated.filter((_, i) => i !== existingIndex)]
             }
             hasChanges = true
+            console.log('🔄 [群聊同步] 更新群聊:', group.name)
           }
         } else {
           // 新增群聊，添加到顶部
           updated = [groupChat, ...updated]
           hasChanges = true
+          console.log('✅ [群聊同步] 新群聊已添加到聊天列表:', group.name)
         }
       })
 
@@ -212,18 +215,41 @@ const ChatList = () => {
       updated.sort((a, b) => {
         const aGroup = groups.find(g => g.id === a.groupId)
         const bGroup = groups.find(g => g.id === b.groupId)
-        
+
         const aDisbanded = aGroup?.disbanded ?? false
         const bDisbanded = bGroup?.disbanded ?? false
-        
+
         if (aDisbanded && !bDisbanded) return 1  // a解散，b未解散，a排后面
         if (!aDisbanded && bDisbanded) return -1 // a未解散，b解散，a排前面
         return 0 // 保持原有顺序
       })
 
+      if (hasChanges) {
+        console.log('✅ [群聊同步] 聊天列表已更新，总数:', updated.length)
+      }
+
       return hasChanges ? updated : prev
     })
   }, [groups])
+
+  // 保存聊天列表到 IndexedDB
+  useEffect(() => {
+    if (!chatsLoaded) return // 只有在初始加载完成后才保存
+
+    const saveChats = async () => {
+      try {
+        await setIndexedDBItem(STORES.SETTINGS, {
+          key: 'chatList',
+          chats: chats
+        })
+        console.log(`💾 聊天列表已保存到 IndexedDB (${chats.length} 个聊天)`)
+      } catch (error) {
+        console.error('💥 保存聊天列表失败:', error)
+      }
+    }
+
+    saveChats()
+  }, [chats, chatsLoaded])
 
   // 实时更新未读消息数和AI输入状态
   useEffect(() => {

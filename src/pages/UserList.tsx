@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { BackIcon, AddIcon, ImageIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
+import { useUser } from '../context/ContactsContext'
 
 const UserList = () => {
   const navigate = useNavigate()

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { BackIcon, ImageIcon } from '../components/Icons'
-import { useUser } from '../context/UserContext'
+import { useUser } from '../context/ContactsContext'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
 
