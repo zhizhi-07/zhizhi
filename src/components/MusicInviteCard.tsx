@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface MusicInviteCardProps {
   inviterName: string
@@ -23,12 +23,23 @@ const MusicInviteCard = ({
 }: MusicInviteCardProps) => {
   const [currentStatus, setCurrentStatus] = useState(status)
 
+  // 同步外部status prop的变化
+  useEffect(() => {
+    setCurrentStatus(status)
+  }, [status])
+
   const handleAccept = () => {
-    setCurrentStatus('accepted')
+    console.log('🎵 MusicInviteCard: 用户点击接受')
+    // 先调用回调，让父组件处理跳转等逻辑
     onAccept?.()
+    // 延迟更新状态，确保跳转先执行
+    setTimeout(() => {
+      setCurrentStatus('accepted')
+    }, 100)
   }
 
   const handleReject = () => {
+    console.log('🎵 MusicInviteCard: 用户点击拒绝')
     setCurrentStatus('rejected')
     onReject?.()
   }

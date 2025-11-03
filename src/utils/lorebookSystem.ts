@@ -3,6 +3,8 @@
  * 基于关键词触发的知识库管理
  */
 
+import { getIndexedDBItem, setIndexedDBItem, STORES } from './indexedDBStorage'
+
 export interface LorebookEntry {
   id: string
   name: string
@@ -60,12 +62,27 @@ const STORAGE_KEY_GLOBAL_LOREBOOK = 'global_lorebook_id'
  */
 class LorebookManager {
   /**
-   * 获取所有世界书
+   * 获取所有世界书（从IndexedDB）
    */
-  getAllLorebooks(): Lorebook[] {
+  async getAllLorebooks(): Promise<Lorebook[]> {
     try {
-      const data = localStorage.getItem(STORAGE_KEY_LOREBOOKS)
-      return data ? JSON.parse(data) : []
+      // 从IndexedDB读取
+      const data = await getIndexedDBItem<{ key: string; lorebooks: Lorebook[] }>(STORES.SETTINGS, STORAGE_KEY_LOREBOOKS)
+      if (data && data.lorebooks) {
+        return data.lorebooks
+      }
+      
+      // 如果IndexedDB没有，尝试从localStorage迁移
+      const localData = localStorage.getItem(STORAGE_KEY_LOREBOOKS)
+      if (localData) {
+        const lorebooks = JSON.parse(localData)
+        console.log('📚 从localStorage迁移世界书到IndexedDB')
+        await setIndexedDBItem(STORES.SETTINGS, { key: STORAGE_KEY_LOREBOOKS, lorebooks })
+        localStorage.removeItem(STORAGE_KEY_LOREBOOKS)
+        return lorebooks
+      }
+      
+      return []
     } catch (error) {
       console.error('获取世界书失败:', error)
       return []
@@ -75,15 +92,15 @@ class LorebookManager {
   /**
    * 获取单个世界书
    */
-  getLorebook(id: string): Lorebook | null {
-    const lorebooks = this.getAllLorebooks()
+  async getLorebook(id: string): Promise<Lorebook | null> {
+    const lorebooks = await this.getAllLorebooks()
     return lorebooks.find(lb => lb.id === id) || null
   }
 
   /**
    * 创建世界书
    */
-  createLorebook(data: Omit<Lorebook, 'id' | 'created_at' | 'updated_at'>): Lorebook {
+  async createLorebook(data: Omit<Lorebook, 'id' | 'created_at' | 'updated_at'>): Promise<Lorebook> {
     const lorebook: Lorebook = {
       ...data,
       id: `lorebook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -91,9 +108,9 @@ class LorebookManager {
       updated_at: Date.now()
     }
 
-    const lorebooks = this.getAllLorebooks()
+    const lorebooks = await this.getAllLorebooks()
     lorebooks.push(lorebook)
-    localStorage.setItem(STORAGE_KEY_LOREBOOKS, JSON.stringify(lorebooks))
+    await setIndexedDBItem(STORES.SETTINGS, { key: STORAGE_KEY_LOREBOOKS, lorebooks })
 
     return lorebook
   }
@@ -101,9 +118,9 @@ class LorebookManager {
   /**
    * 更新世界书
    */
-  updateLorebook(id: string, updates: Partial<Lorebook>): boolean {
+  async updateLorebook(id: string, updates: Partial<Lorebook>): Promise<boolean> {
     try {
-      const lorebooks = this.getAllLorebooks()
+      const lorebooks = await this.getAllLorebooks()
       const index = lorebooks.findIndex(lb => lb.id === id)
       
       if (index === -1) return false
@@ -114,7 +131,7 @@ class LorebookManager {
         updated_at: Date.now()
       }
 
-      localStorage.setItem(STORAGE_KEY_LOREBOOKS, JSON.stringify(lorebooks))
+      await setIndexedDBItem(STORES.SETTINGS, { key: STORAGE_KEY_LOREBOOKS, lorebooks })
       return true
     } catch (error) {
       console.error('更新世界书失败:', error)
@@ -125,14 +142,14 @@ class LorebookManager {
   /**
    * 删除世界书
    */
-  deleteLorebook(id: string): boolean {
+  async deleteLorebook(id: string): Promise<boolean> {
     try {
-      const lorebooks = this.getAllLorebooks()
+      const lorebooks = await this.getAllLorebooks()
       const filtered = lorebooks.filter(lb => lb.id !== id)
       
       if (filtered.length === lorebooks.length) return false
 
-      localStorage.setItem(STORAGE_KEY_LOREBOOKS, JSON.stringify(filtered))
+      await setIndexedDBItem(STORES.SETTINGS, { key: STORAGE_KEY_LOREBOOKS, lorebooks: filtered })
       return true
     } catch (error) {
       console.error('删除世界书失败:', error)
@@ -143,8 +160,8 @@ class LorebookManager {
   /**
    * 添加条目
    */
-  addEntry(lorebookId: string, entry: Omit<LorebookEntry, 'id' | 'created_at' | 'updated_at'>): LorebookEntry | null {
-    const lorebook = this.getLorebook(lorebookId)
+  async addEntry(lorebookId: string, entry: Omit<LorebookEntry, 'id' | 'created_at' | 'updated_at'>): Promise<LorebookEntry | null> {
+    const lorebook = await this.getLorebook(lorebookId)
     if (!lorebook) return null
 
     const newEntry: LorebookEntry = {
@@ -155,7 +172,7 @@ class LorebookManager {
     }
 
     lorebook.entries.push(newEntry)
-    this.updateLorebook(lorebookId, { entries: lorebook.entries })
+    await this.updateLorebook(lorebookId, { entries: lorebook.entries })
 
     return newEntry
   }
@@ -163,11 +180,11 @@ class LorebookManager {
   /**
    * 更新条目
    */
-  updateEntry(lorebookId: string, entryId: string, updates: Partial<LorebookEntry>): boolean {
-    const lorebook = this.getLorebook(lorebookId)
+  async updateEntry(lorebookId: string, entryId: string, updates: Partial<LorebookEntry>): Promise<boolean> {
+    const lorebook = await this.getLorebook(lorebookId)
     if (!lorebook) return false
 
-    const entryIndex = lorebook.entries.findIndex(e => e.id === entryId)
+    const entryIndex = lorebook.entries.findIndex((e: LorebookEntry) => e.id === entryId)
     if (entryIndex === -1) return false
 
     lorebook.entries[entryIndex] = {
@@ -176,47 +193,47 @@ class LorebookManager {
       updated_at: Date.now()
     }
 
-    return this.updateLorebook(lorebookId, { entries: lorebook.entries })
+    return await this.updateLorebook(lorebookId, { entries: lorebook.entries })
   }
 
   /**
    * 删除条目
    */
-  deleteEntry(lorebookId: string, entryId: string): boolean {
-    const lorebook = this.getLorebook(lorebookId)
+  async deleteEntry(lorebookId: string, entryId: string): Promise<boolean> {
+    const lorebook = await this.getLorebook(lorebookId)
     if (!lorebook) return false
 
-    const filtered = lorebook.entries.filter(e => e.id !== entryId)
+    const filtered = lorebook.entries.filter((e: LorebookEntry) => e.id !== entryId)
     if (filtered.length === lorebook.entries.length) return false
 
-    return this.updateLorebook(lorebookId, { entries: filtered })
+    return await this.updateLorebook(lorebookId, { entries: filtered })
   }
 
   /**
    * 获取全局世界书
    */
-  getGlobalLorebook(): Lorebook | null {
+  async getGlobalLorebook(): Promise<Lorebook | null> {
     const globalId = localStorage.getItem(STORAGE_KEY_GLOBAL_LOREBOOK)
     if (!globalId) return null
-    return this.getLorebook(globalId)
+    return await this.getLorebook(globalId)
   }
 
   /**
    * 设置全局世界书
    */
-  setGlobalLorebook(lorebookId: string): boolean {
-    const lorebook = this.getLorebook(lorebookId)
+  async setGlobalLorebook(lorebookId: string): Promise<boolean> {
+    const lorebook = await this.getLorebook(lorebookId)
     if (!lorebook) return false
 
     localStorage.setItem(STORAGE_KEY_GLOBAL_LOREBOOK, lorebookId)
-    return this.updateLorebook(lorebookId, { is_global: true })
+    return await this.updateLorebook(lorebookId, { is_global: true })
   }
 
   /**
    * 获取角色关联的世界书
    */
-  getCharacterLorebooks(characterId: string): Lorebook[] {
-    const lorebooks = this.getAllLorebooks()
+  async getCharacterLorebooks(characterId: string): Promise<Lorebook[]> {
+    const lorebooks = await this.getAllLorebooks()
     return lorebooks.filter(lb => 
       lb.character_ids.includes(characterId) || lb.is_global
     )
@@ -267,12 +284,12 @@ class LorebookManager {
   /**
    * 构建世界书上下文（返回详细信息）
    */
-  buildContextWithStats(
+  async buildContextWithStats(
     characterId: string,
     recentMessages: string,
     maxTokens: number = 2000
-  ): { context: string; triggeredEntries: Array<{ name: string; tokens: number }> } {
-    const lorebooks = this.getCharacterLorebooks(characterId)
+  ): Promise<{ context: string; triggeredEntries: Array<{ name: string; tokens: number }> }> {
+    const lorebooks = await this.getCharacterLorebooks(characterId)
     if (lorebooks.length === 0) return { context: '', triggeredEntries: [] }
 
     const allTriggered: LorebookEntry[] = []
@@ -345,12 +362,12 @@ class LorebookManager {
   /**
    * 构建世界书上下文
    */
-  buildContext(
+  async buildContext(
     characterId: string,
     recentMessages: string,
     maxTokens: number = 2000
-  ): string {
-    const lorebooks = this.getCharacterLorebooks(characterId)
+  ): Promise<string> {
+    const lorebooks = await this.getCharacterLorebooks(characterId)
     if (lorebooks.length === 0) return ''
 
     const allTriggered: LorebookEntry[] = []
@@ -429,13 +446,13 @@ class LorebookManager {
    * 导入世界书（JSON）
    * 支持本系统格式和 SillyTavern 格式
    */
-  importLorebook(jsonString: string): Lorebook | null {
+  async importLorebook(jsonString: string): Promise<Lorebook | null> {
     try {
       const data = JSON.parse(jsonString)
       
       // 检测是否为 SillyTavern 格式
       if (this.isSillyTavernFormat(data)) {
-        return this.importFromSillyTavern(data)
+        return await this.importFromSillyTavern(data)
       }
       
       // 本系统格式
@@ -444,7 +461,7 @@ class LorebookManager {
       }
 
       // 创建新的世界书
-      return this.createLorebook({
+      return await this.createLorebook({
         name: data.name,
         description: data.description || '',
         entries: data.entries || [],
@@ -498,7 +515,7 @@ class LorebookManager {
   /**
    * 从 SillyTavern 格式导入
    */
-  private importFromSillyTavern(data: any): Lorebook {
+  private async importFromSillyTavern(data: any): Promise<Lorebook> {
     console.log('检测到 SillyTavern 格式，开始转换...')
     
     // 将 entries 转换为数组（如果是对象格式）
@@ -555,7 +572,7 @@ class LorebookManager {
     })
 
     // 创建世界书
-    return this.createLorebook({
+    return await this.createLorebook({
       name: data.name || '导入的世界书',
       description: data.description || '从 SillyTavern 导入',
       entries: entries,

@@ -15,35 +15,38 @@ const EditWorldBook = () => {
   const [showSettings, setShowSettings] = useState(false)
 
   useEffect(() => {
-    if (id) {
-      const lb = lorebookManager.getLorebook(id)
-      setLorebook(lb)
-    } else {
-      // 创建新世界书
-      const newLorebook: Lorebook = {
-        id: '',
-        name: '新世界书',
-        description: '',
-        entries: [],
-        scan_depth: 10,
-        token_budget: 2000,
-        recursive_scanning: false,
-        is_global: false,
-        character_ids: [],
-        created_at: Date.now(),
-        updated_at: Date.now()
+    const loadLorebook = async () => {
+      if (id) {
+        const lb = await lorebookManager.getLorebook(id)
+        setLorebook(lb)
+      } else {
+        // 创建新世界书
+        const newLorebook: Lorebook = {
+          id: '',
+          name: '新世界书',
+          description: '',
+          entries: [],
+          scan_depth: 10,
+          token_budget: 2000,
+          recursive_scanning: false,
+          is_global: false,
+          character_ids: [],
+          created_at: Date.now(),
+          updated_at: Date.now()
+        }
+        setLorebook(newLorebook)
       }
-      setLorebook(newLorebook)
     }
+    loadLorebook()
   }, [id])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!lorebook) return
 
     if (id) {
-      lorebookManager.updateLorebook(id, lorebook)
+      await lorebookManager.updateLorebook(id, lorebook)
     } else {
-      lorebookManager.createLorebook(lorebook)
+      await lorebookManager.createLorebook(lorebook)
     }
 
     navigate('/worldbook')
@@ -99,7 +102,16 @@ const EditWorldBook = () => {
     })
   }
 
-  if (!lorebook) return null
+  if (!lorebook) {
+    return (
+      <div className="h-full flex flex-col bg-gray-50">
+        {showStatusBar && <StatusBar />}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-gray-400 text-sm">加载中...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex flex-col bg-gray-50">

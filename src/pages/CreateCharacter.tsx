@@ -31,6 +31,7 @@ const CreateCharacter = () => {
     systemPrompt: '',
     alternateGreetings: [] as string[],
     characterBook: undefined as any,
+    regexScripts: [] as any[],  // 正则表达式脚本（从ST导入）
     tags: [] as string[],
     creator: '',
     // 开场白（新增）
@@ -124,7 +125,7 @@ const CreateCharacter = () => {
       
       // 同时读取图片作为头像
       const reader = new FileReader()
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const imageDataUrl = reader.result as string
         
         // 转换为内部格式
@@ -154,6 +155,7 @@ const CreateCharacter = () => {
           systemPrompt: converted.systemPrompt || '',
           alternateGreetings: converted.alternateGreetings || [],
           characterBook: converted.characterBook,
+          regexScripts: converted.regexScripts || [],  // 正则脚本从ST导入
           tags: converted.tags || [],
           creator: converted.creator || '',
           // 开场白（从ST导入）
@@ -190,7 +192,7 @@ const CreateCharacter = () => {
               }
               
               // 导入世界书
-              const importedLorebook = lorebookManager.importLorebook(JSON.stringify(lorebookData))
+              const importedLorebook = await lorebookManager.importLorebook(JSON.stringify(lorebookData))
               if (importedLorebook) {
                 lorebookImported = true
                 setImportedLorebookId(importedLorebook.id) // 保存世界书ID，等角色创建后关联
@@ -243,7 +245,7 @@ const CreateCharacter = () => {
     })
   }
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!formData.name.trim()) {
       alert('请输入角色名字')
       return
@@ -270,6 +272,7 @@ const CreateCharacter = () => {
         systemPrompt: formData.systemPrompt || undefined,
         alternateGreetings: formData.alternateGreetings.length > 0 ? formData.alternateGreetings : undefined,
         characterBook: formData.characterBook,
+        regexScripts: formData.regexScripts.length > 0 ? formData.regexScripts : undefined,  // 正则脚本（从ST导入）
         tags: formData.tags.length > 0 ? formData.tags : undefined,
         creator: formData.creator || undefined,
         // 开场白（新增）
@@ -311,10 +314,10 @@ const CreateCharacter = () => {
       
       // 如果有导入的世界书，关联到新创建的角色
       if (importedLorebookId && newCharacter) {
-        const lorebook = lorebookManager.getLorebook(importedLorebookId)
+        const lorebook = await lorebookManager.getLorebook(importedLorebookId)
         if (lorebook) {
           const updatedCharacterIds = [...lorebook.character_ids, newCharacter.id]
-          lorebookManager.updateLorebook(importedLorebookId, {
+          await lorebookManager.updateLorebook(importedLorebookId, {
             character_ids: updatedCharacterIds
           })
           console.log('✅ 世界书已自动关联到角色:', newCharacter.name, '世界书ID:', importedLorebookId)

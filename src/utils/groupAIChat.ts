@@ -1,4 +1,5 @@
 import { callAI } from './api'
+import { buildRoleplayPrompt, Character, User } from './prompts'
 
 interface GroupMember {
   id: string
@@ -6,6 +7,8 @@ interface GroupMember {
   avatar: string
   type: 'user' | 'character'
   description?: string
+  // 完整角色卡数据
+  characterData?: Character
 }
 
 interface GroupMessage {
@@ -49,10 +52,12 @@ export const generateGroupAIChat = async (
       `${msg.senderName}: ${msg.content}`
     ).join('\n')
 
-    // 构建AI成员信息
+    // 构建AI成员信息（简化版，只保留核心特点）
     const aiMembersInfo = aiMembers.map(member => {
-      const desc = characterDescriptions.get(member.id) || '一个AI角色'
-      return `- ${member.name}: ${desc.substring(0, 100)}`
+      const fullDesc = characterDescriptions.get(member.id) || '一个AI角色'
+      // 只提取前200字作为核心特点，避免token爆炸
+      const coreDesc = fullDesc.substring(0, 200) + (fullDesc.length > 200 ? '...' : '')
+      return `- ${member.name}: ${coreDesc}`
     }).join('\n')
 
     // 获取用户成员
@@ -158,41 +163,57 @@ ${messageHistory || '（还没有消息）'}
 
 // 让指定AI回复群聊消息
 export const generateAIReplyInGroup = async (
-  characterId: string,
-  characterName: string,
-  characterDescription: string,
+  character: Character,  // 完整角色卡
   recentMessages: GroupMessage[],
-  members: GroupMember[]
+  members: GroupMember[],
+  userInfo?: User  // 用户信息
 ): Promise<string | null> => {
   try {
-    // 构建消息历史
-    const messageHistory = recentMessages.slice(-15).map(msg =>
-      `${msg.senderName}: ${msg.content}`
-    ).join('\n')
+    // 构建消息历史（格式化为对话格式）
+    const conversationHistory = recentMessages.slice(-15).map(msg => ({
+      role: msg.senderType === 'user' ? 'user' as const : 'assistant' as const,
+      content: `【${msg.senderName}】${msg.content}`
+    }))
 
     // 构建成员列表
     const memberList = members.map(m => m.name).join('、')
 
-    const prompt = `你是 ${characterName}。
+    // 使用完整的角色卡系统提示词
+    const systemPrompt = buildRoleplayPrompt(
+      character,
+      userInfo || { name: '用户', nickname: '用户' },
+      false, // 群聊不用旁白模式
+      undefined,
+      undefined,
+      false,
+      undefined,
+      false,
+      undefined,
+      undefined,
+      undefined // 群聊暂不使用正则脚本
+    )
 
-【你的性格】
-${characterDescription}
-
-【群成员】${memberList}
+    // 添加群聊特定说明
+    const groupContext = `
+【当前场景：群聊】
+- 群成员：${memberList}
+- 这是一个群聊，有多人在场
+- 你可以@某人来回复，格式：@用户名 内容
+- 回复要自然随意，不要太长（1-3句话即可）
+- 注意群聊氛围，不要太正经
 
 【最近对话】
-${messageHistory}
+${recentMessages.slice(-10).map(m => `${m.senderName}: ${m.content}`).join('\n')}
 
-【要求】
-1. 根据最近的对话，以你的性格自然回复
-2. 5-30字，像真人聊天一样随意
-3. 可以@某人，格式：@用户名 回复内容
-4. 不要说教、不要太正经
-5. 直接输出回复内容，不要任何前缀
+现在请以你的性格自然回复：`
 
-现在回复：`
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      ...conversationHistory,
+      { role: 'user' as const, content: groupContext }
+    ]
 
-    const response = await callAI([{ role: 'user' as const, content: prompt }], 1, 3000)
+    const response = await callAI(messages, 1, 5000)
     
     // 清理回复
     let cleaned = response.trim()

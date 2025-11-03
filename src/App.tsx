@@ -396,6 +396,7 @@ function App() {
                                     <Route path="/statusbar-customize" element={<PageWrapper><StatusBarCustomize /></PageWrapper>} />
                                     <Route path="/worldbook" element={<PageWrapper><WorldBook /></PageWrapper>} />
                                     <Route path="/world-book" element={<PageWrapper><WorldBook /></PageWrapper>} />
+                                    <Route path="/create-world-book" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                     <Route path="/edit-world-book/:id" element={<PageWrapper><EditWorldBook /></PageWrapper>} />
                                     <Route path="/memory-cleanup" element={<PageWrapper><MemoryCleanup /></PageWrapper>} />
                                     <Route path="/storage-migration" element={<PageWrapper><StorageMigration /></PageWrapper>} />

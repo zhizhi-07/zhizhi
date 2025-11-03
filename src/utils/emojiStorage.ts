@@ -1,9 +1,15 @@
 /**
  * 表情包存储工具 - IndexedDB 版本
- * 使用旧的 indexedDB.ts（版本1），避免版本冲突
+ * 使用新版 indexedDBStorage.ts（版本3）
  */
 
-import { setItem, getAllItems, deleteItem, clearStore, STORES } from './indexedDB'
+import { 
+  setIndexedDBItem, 
+  getAllIndexedDBItems, 
+  deleteIndexedDBItem, 
+  clearIndexedDBStore,
+  STORES 
+} from './indexedDBStorage'
 
 export interface Emoji {
   id: number
@@ -21,7 +27,7 @@ console.log('📦 表情包存储：IndexedDB')
  */
 export async function getEmojis(): Promise<Emoji[]> {
   try {
-    return await getAllItems<Emoji>(STORES.EMOJIS)
+    return await getAllIndexedDBItems<Emoji>(STORES.EMOJIS)
   } catch (error) {
     console.error('读取表情包失败:', error)
     return []
@@ -34,10 +40,10 @@ export async function getEmojis(): Promise<Emoji[]> {
 export async function saveEmojis(emojis: Emoji[]): Promise<boolean> {
   try {
     // 清空旧数据
-    await clearStore(STORES.EMOJIS)
+    await clearIndexedDBStore(STORES.EMOJIS)
     // 批量保存
     for (const emoji of emojis) {
-      await setItem(STORES.EMOJIS, emoji)
+      await setIndexedDBItem(STORES.EMOJIS, emoji)
     }
     return true
   } catch (error) {
@@ -58,7 +64,7 @@ export async function addEmoji(emoji: Omit<Emoji, 'id' | 'addTime' | 'useCount'>
       useCount: 0
     }
     
-    await setItem(STORES.EMOJIS, newEmoji)
+    await setIndexedDBItem(STORES.EMOJIS, newEmoji)
     return newEmoji
   } catch (error) {
     console.error('添加表情包失败:', error)
@@ -71,7 +77,7 @@ export async function addEmoji(emoji: Omit<Emoji, 'id' | 'addTime' | 'useCount'>
  */
 export async function deleteEmoji(id: number): Promise<boolean> {
   try {
-    await deleteItem(STORES.EMOJIS, id)
+    await deleteIndexedDBItem(STORES.EMOJIS, id)
     return true
   } catch (error) {
     console.error('删除表情包失败:', error)
@@ -84,11 +90,11 @@ export async function deleteEmoji(id: number): Promise<boolean> {
  */
 export async function incrementUseCount(id: number): Promise<void> {
   try {
-    const { getItem } = await import('./indexedDB')
-    const emoji = await getItem<Emoji>(STORES.EMOJIS, id)
+    const { getIndexedDBItem } = await import('./indexedDBStorage')
+    const emoji = await getIndexedDBItem<Emoji>(STORES.EMOJIS, String(id))
     if (emoji) {
       emoji.useCount = (emoji.useCount || 0) + 1
-      await setItem(STORES.EMOJIS, emoji)
+      await setIndexedDBItem(STORES.EMOJIS, emoji)
     }
   } catch (error) {
     console.error('更新使用次数失败:', error)
@@ -171,7 +177,7 @@ export async function importEmojis(jsonData: string, replaceMode: boolean = fals
  */
 export async function clearAllEmojis(): Promise<boolean> {
   try {
-    await clearStore(STORES.EMOJIS)
+    await clearIndexedDBStore(STORES.EMOJIS)
     return true
   } catch (error) {
     console.error('清空表情包失败:', error)

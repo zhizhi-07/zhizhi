@@ -6,6 +6,7 @@ import { useSettings } from '../context/SettingsContext'
 import { useCharacter, useUser } from '../context/ContactsContext'
 import { callAI } from '../utils/api'
 import { buildRoleplayPrompt, buildBlacklistPrompt } from '../utils/prompts'
+import { applyRegexToMessage } from '../utils/regexEngine'
 import MusicInviteCard from '../components/MusicInviteCard'
 import MusicInviteSelector from '../components/MusicInviteSelector'
 import MusicShareCard from '../components/MusicShareCard'
@@ -67,7 +68,7 @@ interface Message {
     senderName: string
     type: 'received' | 'sent'
   }
-  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite' | 'xiaohongshu' | 'image' | 'musicInvite' | 'musicShare'
+  messageType?: 'text' | 'transfer' | 'system' | 'redenvelope' | 'emoji' | 'photo' | 'voice' | 'location' | 'intimate_pay' | 'couple_space_invite' | 'xiaohongshu' | 'image' | 'musicInvite' | 'musicShare' | 'html'
   transfer?: {
     amount: number
     message: string
@@ -199,7 +200,7 @@ const ChatDetail = () => {
   const isMountedRef = useRef(true) // 追踪组件是否已挂载（用于切换聊天时继续AI回复）
   
   // Token 计数状态
-  const [tokenStats, setTokenStats] = useState({ total: 0, remaining: 0, percentage: 0, systemPrompt: 0, lorebook: 0, messages: 0 })
+  const [tokenStats, setTokenStats] = useState({ total: 0, remaining: 0, percentage: 0, systemPrompt: 0, character: 0, lorebook: 0, messages: 0 })
   const [showTokenDetail, setShowTokenDetail] = useState(false)
   const [responseTime, setResponseTime] = useState(0) // 响应时间（毫秒）
   const [lorebookEntries, setLorebookEntries] = useState<Array<{ name: string; tokens: number }>>([])
@@ -615,7 +616,6 @@ const ChatDetail = () => {
     setDisplayCount(30)
     isFirstLoadRef.current = true
     prevMessageCountRef.current = 0 // 重置消息数量记录
-    processedMessageIdsRef.current.clear() // 清除已处理的消息ID
 
     // 清除未读消息
     if (id) {
@@ -683,56 +683,9 @@ const ChatDetail = () => {
     }
   }, [id])
 
-  // 记录已处理的消息ID，防止重复触发通知
-  const processedMessageIdsRef = useRef<Set<number>>(new Set())
-
-  // 实时监听AI消息，立即触发通知和未读消息（和群聊逻辑一致）
-  useEffect(() => {
-    if (!id || !character || messages.length === 0) return
-
-    const lastMessage = messages[messages.length - 1]
-
-    // 只处理AI发送的消息，且未处理过
-    if (lastMessage && lastMessage.type === 'received' && !processedMessageIdsRef.current.has(lastMessage.id)) {
-      // 标记为已处理
-      processedMessageIdsRef.current.add(lastMessage.id)
-
-      // 判断用户是否在当前聊天页面
-      const isInCurrentChat = !document.hidden && window.location.pathname === `/chat/${id}`
-
-      console.log('🔔 [通知检查]', {
-        characterName: character.name,
-        messageContent: lastMessage.content?.substring(0, 20),
-        isInCurrentChat,
-        documentHidden: document.hidden,
-        currentPath: window.location.pathname,
-        expectedPath: `/chat/${id}`,
-        messageId: lastMessage.id
-      })
-
-      // 如果不在当前页面，立即增加未读并发送通知
-      if (!isInCurrentChat) {
-        console.log('📬 [触发通知] 发送通知给:', character.name)
-        incrementUnread(id, 1, 'single')
-
-        // 发送通知事件
-        window.dispatchEvent(new CustomEvent('background-chat-message', {
-          detail: {
-            title: character.name,
-            message: lastMessage.content || '[消息]',
-            chatId: id,
-            type: 'single',
-            avatar: character.avatar
-          }
-        }))
-
-        // 更新聊天列表
-        updateChatListLastMessage(id, lastMessage.content, lastMessage.timestamp)
-      } else {
-        console.log('⏸️ [跳过通知] 用户正在当前聊天窗口')
-      }
-    }
-  }, [messages, id, character?.id])
+  // ❌ 已移除重复的通知useEffect
+  // 原因：safeSetMessages中已经有了更可靠的通知逻辑，这里会导致重复通知
+  // 新的通知逻辑在safeSetMessages中（第2728-2759行），会在消息保存时立即触发
 
   // 🔍 首次进入聊天时自动识别AI头像（只识别一次，除非头像变了）
   useEffect(() => {
@@ -1324,8 +1277,9 @@ ${character.description || ''}
       setInputValue('')
       setQuotedMessage(null) // 清除引用
       
-      // 更新火花
+      // ⚡ 立即保存消息（但不更新聊天列表，等AI回复后再更新）
       if (id) {
+        safeSetItem(`chat_messages_${id}`, updatedMessages)
         updateStreak(id)
       }
       
@@ -2385,7 +2339,7 @@ ${willAccept ?
       
       // 保留原始消息内容，但添加撤回标记
       // AI 可以看到原始内容，但用户界面显示撤回提示
-      setMessages(prev => prev.map(msg => 
+      const newMessages = messages.map(msg => 
         msg.id === messageToRecall.id 
           ? { 
               ...msg, 
@@ -2398,7 +2352,17 @@ ${willAccept ?
               messageType: 'system' as const 
             }
           : msg
-      ))
+      )
+      
+      // 立即保存到state和localStorage
+      safeSetMessages(newMessages)
+      
+      // 确保localStorage中的数据已更新
+      if (id) {
+        localStorage.setItem(`chat_messages_${id}`, JSON.stringify(newMessages))
+      }
+      
+      console.log('↩️ 消息已撤回并永久保存（ID:', messageToRecall.id, '），理由:', recallReason.trim())
       
       // 重置状态
       setShowRecallReasonModal(false)
@@ -2714,8 +2678,41 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
     if (id) {
       safeSetItem(`chat_messages_${id}`, newMessages)
       console.log('💾 消息已立即保存到 localStorage')
+      
+      // ⚡ 检查是否需要发送后台通知（修复私聊没有后台通知的bug）
+      if (newMessages.length > 0) {
+        const lastMessage = newMessages[newMessages.length - 1]
+        
+        // 只处理AI发送的消息
+        if (lastMessage && lastMessage.type === 'received' && character) {
+          // ⚡ 始终更新聊天列表的最后消息（不管用户是否在当前页面）
+          updateChatListLastMessage(id, lastMessage.content, lastMessage.timestamp)
+          
+          // 判断用户是否在当前聊天页面
+          const isInCurrentChat = !document.hidden && window.location.pathname === `/chat/${id}`
+          
+          if (!isInCurrentChat) {
+            // 只有不在当前页面时才发送通知和增加未读
+            console.log('📬 [后台通知] 用户不在当前页面，发送通知')
+            incrementUnread(id, 1, 'single')
+            
+            // 发送通知事件
+            window.dispatchEvent(new CustomEvent('background-chat-message', {
+              detail: {
+                title: character.name,
+                message: lastMessage.content || '[消息]',
+                chatId: id,
+                type: 'single',
+                avatar: character.avatar
+              }
+            }))
+          } else {
+            console.log('✅ [当前窗口] 已更新聊天列表，不发送通知')
+          }
+        }
+      }
     }
-  }, [id])
+  }, [id, character])
 
   // 获取AI回复
   const getAIReply = async (currentMessages: Message[]) => {
@@ -2725,10 +2722,14 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
     console.log('  - character:', character?.name)
     console.log('  - id:', id)
     
+    // 简化变量定义
+    const user = currentUser
+    const char = character
+    
     setIsAiTyping(true)
     
     console.log('🎭 开始生成AI回复')
-    console.log('👤 角色:', character?.name)
+    console.log('👤 角色:', char?.name)
     console.log('💬 当前消息数:', currentMessages.length)
 
     try {
@@ -2868,7 +2869,8 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
           coupleSpaceContent, // 传入情侣空间内容摘要
           enableProactiveCalls, // 传入主动打电话开关
           userAppearance || undefined, // 传入用户外貌描述
-          characterAvatar || undefined // 传入AI头像描述
+          characterAvatar || undefined, // 传入AI头像描述
+          character?.regexScripts // 传入正则脚本
         )
         
         console.log('✅ 使用角色扮演提示词系统')
@@ -2907,7 +2909,8 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
           coupleSpaceContent, // 传入情侣空间内容摘要
           enableProactiveCalls, // 传入主动打电话开关
           userAppearance || undefined, // 传入用户外貌描述
-          characterAvatar || undefined // 传入AI头像描述
+          characterAvatar || undefined, // 传入AI头像描述
+          character?.regexScripts // 传入正则脚本
         )
       }
       
@@ -3075,21 +3078,17 @@ ${currentUser?.name || '用户'}："${lastMessage.content}"
         
         if (groupNames.size > 0) {
           groupChatContext = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 群聊上下文提示\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n你现在在 ${groupNames.size} 个群聊中：${Array.from(groupNames).map(n => `"${n}"`).join('、')}\n\n聊天记录中标注了"💬 群聊[群名]"的消息来自群聊，不是私聊。\n- 不同群的消息是分开的，注意区分\n- 你可以在私聊中提到群聊里发生的事\n- 群聊和私聊是两个不同的场景\n\n`
-          console.log(`💬 AI知道自己在 ${groupNames.size} 个群:`, Array.from(groupNames).join('、'))
         }
       }
       
-      // 构建世界书上下文（获取详细统计）
+      // 📚 构建世界书上下文
       let lorebookContext = ''
       if (character?.id) {
         const recentMessagesText = recentMessages.map(m => m.content || '').join('\n')
-        const lorebookResult = lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
+        const lorebookResult = await lorebookManager.buildContextWithStats(character.id, recentMessagesText, 2000)
         lorebookContext = lorebookResult.context ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📚 世界书设定\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${lorebookResult.context}\n\n` : ''
         setLorebookEntries(lorebookResult.triggeredEntries)
         console.log('📚 世界书上下文:', lorebookResult.context ? `已加载 ${lorebookResult.triggeredEntries.length} 个条目` : '未触发')
-      } else {
-        console.warn('⚠️ character 未定义，跳过世界书加载')
-        setLorebookEntries([])
       }
       
       // 构建系统提示词
@@ -3260,6 +3259,12 @@ ${emojiInstructions}
         },
         ...limitedMessages.map((msg, mapIndex) => {
           console.log(`  🔹 处理消息 ${mapIndex + 1}/${recentMessages.length}: type=${msg.type}, messageType=${msg.messageType}`)
+          
+          // 跳过HTML消息（不发送给AI，避免AI学习HTML格式）
+          if (msg.messageType === 'html') {
+            console.log('⚠️ 跳过HTML消息，不发送给AI')
+            return null
+          }
           
           // 优先处理撤回的消息
           if (msg.isRecalled && msg.recalledContent) {
@@ -3553,16 +3558,27 @@ ${emojiInstructions}
         }
         return ''
       })
+      // 构建角色信息字符串（用于单独统计token）
+      const characterInfo = [
+        character?.description,
+        character?.personality,
+        character?.scenario,
+        character?.firstMessage,
+        character?.exampleMessages
+      ].filter(Boolean).join('\n')
+      
       const stats = calculateContextTokens(
         fullSystemPrompt,
         lorebookContext,
         messageContents,
-        contextLimit
+        contextLimit,
+        characterInfo  // 传入角色信息
       )
       setTokenStats(stats)
       console.log('📊Token统计:', {
         总计: stats.total,
         系统提示: stats.systemPrompt,
+        角色: stats.character,
         世界书: stats.lorebook,
         消息: stats.messages,
         剩余: stats.remaining,
@@ -3601,6 +3617,14 @@ ${emojiInstructions}
       }
       
       console.log('📨 AI原始回复:', aiResponse)
+      
+      // ⚡ 应用正则脚本替换（如 <-EVE_DATA-> 等标记）
+      aiResponse = applyRegexToMessage(aiResponse, character?.regexScripts, {
+        characterName: character?.name,
+        userName: currentUser?.name,
+        date: new Date()
+      })
+      console.log('🔧 正则脚本处理后:', aiResponse)
       
       // 如果是记账助手，提取账单信息
       if (id === 'accounting_assistant') {
@@ -3930,7 +3954,8 @@ ${emojiInstructions}
                 }),
                 timestamp: Date.now(),
                 messageType: 'system',
-                avatarPrompt: usedPrompt || description  // 保存提示词
+                avatarPrompt: usedPrompt || description,  // 保存提示词
+                isHidden: false  // 确保系统消息可见
               }
               console.log('📣 添加系统提示:', systemMessage.content)
               // 使用函数式更新确保基于最新状态
@@ -4288,6 +4313,7 @@ ${emojiInstructions}
       cleanedResponse = cleanedResponse.replace(/\[状态:[^\]]+\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[状态:[\s\S]*?\]/g, '').trim()
       cleanedResponse = cleanedResponse.replace(/\[.*?状态.*?\]/g, '').trim()
+      cleanedResponse = cleanedResponse.replace(/<status>[\s\S]*?<\/status>/gi, '').trim()
       
       console.log('🧹 清理后的回复内容:', cleanedResponse)
       console.log('📏 清理后的回复长度:', cleanedResponse.length)
@@ -4696,7 +4722,15 @@ ${emojiInstructions}
         // 将字面的 \n 转换为真正的换行符（处理AI可能输出的 \\n）
         // 同时保留AI直接输出的真正换行符
         const normalizedResponse = cleanedResponse.replace(/\\n/g, '\n')
-        const responseLines = normalizedResponse.trim().split('\n').filter(line => line.trim())
+        
+        // 检测是否包含HTML标签（正则脚本替换后的内容）
+        // 排除 <status> 和 <-xxx-> 这些非HTML标签
+        const containsHTML = /<(details|style|div|span|summary|html|head|body|script)/i.test(normalizedResponse)
+        
+        // 如果包含HTML，不拆分；否则按换行符拆分
+        const responseLines = containsHTML 
+          ? [normalizedResponse.trim()] 
+          : normalizedResponse.trim().split('\n').filter(line => line.trim())
         
         // 如果回复只有一行，直接添加
         if (responseLines.length === 1) {
@@ -4741,12 +4775,13 @@ ${emojiInstructions}
             const aiMessage: Message = {
               id: newMessages.length + 1,
               type: 'received',
-              content: finalContent,
+              content: containsHTML ? normalizedResponse.trim() : finalContent,
             time: new Date().toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit',
             }),
             timestamp: now,
+            messageType: containsHTML ? 'html' : undefined, // 标记HTML消息
             narrations: narrations.length > 0 ? narrations : undefined,
             quotedMessage: quotedMsg ? {
               id: quotedMsg.id,
@@ -5882,6 +5917,10 @@ ${emojiInstructions}
                   <span className="text-gray-700">{tokenStats.systemPrompt.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between text-[11px]">
+                  <span className="text-gray-500">角色</span>
+                  <span className="text-gray-700">{tokenStats.character.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
                   <span className="text-gray-500">世界书</span>
                   <span className="text-gray-700">{tokenStats.lorebook.toLocaleString()}</span>
                 </div>
@@ -6104,9 +6143,9 @@ ${emojiInstructions}
                          </div>
                        </div>
                      )}
-                     <div className="flex justify-center mb-4">
+                     <div className="flex justify-center mb-3">
                       <div 
-                        className={`bg-gray-200/80 px-3 py-1.5 rounded-md ${message.isRecalled || message.avatarPrompt ? 'cursor-pointer hover:bg-gray-300/80 transition-colors' : ''}`}
+                        className={`bg-gray-100 px-3 py-1.5 rounded-md ${message.isRecalled || message.avatarPrompt ? 'cursor-pointer hover:bg-gray-200 transition-colors' : ''}`}
                         onClick={() => {
                           if (message.isRecalled && message.recalledContent) {
                             setViewingRecalledMessage(message)
@@ -6173,6 +6212,27 @@ ${emojiInstructions}
                          </div>
                        ))}
                      </div>
+                   </div>
+                 )
+               }
+               
+               // HTML消息：独立渲染，不包裹在气泡里
+               if (message.messageType === 'html' && message.content) {
+                 return (
+                   <div key={message.id}>
+                     {/* 时间分隔线 */}
+                     {showTimeDivider && message.timestamp && (
+                       <div className="flex justify-center mb-4">
+                         <div className="bg-gray-200/60 px-3 py-1 rounded-full">
+                           <span className="text-xs text-gray-500">{formatTimestamp(message.timestamp)}</span>
+                         </div>
+                       </div>
+                     )}
+                     {/* 直接渲染HTML内容，不包裹气泡 */}
+                     <div 
+                       className="mb-4"
+                       dangerouslySetInnerHTML={{ __html: message.content }}
+                     />
                    </div>
                  )
                }

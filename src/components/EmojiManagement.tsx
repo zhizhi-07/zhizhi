@@ -69,21 +69,32 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
   }
 
   const handleConfirmBatchUpload = async () => {
-    if (batchFiles.length === 0) return
+    if (batchFiles.length === 0) {
+      console.warn('❌ 没有选择文件')
+      return
+    }
     
+    console.log(`📤 开始批量上传 ${batchFiles.length} 个文件`)
     setUploading(true)
     
     try {
+      console.log('📦 导入 emojiStorage 模块...')
       const { addEmoji } = await import('../utils/emojiStorage')
+      console.log('✅ 模块导入成功')
+      
       let successCount = 0
       let failedCount = 0
       
       for (let i = 0; i < batchFiles.length; i++) {
         const file = batchFiles[i]
+        console.log(`🔄 处理文件 ${i + 1}/${batchFiles.length}: ${file.name}`)
         
         try {
+          console.log(`  📖 读取文件为 DataURL...`)
           const dataUrl = await readFileAsDataURL(file)
+          console.log(`  ✅ 文件读取成功，大小: ${(dataUrl.length / 1024).toFixed(2)} KB`)
           
+          console.log(`  💾 添加到数据库...`)
           const result = await addEmoji({
             url: dataUrl,
             name: file.name,
@@ -92,39 +103,49 @@ const EmojiManagement = ({ show, onClose }: EmojiManagementProps) => {
           
           if (result) {
             successCount++
-            console.log(`✅ 成功添加: ${file.name}`)
+            console.log(`  ✅ 成功添加: ${file.name}`)
           } else {
             failedCount++
-            console.warn(`❌ 添加失败: ${file.name} (存储空间不足)`)
+            console.warn(`  ❌ 添加失败: ${file.name} (可能是存储空间不足)`)
+            alert(`添加 ${file.name} 失败，可能是存储空间不足`)
             // 如果失败，停止继续添加
             break
           }
         } catch (error) {
           failedCount++
-          console.error(`❌ 处理失败: ${file.name}`, error)
+          const errorMsg = error instanceof Error ? error.message : String(error)
+          console.error(`  ❌ 处理失败: ${file.name}`, error)
+          alert(`处理 ${file.name} 失败：${errorMsg}`)
         }
       }
       
-      // 显示结果（只在有错误时弹窗）
+      // 显示结果
       if (successCount > 0 && failedCount === 0) {
-        console.log(`✅ 成功添加 ${successCount} 个表情包！`)
+        console.log(`🎉 成功添加 ${successCount} 个表情包！`)
+        alert(`成功添加 ${successCount} 个表情包！`)
       } else if (successCount > 0 && failedCount > 0) {
         console.warn(`⚠️ 部分成功！成功：${successCount} 个，失败：${failedCount} 个`)
+        alert(`部分成功！成功：${successCount} 个，失败：${failedCount} 个`)
       } else if (failedCount > 0) {
-        console.error(`❌ 添加失败，请检查存储空间`)
+        console.error(`❌ 全部失败`)
+        alert('上传失败，请检查控制台查看详细错误')
       }
       
       // 重置
       setBatchFiles([])
       setShowBatchPreview(false)
       setDescriptions({})
-      loadEmojis()
+      
+      console.log('🔄 重新加载表情包列表...')
+      await loadEmojis()
       
     } catch (error) {
-      console.error('批量上传失败:', error)
-      alert('批量上传失败，请重试')
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('💥 批量上传失败:', error)
+      alert(`批量上传失败：${errorMsg}`)
     } finally {
       setUploading(false)
+      console.log('✅ 批量上传流程结束')
     }
   }
 

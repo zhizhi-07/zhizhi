@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BackIcon, AddIcon, SearchIcon, MoreIcon } from '../components/Icons'
 import StatusBar from '../components/StatusBar'
 import { useSettings } from '../context/SettingsContext'
@@ -11,28 +11,47 @@ const WorldBook = () => {
   const [lorebooks, setLorebooks] = useState<Lorebook[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showMenu, setShowMenu] = useState<string | null>(null)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadLorebooks()
   }, [])
 
-  const loadLorebooks = () => {
-    const all = lorebookManager.getAllLorebooks()
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(null)
+      }
+    }
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showMenu])
+
+  const loadLorebooks = async () => {
+    const all = await lorebookManager.getAllLorebooks()
     setLorebooks(all)
   }
 
   const handleCreate = () => {
-    navigate('/worldbook/create')
+    navigate('/create-world-book')
   }
 
   const handleEdit = (id: string) => {
-    navigate(`/worldbook/edit/${id}`)
+    navigate(`/edit-world-book/${id}`)
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('确定要删除这个世界书吗？')) {
-      lorebookManager.deleteLorebook(id)
-      loadLorebooks()
+      await lorebookManager.deleteLorebook(id)
+      await loadLorebooks()
     }
   }
 
@@ -58,11 +77,11 @@ const WorldBook = () => {
       if (!file) return
 
       const reader = new FileReader()
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const content = event.target?.result as string
-        const lorebook = lorebookManager.importLorebook(content)
+        const lorebook = await lorebookManager.importLorebook(content)
         if (lorebook) {
-          loadLorebooks()
+          await loadLorebooks()
           alert('导入成功')
         } else {
           alert('导入失败，请检查文件格式')
@@ -166,7 +185,14 @@ const WorldBook = () => {
                     )}
                   </div>
                   <button
-                    onClick={() => setShowMenu(showMenu === lorebook.id ? null : lorebook.id)}
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      setMenuPosition({
+                        top: rect.bottom + 4,
+                        right: window.innerWidth - rect.right
+                      })
+                      setShowMenu(showMenu === lorebook.id ? null : lorebook.id)
+                    }}
                     className="ios-button text-gray-400 ml-2"
                   >
                     <MoreIcon size={20} />
@@ -179,9 +205,16 @@ const WorldBook = () => {
                   <span>预算 {lorebook.token_budget}</span>
                 </div>
 
-                {/* 菜单 */}
+                {/* 菜单 - 使用 Portal 和 fixed 定位 */}
                 {showMenu === lorebook.id && (
-                  <div className="absolute right-4 top-14 glass-effect rounded-xl shadow-lg border border-white/30 overflow-hidden z-10">
+                  <div 
+                    ref={menuRef}
+                    className="fixed glass-effect rounded-xl shadow-lg border border-white/30 overflow-hidden z-[9999]"
+                    style={{
+                      top: `${menuPosition.top}px`,
+                      right: `${menuPosition.right}px`
+                    }}
+                  >
                     <button
                       onClick={() => {
                         handleEdit(lorebook.id)

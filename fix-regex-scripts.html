@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>修复正则脚本 - 单行格式</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .info {
+      background: #e3f2fd;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 4px solid #2196F3;
+    }
+    .warning {
+      background: #fff3e0;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 4px solid #ff9800;
+    }
+    button {
+      background: #2196F3;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-right: 10px;
+    }
+    button:hover {
+      background: #1976D2;
+    }
+    button.success {
+      background: #4CAF50;
+    }
+    button.danger {
+      background: #f44336;
+    }
+    pre {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    #result.success {
+      background: #c8e6c9;
+      color: #2e7d32;
+      display: block;
+    }
+    #result.error {
+      background: #ffcdd2;
+      color: #c62828;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 修复正则脚本 - 单行格式</h1>
+    
+    <div class="info">
+      <strong>问题：</strong>AI输出的状态卡片是<strong>单行格式</strong>（没有换行符），但正则脚本期待<strong>多行格式</strong>（有 <code>\n</code>）。
+    </div>
+    
+    <div class="warning">
+      <strong>⚠️ 注意：</strong>此操作会修改所有角色的正则脚本。建议先<strong>导出角色备份</strong>。
+    </div>
+    
+    <h2>修复内容</h2>
+    <p>将正则表达式中的 <code>\n</code>（换行符）替换为空，使其匹配单行格式。</p>
+    
+    <pre>原始：<-EVE_DATA->\n\|...\|\n\n<-方亦楷基础状态->
+修复后：<-EVE_DATA->\|...\|<-方亦楷基础状态-></pre>
+    
+    <button onclick="fixRegexScripts()">🔧 修复所有角色的正则脚本</button>
+    <button class="success" onclick="viewContacts()">👀 查看当前角色数据</button>
+    
+    <div id="result"></div>
+  </div>
+  
+  <script>
+    function showResult(message, isSuccess) {
+      const result = document.getElementById('result');
+      result.textContent = message;
+      result.className = isSuccess ? 'success' : 'error';
+    }
+    
+    function viewContacts() {
+      try {
+        const contactsStr = localStorage.getItem('characters');
+        if (!contactsStr) {
+          showResult('未找到角色数据', false);
+          return;
+        }
+        
+        const contacts = JSON.parse(contactsStr);
+        console.log('=== 所有角色 ===');
+        console.log(contacts);
+        
+        contacts.forEach((contact, index) => {
+          console.log(`\n角色 ${index + 1}: ${contact.name}`);
+          console.log('  ID:', contact.id);
+          console.log('  regexScripts 数量:', contact.regexScripts?.length || 0);
+          
+          if (contact.regexScripts && contact.regexScripts.length > 0) {
+            contact.regexScripts.forEach((script, i) => {
+              console.log(`\n  脚本 ${i + 1}: ${script.scriptName}`);
+              console.log('    findRegex:', script.findRegex);
+              console.log('    replaceString:', script.replaceString.substring(0, 100) + '...');
+              console.log('    disabled:', script.disabled);
+            });
+          }
+        });
+        
+        showResult(`✅ 已在控制台输出 ${contacts.length} 个角色的数据，请按 F12 查看`, true);
+      } catch (error) {
+        showResult('❌ 解析角色数据失败: ' + error.message, false);
+      }
+    }
+    
+    function fixRegexScripts() {
+      if (!confirm('确定要修复所有角色的正则脚本吗？\n\n建议先导出角色备份！')) {
+        return;
+      }
+      
+      try {
+        const contactsStr = localStorage.getItem('characters');
+        if (!contactsStr) {
+          showResult('未找到角色数据', false);
+          return;
+        }
+        
+        const contacts = JSON.parse(contactsStr);
+        let fixedCount = 0;
+        let scriptCount = 0;
+        
+        contacts.forEach(contact => {
+          if (contact.regexScripts && Array.isArray(contact.regexScripts)) {
+            let hasChanges = false;
+            
+            contact.regexScripts.forEach(script => {
+              // 移除所有 \n（换行符）
+              const originalFindRegex = script.findRegex;
+              script.findRegex = script.findRegex.replace(/\\n/g, '');
+              
+              if (originalFindRegex !== script.findRegex) {
+                console.log(`✅ 修复脚本: ${script.scriptName}`);
+                console.log(`  原始: ${originalFindRegex}`);
+                console.log(`  修复: ${script.findRegex}`);
+                hasChanges = true;
+                scriptCount++;
+              }
+            });
+            
+            if (hasChanges) {
+              fixedCount++;
+            }
+          }
+        });
+        
+        // 保存回 localStorage
+        localStorage.setItem('characters', JSON.stringify(contacts));
+        
+        showResult(`✅ 成功！修复了 ${fixedCount} 个角色的 ${scriptCount} 个正则脚本\n\n请刷新页面以应用更改`, true);
+        
+        console.log('=== 修复完成 ===');
+        console.log('修复角色数:', fixedCount);
+        console.log('修复脚本数:', scriptCount);
+        
+      } catch (error) {
+        showResult('❌ 修复失败: ' + error.message, false);
+        console.error(error);
+      }
+    }
+  </script>
+</body>
+</html>

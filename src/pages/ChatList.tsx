@@ -129,37 +129,9 @@ const ChatList = () => {
     }
   }, [chatsLoaded])
 
-  // 安全保存聊天列表到 IndexedDB（带完整错误处理）
-  useEffect(() => {
-    if (!chatsLoaded || chats.length === 0) return
-    
-    const saveChats = async () => {
-      try {
-        // 保存到 IndexedDB
-        await setIndexedDBItem(STORES.SETTINGS, {
-          key: 'chatList',
-          chats: chats
-        })
-        console.log(`💾 [IndexedDB] 已保存 ${chats.length} 个聊天`)
-      } catch (error) {
-        console.error('💥 IndexedDB 保存失败，尝试 localStorage 降级:', error)
-        
-        // 降级：尝试保存到 localStorage（限制数据量）
-        try {
-          // 只保留最近100个聊天
-          const limitedChats = chats.slice(0, 100)
-          localStorage.setItem('chatList', JSON.stringify(limitedChats))
-          console.log('⚠️ 已降级保存到 localStorage（限制100个）')
-        } catch (localError) {
-          console.error('❌ localStorage 也失败，但不删除数据！保留内存中的数据', localError)
-          // 关键：不删除数据，只是无法持久化
-          alert('⚠️ 存储空间不足，聊天列表可能无法保存。请清理浏览器缓存或导出重要数据。')
-        }
-      }
-    }
-    
-    saveChats()
-  }, [chats, chatsLoaded])
+  // ❌ 已移除重复的保存逻辑（保留第236-252行的简单保存）
+  // 原逻辑有bug：`chats.length === 0` 会阻止保存空列表，导致群聊丢失
+  // 新的保存逻辑在第236-252行，允许保存空列表
 
   // 同步群聊到聊天列表（新增和更新）
   useEffect(() => {
@@ -232,7 +204,7 @@ const ChatList = () => {
     })
   }, [groups])
 
-  // 保存聊天列表到 IndexedDB
+  // 保存聊天列表到 IndexedDB（允许保存空列表）
   useEffect(() => {
     if (!chatsLoaded) return // 只有在初始加载完成后才保存
 
@@ -244,7 +216,19 @@ const ChatList = () => {
         })
         console.log(`💾 聊天列表已保存到 IndexedDB (${chats.length} 个聊天)`)
       } catch (error) {
-        console.error('💥 保存聊天列表失败:', error)
+        console.error('💥 IndexedDB 保存失败，尝试 localStorage 降级:', error)
+        
+        // 降级：尝试保存到 localStorage（限制数据量）
+        try {
+          // 只保留最近100个聊天
+          const limitedChats = chats.slice(0, 100)
+          localStorage.setItem('chatList', JSON.stringify(limitedChats))
+          console.log('⚠️ 已降级保存到 localStorage（限制100个）')
+        } catch (localError) {
+          console.error('❌ localStorage 也失败，但不删除数据！保留内存中的数据', localError)
+          // 关键：不删除数据，只是无法持久化
+          alert('⚠️ 存储空间不足，聊天列表可能无法保存。请清理浏览器缓存或导出重要数据。')
+        }
       }
     }
 

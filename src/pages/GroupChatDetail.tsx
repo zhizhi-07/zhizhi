@@ -293,15 +293,25 @@ const GroupChatDetail = () => {
         setIsAiTyping(true)
         console.log('🤖 触发AI自由对话 - 使用剧本导演模式')
 
-        // 1. 准备成员信息（包含身份和头衔）
+        // 1. 准备成员信息（包含完整人设）
         const memberProfiles: GroupMemberProfile[] = group.members.map(member => {
           const character = member.type === 'character' ? getCharacter(member.id) : null
+          
+          // 拼接完整人设（所有字段）
+          const fullPersonality = [
+            character?.description,
+            character?.personality,
+            character?.scenario,
+            character?.systemPrompt,
+            character?.postHistoryInstructions
+          ].filter(Boolean).join('\n\n')
+          
           return {
             id: member.id,
             name: member.name,
             avatar: member.avatar,
             type: member.type,
-            description: character?.description || character?.signature || '',
+            description: fullPersonality || character?.signature || '一个角色',
             role: member.role,
             title: member.title
           }
@@ -812,20 +822,13 @@ const GroupChatDetail = () => {
     // 先让AI抢红包
     await handleAiGrabRedEnvelopes()
     
-    // 检查是否启用剧本导演模式（默认启用）
-    const useDirector = localStorage.getItem(`group_use_director_${id}`) !== 'false'
-    
     // 获取最后一条用户消息
     const lastUserMessage = [...messages].reverse().find(msg => msg.senderType === 'user' && msg.messageType === 'text')
     
     // 如果有用户消息，就回复用户消息；否则让AI主动聊天
     if (lastUserMessage) {
-      // 回复用户的消息
-      if (useDirector) {
-        await handleAiRepliesWithDirector(lastUserMessage)
-      } else {
-        await handleAiReplies(lastUserMessage)
-      }
+      // 回复用户的消息（强制使用导演系统）
+      await handleAiRepliesWithDirector(lastUserMessage)
     } else {
       // 空群聊或没有用户消息，让AI们主动聊天
       const promptHint = '(群里比较安静，AI们可以主动打招呼、聊聊天、分享自己的事情)'
@@ -846,11 +849,8 @@ const GroupChatDetail = () => {
         messageType: 'text'
       }
 
-      if (useDirector) {
-        await handleAiRepliesWithDirector(virtualMessage)
-      } else {
-        await handleAiReplies(virtualMessage)
-      }
+      // 强制使用导演系统
+      await handleAiRepliesWithDirector(virtualMessage)
     }
   }
 
@@ -948,15 +948,25 @@ const GroupChatDetail = () => {
     setIsAiTyping(true)
     
     try {
-      // 1. 准备成员信息（包含身份和头衔）
+      // 1. 准备成员信息（包含完整人设）
       const memberProfiles: GroupMemberProfile[] = group.members.map(member => {
         const character = member.type === 'character' ? getCharacter(member.id) : null
+        
+        // 拼接完整人设（所有字段）
+        const fullPersonality = [
+          character?.description,
+          character?.personality,
+          character?.scenario,
+          character?.systemPrompt,
+          character?.postHistoryInstructions
+        ].filter(Boolean).join('\n\n')
+        
         return {
           id: member.id,
           name: member.name,
           avatar: member.avatar,
           type: member.type,
-          description: character?.description || character?.signature || '',
+          description: fullPersonality || character?.signature || '一个角色',
           role: member.role,
           title: member.title
         }

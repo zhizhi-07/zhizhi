@@ -309,6 +309,7 @@ export function convertCharacterCardToInternal(
   exampleMessages?: string
   systemPrompt?: string
   characterBook?: any
+  regexScripts?: any[]  // 新增：正则表达式脚本
   alternateGreetings?: string[]
   tags?: string[]
   creator?: string
@@ -380,6 +381,23 @@ export function convertCharacterCardToInternal(
   }
   console.log('📝 导入了', offlineGreetings.length, '个线下开场白')
   
+  // 提取正则表达式脚本（SillyTavern Regex Scripts）
+  let regexScripts: any[] | undefined = undefined
+  if ('extensions' in data && data.extensions && typeof data.extensions === 'object') {
+    const ext = data.extensions as any
+    // 检查 regex_scripts（SillyTavern的存储位置）
+    if (ext.regex_scripts && Array.isArray(ext.regex_scripts)) {
+      const filtered = ext.regex_scripts.filter((script: any) => script && !script.disabled)
+      if (filtered.length > 0) {
+        regexScripts = filtered
+        console.log('🔧 导入了', filtered.length, '个正则脚本')
+        filtered.forEach((script: any, index: number) => {
+          console.log(`  ${index + 1}. ${script.scriptName || '未命名'}: ${script.findRegex} → ${script.replaceString}`)
+        })
+      }
+    }
+  }
+  
   const result = {
     name: data.name.trim(),
     username: `wxid_${Date.now().toString().slice(-8)}`, // 自动生成
@@ -393,6 +411,7 @@ export function convertCharacterCardToInternal(
     exampleMessages: data.mes_example,
     systemPrompt: 'system_prompt' in data ? data.system_prompt : undefined,
     characterBook: cleanedCharacterBook,
+    regexScripts: regexScripts,  // 新增：正则表达式脚本（从ST导入）
     alternateGreetings: 'alternate_greetings' in data ? data.alternate_greetings : undefined,
     tags: 'tags' in data ? data.tags : undefined,
     creator: 'creator' in data ? data.creator : undefined,

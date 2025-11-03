@@ -45,9 +45,11 @@ export function incrementUnread(chatId: string, count: number = 1, type: 'single
   const data = getUnreadData()
   const current = data.get(chatId)
   
+  let newCount = count
   if (current) {
     current.count += count
     current.lastUpdate = Date.now()
+    newCount = current.count
   } else {
     data.set(chatId, {
       chatId,
@@ -59,10 +61,10 @@ export function incrementUnread(chatId: string, count: number = 1, type: 'single
   
   saveUnreadData(data)
   
-  // 更新聊天列表
-  updateChatListUnread(chatId, current ? current.count : count, type)
+  // 更新聊天列表（使用新的总数）
+  updateChatListUnread(chatId, newCount, type)
   
-  console.log(`📬 [${type}] 未读消息 +${count}: ${chatId}, 总计: ${current ? current.count : count}`)
+  console.log(`📬 [${type}] 未读消息 +${count}: ${chatId}, 总计: ${newCount}`)
 }
 
 /**

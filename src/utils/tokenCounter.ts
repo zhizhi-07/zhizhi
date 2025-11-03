@@ -30,6 +30,7 @@ export function estimateTokens(text: string): number {
  */
 export interface TokenStats {
   systemPrompt: number
+  character: number  // 角色信息占用
   lorebook: number
   messages: number
   total: number
@@ -41,18 +42,21 @@ export function calculateContextTokens(
   systemPrompt: string,
   lorebookContext: string,
   messages: string[],
-  contextLimit: number = 8000
+  contextLimit: number = 8000,
+  characterInfo?: string  // 角色信息（personality, scenario等）
 ): TokenStats {
   const systemTokens = estimateTokens(systemPrompt)
+  const characterTokens = characterInfo ? estimateTokens(characterInfo) : 0
   const lorebookTokens = estimateTokens(lorebookContext)
   const messageTokens = messages.reduce((sum, msg) => sum + estimateTokens(msg), 0)
   
-  const total = systemTokens + lorebookTokens + messageTokens
+  const total = systemTokens + characterTokens + lorebookTokens + messageTokens
   const remaining = Math.max(0, contextLimit - total)
   const percentage = Math.min(100, (total / contextLimit) * 100)
   
   return {
     systemPrompt: systemTokens,
+    character: characterTokens,
     lorebook: lorebookTokens,
     messages: messageTokens,
     total,

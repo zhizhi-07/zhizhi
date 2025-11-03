@@ -34,11 +34,27 @@ export interface Character {
   postHistoryInstructions?: string
   alternateGreetings?: string[]
   characterBook?: any
+  regexScripts?: RegexScript[]  // 正则表达式脚本（从SillyTavern导入）
   tags?: string[]
   creator?: string
   characterVersion?: string
   onlineGreeting?: string
   offlineGreetings?: string[]
+}
+
+// 正则表达式脚本（SillyTavern格式）
+export interface RegexScript {
+  scriptName: string      // 脚本名称
+  findRegex: string       // 查找的正则表达式
+  replaceString: string   // 替换的字符串
+  trimStrings: boolean    // 是否修剪空白
+  disabled: boolean       // 是否禁用
+  markdownOnly: boolean   // 仅在markdown模式
+  promptOnly: boolean     // 仅在提示词中
+  runOnEdit: boolean      // 编辑时运行
+  substituteRegex: boolean // 使用正则替换
+  min_depth?: number      // 最小深度
+  max_depth?: number      // 最大深度
 }
 
 // ==================== Context 定义 ====================
@@ -176,7 +192,8 @@ export const ContactsProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     safeSetItem('characters', characters)
-    IDB.setItem(IDB.STORES.CHARACTERS, 'all', characters).catch(console.error)
+    // IndexedDB: 保存到SETTINGS存储，key为'characters'
+    IDB.setItem(IDB.STORES.SETTINGS, { key: 'characters', data: characters }).catch(console.error)
   }, [characters])
 
   // ========== 用户方法 ==========

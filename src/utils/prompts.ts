@@ -1,3 +1,6 @@
+import { applyRegexToPrompt } from './regexEngine'
+import type { RegexScript } from '../context/ContactsContext'
+
 // ST标准模板变量替换函数
 export function replaceVars(
   text: string, 
@@ -64,7 +67,8 @@ export const buildRoleplayPrompt = (
   coupleSpaceContent?: string,
   enableProactiveCalls?: boolean,
   userAppearance?: string,  // 用户外貌描述（通过识图获得）
-  characterAvatar?: string  // AI自己的头像描述
+  characterAvatar?: string,  // AI自己的头像描述
+  regexScripts?: RegexScript[]  // 正则表达式脚本
 ) => {
   const now = new Date()
   const dateStr = now.toLocaleDateString('zh-CN', { 
@@ -168,7 +172,7 @@ ${character.userInfo ? `${character.userInfo}\n\n` : ''}💡 这些是已知信�
 你的性格是稳定的。基于上面的对话历史，保持情绪和态度的自然过渡。
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
 
-  return `${roleInfo}
+  const basePrompt = `${roleInfo}
 
 ## 当前状态
 时间：${dateStr} ${timeOfDay} ${currentTime}
@@ -296,6 +300,15 @@ ${memePrompt}
 现在，基于上面的对话历史，用你的性格自然地回复 ${user.name}。
 
 记住：你是真实的人，不是AI。像在手机上和朋友聊天一样，轻松、真实、随意。`
+  
+  // 应用正则表达式脚本（如果有的话）
+  const finalPrompt = applyRegexToPrompt(basePrompt, regexScripts, {
+    characterName: character.name,
+    userName: user.name,
+    date: now
+  })
+  
+  return finalPrompt
 }
 
 // 生成拉黑警告提示词

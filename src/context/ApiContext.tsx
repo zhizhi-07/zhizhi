@@ -37,7 +37,7 @@ const hiApiConfig: ApiConfig = {
   model: 'gemini-2.5-pro',
   provider: 'openai', // OpenAI格式的Gemini代理
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 8000,
   createdAt: new Date().toISOString()
 }
 
@@ -50,7 +50,7 @@ const geminiProxyConfig: ApiConfig = {
   model: 'gemini-2.5-pro',
   provider: 'google', // 真正的Google API格式
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 8000,
   createdAt: new Date().toISOString()
 }
 
@@ -63,7 +63,7 @@ const defaultApiConfig: ApiConfig = {
   model: 'deepseek-ai/DeepSeek-V3',
   provider: 'siliconflow',
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 8000,
   createdAt: new Date().toISOString()
 }
 
@@ -76,7 +76,7 @@ const jiubanApiConfig: ApiConfig = {
   model: 'gemini-2.5-pro',
   provider: 'openai', // OpenAI格式的Gemini代理
   temperature: 0.7,
-  maxTokens: 2000,
+  maxTokens: 8000,
   createdAt: new Date().toISOString()
 }
 
@@ -115,6 +115,27 @@ export const ApiProvider = ({ children }: { children: ReactNode }) => {
       // 标记已迁移
       localStorage.setItem('api_migrated_to_multi', 'true')
       console.log('✅ API配置已迁移到新的多API系统')
+    }
+    
+    // 强制更新maxTokens到8000（一次性迁移）
+    const tokensMigrated = localStorage.getItem('api_maxTokens_migrated_v2')
+    if (!tokensMigrated) {
+      console.log('🔄 更新maxTokens到8000...')
+      
+      // 清除旧的apiSettings
+      localStorage.removeItem('apiSettings')
+      
+      // 清除旧的apiConfigs，强制使用新配置
+      localStorage.removeItem('apiConfigs')
+      
+      // 标记已迁移
+      localStorage.setItem('api_maxTokens_migrated_v2', 'true')
+      console.log('✅ maxTokens已更新到8000，请刷新页面')
+      
+      // 刷新页面以应用新配置
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
     }
   }, [])
 
